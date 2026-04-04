@@ -21400,7 +21400,12 @@ function prendreCarteNationPourRafraichissement() {
     jeu.joueurZones.cartePleineVisible = null;
     jeu.joueurZones.pileRafraichissementNationEpuisee = true;
 
-    passerJoueurEnEmpire();
+    if (configurationPartie.nationJoueur === "Vikings") {
+      declencherDecompte();
+    } else {
+      passerJoueurEnEmpire();
+    }
+
     return cartePleine;
   }
 
