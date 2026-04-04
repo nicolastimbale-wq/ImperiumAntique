@@ -1,0 +1,19 @@
+# Dossiers à ignorer
+node_modules/
+dist/
+build/
+
+# Electron
+*.exe
+*.asar
+win-unpacked/
+
+# Logs
+*.log
+
+# Système
+Thumbs.db
+.DS_Store
+
+# Optionnel
+*.zip

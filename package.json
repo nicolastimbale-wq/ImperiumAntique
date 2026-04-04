@@ -1,0 +1,21 @@
+{
+  "name": "imperium",
+  "version": "1.0.0",
+  "description": "Jeu Imperium desktop",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "dist": "electron-builder"
+  },
+  "devDependencies": {
+    "electron": "30.0.0",
+    "electron-builder": "24.0.0"
+  },
+  "build": {
+    "appId": "com.imperium.jeu",
+    "productName": "Imperium",
+    "win": {
+      "target": "nsis"
+    }
+  }
+}

@@ -1,0 +1,393 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <title>Imperium</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+  <div id="app">
+
+    <div id="bloc-compteurs-global" class="ui-cachee">
+      <div class="compteur-joueur">
+        <img src="icons/jeton-action.png" class="icone-compteur-personnalisee">
+        <span id="valeur-actions">3</span>
+      </div>
+
+      <div class="compteur-joueur">
+        <img src="icons/jeton-epuisement.png" class="icone-compteur-personnalisee">
+        <span id="valeur-epuisement">0</span>
+      </div>
+
+      <div class="compteur-joueur">
+        <img src="icons/imperium-population.png" class="icone-compteur-ressource">
+        <span id="valeur-population">2</span>
+      </div>
+
+      <div class="compteur-joueur">
+        <img src="icons/imperium-materiaux.png" class="icone-compteur-ressource">
+        <span id="valeur-materiaux">3</span>
+      </div>
+
+      <div class="compteur-joueur">
+        <img src="icons/imperium-progres.png" class="icone-compteur-ressource">
+        <span id="valeur-progres">1</span>
+      </div>
+    </div>
+
+    
+
+    
+
+   <div id="bloc-controles-tour" class="ui-cachee">
+  <button id="btn-vue-marche">Marché</button>
+  <button id="btn-vue-joueur">Joueur</button>
+  <button id="btn-vue-bot">Bot</button>
+
+  <button id="btn-pacifier">Pacifier</button>
+  <button id="btn-innover-tour">Innover</button>
+  <button id="btn-fin-tour">Fin du tour</button>
+  <button id="btn-fin-nettoyage">Terminer nettoyage</button>
+  <button id="btn-commencer-tour-bot" disabled>Commencer tour Bot</button>
+  <button id="btn-fin-solstice">Fin Solstice</button>
+</div>
+
+    <div id="vue-accueil" class="vue-active">
+  <div class="menu-accueil">
+    <h1 class="titre-accueil">Imperium</h1>
+    <p class="sous-titre-accueil">Choisissez votre nation et préparez la partie</p>
+
+    <div class="bloc-choix">
+      <label for="choix-nation-joueur">Nation du joueur</label>
+      <select id="choix-nation-joueur"></select>
+    </div>
+
+    <div class="bloc-choix">
+      <label for="choix-nation-bot">Nation du bot</label>
+      <select id="choix-nation-bot"></select>
+    </div>
+
+    <div class="bloc-choix">
+      <label for="choix-difficulte-bot">Difficulté</label>
+      <select id="choix-difficulte-bot">
+        <option value="facile">Facile</option>
+        <option value="normal">Normal</option>
+        <option value="difficile">Difficile</option>
+      </select>
+    </div>
+
+    <button class="bouton-accueil" onclick="commencerNouvellePartie()">
+      Commencer la partie
+    </button>
+</div>
+</div>
+    <section id="vue-marche" class="vue-cachee">
+      <section id="zone-marche">
+        <div id="marche-wrapper">
+          <div id="marche-scale">
+            <div id="haut-marche"></div>
+
+            <div id="zone-indicateurs-et-exil">
+              <div id="barre-indicateurs"></div>
+              <div id="pile-exil"></div>
+            </div>
+
+            <div id="bas-marche"></div>
+          </div>
+        </div>
+      </section>
+    </section>
+
+    <section id="vue-joueur" class="vue-cachee">
+      <section id="zone-joueur">
+        <div id="fond-joueur">
+          <div id="joueur-wrapper">
+            <div id="joueur-scale">
+
+              <div id="bloc-zone-joueur">
+                <div id="slot-statut" class="slot-joueur"></div>
+                <div id="slot-etoile" class="slot-joueur"></div>
+                <div id="slot-pleine" class="slot-joueur"></div>
+                <div id="slot-croissant" class="slot-joueur"></div>
+                <div id="slot-puissance" class="slot-joueur"></div>
+                <div id="slot-base" class="slot-joueur"></div>
+                <div id="slot-defausse" class="slot-joueur"></div>
+                <div id="bloc-compteurs-joueur"></div>
+              </div>
+
+              <div id="bloc-main-joueur">
+                <div id="slot-main"></div>
+              </div>
+
+              <div id="bloc-tableau-joueur">
+                <div class="titre-tableau-joueur"></div>
+                <div id="contenu-tableau-joueur"></div>
+              </div>
+
+            </div>
+          </div>
+        </div>
+      </section>
+    </section>
+
+  <!-- =========================================================
+     VUE BOT
+     ========================================================= -->
+
+<section id="vue-bot" class="vue-cachee">
+  <div id="bot-wrapper">
+    <div id="bot-scale">
+      <section id="zone-bot">
+
+        <div id="bot-layout">
+
+          <!-- COLONNE GAUCHE -->
+          <div id="bot-zone-gauche">
+
+            <div id="bloc-compteurs-bot" class="bloc-bot">
+              <h2>Bot</h2>
+              <div class="ligne-compteurs-bot">
+                <div class="compteur-bot">Population : <span id="bot-population">0</span></div>
+                <div class="compteur-bot">Matériaux : <span id="bot-materiaux">0</span></div>
+                <div class="compteur-bot">Progrès : <span id="bot-progres">0</span></div>
+              </div>
+            </div>
+
+            <div id="bloc-emplacements-bot" class="bloc-bot">
+              <div id="grille-emplacements-bot" class="grille-emplacements-bot">
+                <div class="colonne-emplacement-bot">
+                  <div class="titre-mini-zone marqueur-bot">1</div>
+                  <div id="bot-emplacement-1" class="slot-carte-bot"></div>
+                </div>
+
+                <div class="colonne-emplacement-bot">
+                  <div class="titre-mini-zone marqueur-bot">2</div>
+                  <div id="bot-emplacement-2" class="slot-carte-bot"></div>
+                </div>
+
+                <div class="colonne-emplacement-bot">
+                  <div class="titre-mini-zone marqueur-bot">3</div>
+                  <div id="bot-emplacement-3" class="slot-carte-bot"></div>
+                </div>
+
+                <div class="colonne-emplacement-bot">
+                  <div class="titre-mini-zone marqueur-bot">4</div>
+                  <div id="bot-emplacement-4" class="slot-carte-bot"></div>
+                </div>
+
+                <div class="colonne-emplacement-bot">
+                  <div class="titre-mini-zone marqueur-bot">5</div>
+                  <div id="bot-emplacement-5" class="slot-carte-bot"></div>
+                </div>
+              </div>
+            </div>
+
+            <div id="bloc-bas-bot" class="bloc-bot">
+              <div id="ligne-bas-bot" class="ligne-bas-bot">
+
+                <div class="pile-bot">
+                  <div class="titre-mini-zone">Statut</div>
+                  <div id="bot-carte-statut" class="slot-carte-bot slot-bot-grand"></div>
+                </div>
+
+                <div class="pile-bot">
+                  <div class="titre-mini-zone">Puissance</div>
+                  <div id="bot-carte-puissance" class="slot-carte-bot slot-bot-grand"></div>
+                </div>
+
+                <div class="pile-bot">
+                  <div class="titre-mini-zone">Dynastie</div>
+                  <div id="bot-pioche-dynastie" class="pile-bot-visuelle slot-bot-grand"></div>
+                  <div id="bot-pioche-dynastie-compteur" class="compteur-mini-bot">0</div>
+                </div>
+
+                <div class="pile-bot">
+                  <div class="titre-mini-zone">Deck C.I.V.</div>
+                  <div id="bot-deck-civ" class="pile-bot-visuelle slot-bot-grand"></div>
+                  <div id="bot-deck-civ-compteur" class="compteur-mini-bot">0</div>
+                </div>
+
+                <div class="pile-bot">
+                  <div class="titre-mini-zone">Défausse</div>
+                  <div id="bot-defausse" class="pile-bot-visuelle slot-bot-grand"></div>
+                  <div id="bot-defausse-compteur" class="compteur-mini-bot">0</div>
+                </div>
+
+              </div>
+            </div>
+
+          </div>
+
+          <!-- COLONNE DROITE -->
+          <div id="bot-zone-droite">
+            <div id="bloc-tableau-bot">
+              <div id="bot-tableau"></div>
+            </div>
+          </div>
+
+        </div>
+
+      </section>
+    </div>
+  </div>
+</section>
+
+<!-- =========================================================
+     PANNEAU BOT
+     ========================================================= -->
+
+<div id="panneau-bot" class="panneau-ui-cache">
+  <div id="panneau-bot-message"></div>
+  <button id="btn-bot-suivant" type="button">Suivant</button>
+</div>
+
+  <div id="zoom-carte"></div>
+
+  <div id="panneau-defausse" class="panneau-defausse">
+    <div class="boite-defausse">
+      <div class="entete-defausse">
+        <div class="titre-defausse">Défausse</div>
+        <button id="btn-fermer-defausse" class="btn-fermer-defausse">Fermer</button>
+      </div>
+      <div id="contenu-defausse" class="contenu-defausse"></div>
+    </div>
+  </div>
+
+  <div id="panneau-etoile" class="panneau-etoile">
+    <div class="boite-etoile">
+      <div class="entete-etoile">
+        <div class="titre-etoile">Développer une carte Étoile</div>
+        <button id="btn-fermer-etoile" class="btn-fermer-etoile">Annuler</button>
+      </div>
+      <div id="contenu-etoile" class="contenu-etoile"></div>
+    </div>
+  </div>
+
+  <div id="panneau-deck-nation" class="panneau-defausse">
+  <div class="boite-defausse">
+    <div class="entete-defausse">
+      <div class="titre-defausse">Deck Nation</div>
+      <button id="btn-fermer-deck-nation" class="btn-fermer-defausse">Fermer</button>
+    </div>
+    <div id="contenu-deck-nation" class="contenu-defausse"></div>
+  </div>
+</div>
+
+<div id="panneau-deck-joueur" class="panneau-defausse">
+  <div class="boite-defausse">
+    <div class="entete-defausse">
+      <div class="titre-defausse">Deck Joueur</div>
+      <button id="btn-fermer-deck-joueur" class="btn-fermer-defausse">Fermer</button>
+    </div>
+    <div id="contenu-deck-joueur" class="contenu-defausse"></div>
+  </div>
+</div>
+
+  <div id="panneau-choix-texte" class="panneau-ui-cache">
+    <div class="panneau-ui-contenu">
+      <div id="panneau-choix-texte-message"></div>
+      <div id="panneau-choix-texte-options"></div>
+      <div id="panneau-choix-texte-actions">
+        <button id="btn-annuler-choix-texte" type="button">Annuler</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="panneau-histoire" class="panneau-defausse">
+  <div class="boite-defausse">
+    <div class="entete-defausse">
+      <div class="titre-defausse">Histoire</div>
+      <button id="btn-fermer-histoire" class="btn-fermer-defausse">Fermer</button>
+    </div>
+    <div id="contenu-histoire" class="contenu-defausse"></div>
+  </div>
+</div>
+
+  <div id="panneau-selection-defausse" class="panneau-defausse">
+    <div class="contenu-panneau-defausse contenu-panneau-selection-defausse">
+      <button id="btn-fermer-selection-defausse" class="btn-fermer-defausse">Fermer</button>
+      <div id="contenu-selection-defausse" class="contenu-selection-defausse"></div>
+    </div>
+  </div>
+
+  <div id="panneau-ui" class="panneau-ui-cache">
+    <div class="panneau-ui-contenu">
+      <div id="panneau-ui-message"></div>
+      <div id="panneau-ui-boutons"></div>
+    </div>
+  </div>
+
+  <div id="panneau-choix-marche-selection" class="panneau-ui-cache">
+  <div class="panneau-ui-contenu">
+    <div id="panneau-choix-marche-selection-message"></div>
+    <div>
+      <button id="btn-fermer-choix-marche-selection">OK</button>
+    </div>
+  </div>
+</div>
+
+  <div id="panneau-exil" class="panneau-defausse">
+  <div class="boite-defausse">
+    <div class="entete-defausse">
+      <div class="titre-defausse">Exil</div>
+      <button id="btn-fermer-exil" class="btn-fermer-defausse">Fermer</button>
+    </div>
+    <div id="contenu-exil" class="contenu-defausse"></div>
+  </div>
+</div>
+
+  <audio id="musique-fond"></audio>
+
+<div id="bloc-musique">
+  <button id="btn-musique">🔊 Musique</button>
+  <button id="btn-musique-suivante">⏭️ Suivante</button>
+</div>
+
+  <div id="panneau-choix-carte" class="panneau-ui-cache">
+  <div class="panneau-ui-contenu">
+    <div id="panneau-choix-carte-message"></div>
+    <div>
+      <button id="btn-annuler-choix-carte">Annuler</button>
+    </div>
+  </div>
+</div>
+<div id="panneau-archiver" class="panneau-defausse">
+  <div class="boite-defausse">
+    <div class="entete-defausse">
+      <div class="titre-defausse">Archiver une carte</div>
+      <button id="btn-fermer-archiver" class="btn-fermer-defausse">Fermer</button>
+    </div>
+
+    <div id="contenu-archiver" class="contenu-archiver">
+      <div class="bloc-archiver-zone">
+        <div class="titre-zone-archiver">Main</div>
+        <div id="contenu-archiver-main" class="contenu-selection-defausse"></div>
+      </div>
+
+      <div class="bloc-archiver-zone">
+        <div class="titre-zone-archiver">Défausse</div>
+        <div id="contenu-archiver-defausse" class="contenu-selection-defausse"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+
+
+  <!-- -----DEBUG----- -->
+  <!--<div id="panneau-debug-cartes">
+  <div class="debug-ligne">
+    <input id="debug-recherche-carte" type="text" placeholder="Nom de carte..." />
+    <button id="debug-btn-rechercher">Rechercher</button>
+    <button id="debug-btn-ajouter-main">Ajouter à la main</button>
+    <button id="debug-btn-boost">+5 ressources / +5 actions / reset épuisement</button>
+    <button id="debug-btn-barbare">Passer en Barbare</button>
+    <button id="debug-btn-empire">Passer en Empire</button>
+  </div>
+  <div id="debug-resultats-cartes"></div>
+</div>   -->
+
+  <script src="cards.js"></script>
+</body>
+</html>

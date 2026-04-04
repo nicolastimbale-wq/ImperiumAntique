@@ -1,0 +1,2986 @@
+/* =========================================================
+   1) PAGE GÉNÉRALE
+   ========================================================= */
+
+html, body {
+  margin: 0;
+  padding: 0;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+}
+
+body {
+  font-family: Arial, sans-serif;
+  background: #f4f4f4;
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+}
+
+#app {
+  width: 100%;
+  height: 100vh;
+  overflow: hidden;
+}
+
+#vue-marche,
+#vue-joueur,
+#vue-bot {
+  width: 100%;
+  height: 100vh;
+  overflow: hidden;
+}
+
+#vue-joueur {
+  width: 100%;
+  min-height: 0;
+  background-image: url("assets/backgrounds/fond-joueur.png");
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  min-height: 100vh;
+}
+
+
+
+
+
+  :root {
+  --carte-largeur: 260px;
+  --carte-scale: 0.80;
+  --offset-compteur: 6px;
+  --scale-zones-joueur: 0.95;
+}
+
+
+
+/* =========================================================
+   2) AFFICHAGE / MASQUAGE DES VUES
+   ========================================================= */
+
+.vue-active {
+  flex: 1;
+  display: block;
+}
+
+.vue-cachee {
+  display: none!important;
+}
+
+.ui-cachee {
+  display: none !important;
+}
+
+
+/* =========================================================
+   3) VUE MARCHÉ
+   ========================================================= */
+
+#zone-marche {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+   background-image: url("assets/backgrounds/fond-marche.png");
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  
+}
+
+#zone-marche::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: rgba(255,255,255,0.15); /* ou rgba(0,0,0,0.2) */
+  pointer-events: none;
+}
+
+#marche-wrapper {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+}
+
+#marche-scale {
+  position: absolute;
+  top: 0;
+  left: 50%;
+  width: fit-content;
+  transform-origin: top center;
+}
+
+
+/* =========================================================
+   4) VUE JOUEUR
+   ========================================================= */
+
+
+
+#vue-joueur.vue-active {
+  display: flex;
+  flex: 1;
+}
+
+#zone-joueur {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  min-height: 0;
+}
+
+#joueur-wrapper {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+}
+
+#joueur-scale {
+  position: absolute;
+  top: 0;
+  left: 50%;
+  width: 1980px;
+  height: 1250px;
+  background: transparent;
+  border: none;
+  box-sizing: border-box;
+  transform-origin: top center;
+  
+}
+
+
+/* =========================================================
+   5) CARTE STANDARD - CONTENEUR
+   ========================================================= */
+
+.carte {
+  position: relative;
+  width: 260px;
+  height: 420px;
+  background: white;
+  border: 2px solid #222;
+  border-radius: 12px;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  box-sizing: border-box;
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,0.6),
+    0 6px 14px rgba(0,0,0,0.22),
+    0 2px 4px rgba(0,0,0,0.12);
+
+}
+
+
+/* =========================================================
+   6) CARTE STANDARD - HAUT DE CARTE
+   ========================================================= */
+
+.bandeau {
+  display: grid;
+  grid-template-columns: 30px 1fr 30px;
+  align-items: center;
+  padding: 6px 8px;
+  font-weight: bold;
+  font-size: 17px;
+}
+
+.pin {
+  text-align: center;
+  font-size: 20px;
+  line-height: 1;
+}
+
+.nom {
+  text-align: center;
+}
+
+
+/* =========================================================
+   7) CARTE STANDARD - ZONE SOUS BANDEAU
+   ========================================================= */
+
+.zone-sous-bandeau {
+  display: grid;
+  grid-template-columns: 35px 1fr 35px;
+  align-items: start;
+  min-height: 42px;
+  padding: 4px 6px 0 6px;
+}
+
+.zone-gauche,
+.zone-centre,
+.zone-droite {
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+}
+
+.statut {
+  font-size: 18px;
+  line-height: 1;
+}
+
+.symbole-centre {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 8px;
+  font-size: 22px;
+  line-height: 1;
+}
+
+
+/* =========================================================
+   8) CARTE STANDARD - TEXTE D’EFFET
+   ========================================================= */
+
+.effet {
+  flex-grow: 1;
+  padding: 10px 12px 4px 12px;
+  line-height: 1.2;
+  overflow: hidden;
+}
+
+.effet.normal {
+  font-size: 18px;
+}
+
+.effet.petit {
+  font-size: 15px;
+}
+
+.effet.tres-petit {
+  font-size: 13px;
+}
+
+
+/* =========================================================
+   8B) CARTE STANDARD - COÛT DE DÉVELOPPEMENT
+   ========================================================= */
+
+.cout-developpement {
+  margin: 0 12px 6px 12px;
+  padding: 8px 10px;
+  border: 2px solid #222;
+  border-radius: 8px;
+  background: #f7f7f7;
+  font-size: 14px;
+  line-height: 1.25;
+  box-sizing: border-box;
+}
+
+.cout-developpement strong {
+  font-size: 13px;
+}
+
+
+/* =========================================================
+   9) CARTE STANDARD - BAS DE CARTE
+   ========================================================= */
+
+.bas {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.categorie {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  bottom: 6px;
+  font-size: 22px;
+  display: flex;
+  gap: 6px;
+}
+
+.zone-victoire {
+  display: flex;
+  align-items: flex-end;
+  justify-content: flex-end;
+  gap: 5px;
+  width: 90px;
+  margin-left: auto;
+}
+
+.condition-victoire {
+  font-size: 11px;
+  line-height: 1.2;
+  text-align: right;
+  max-width: 80px;
+  word-break: break-word;
+}
+
+.points-victoire {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 26px;
+  min-height: 26px;
+  font-size: 13px;
+  font-weight: bold;
+  flex-shrink: 0;
+}
+
+
+/* =========================================================
+   10) CARTE NATION - COIN INFÉRIEUR GAUCHE
+   ========================================================= */
+
+.coin-nation {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  width: 60px;
+  height: 60px;
+}
+
+.triangle-nation {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  width: 60px;
+  height: 60px;
+  clip-path: polygon(0 100%, 0 0, 100% 100%);
+  display: flex;
+  align-items: flex-end;
+  justify-content: flex-start;
+  padding: 8px;
+  box-sizing: border-box;
+}
+
+.icone-localisation {
+  width: 22px;
+  height: 22px;
+}
+
+
+/* =========================================================
+   11) ICÔNES GÉNÉRALES
+   ========================================================= */
+
+.icone {
+  width: 32px;
+  height: 32px;
+}
+
+.icone-centre {
+  width: 32px;
+  height: 32px;
+}
+
+.icone-categorie {
+  width: 32px;
+  height: 32px;
+}
+
+.icone-pv {
+  width: 32px;
+  height: 32px;
+  display: block;
+}
+
+.icone-region {
+  display: inline-block;
+}
+
+.icone-ressource {
+  width: 16px;
+  height: 16px;
+  object-fit: contain;
+  vertical-align: middle;
+  margin: 0 2px;
+}
+
+.condition-victoire .icone-ressource {
+  width: 12px;
+  height: 12px;
+  margin: 0 2px;
+  vertical-align: middle;
+}
+
+
+/* =========================================================
+   12) ICÔNE SPÉCIALE - PUISSANCE
+   ========================================================= */
+
+.icone-puissance {
+  position: relative;
+  width: 18px;
+  height: 18px;
+  display: block;
+}
+
+.icone-puissance::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 3px;
+  width: 10px;
+  height: 10px;
+  background: white;
+}
+
+.icone-puissance::after {
+  content: "";
+  position: absolute;
+  bottom: 0;
+  left: 1px;
+  width: 14px;
+  height: 5px;
+  background: white;
+}
+
+
+/* =========================================================
+   13) MARCHÉ - HAUT (PIOCHES)
+   ========================================================= */
+
+#haut-marche {
+  display: grid;
+  grid-template-columns: 430px 220px 220px 220px 220px;
+  column-gap: 30px;
+  align-items: end;
+  width: fit-content;
+}
+
+.colonne-marche {
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  min-height: 360px;
+  margin-bottom: -120px;
+}
+
+.bloc-pioche {
+  width: 180px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 10px;
+  box-sizing: border-box;
+}
+
+.bloc-pioche.principale {
+  width: 180px;
+}
+
+.dos-pioche {
+  position: relative;
+  width: 260px;
+  height: 420px;
+  background: #444;
+  border: 2px solid #222;
+  border-radius: 12px;
+  box-sizing: border-box;
+  transform: translateY(80px) scale(0.80);
+  transform-origin: top center;
+}
+
+.bloc-pioche.principale .dos-pioche {
+  width: 420px;
+  height: 260px;
+}
+
+.compteur-pioche {
+  position: absolute;
+  right: 8px;
+  bottom: 8px;
+  min-width: 34px;
+  height: 34px;
+  padding: 0 8px;
+  border: 2px solid #222;
+  border-radius: 8px;
+  background: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 20px;
+  font-weight: bold;
+  box-sizing: border-box;
+}
+
+
+/* =========================================================
+   14) MARCHÉ - BARRE DES INDICATEURS
+   ========================================================= */
+
+#barre-indicateurs {
+  margin-top: 16px;
+  border: 3px solid #222;
+  background-image:
+    linear-gradient(rgba(255,255,255,0.30), rgba(255,255,255,0.30)),
+    url("assets/backgrounds/marbre-grece.png");
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  min-height: 70px;
+  display: grid;
+  grid-template-columns: 430px 220px 220px 220px 220px;
+  column-gap: 30px;
+  align-items: center;
+  padding: 10px 16px;
+  box-sizing: border-box;
+  width: fit-content;
+  border-radius: 12px;
+}
+
+.colonne-indicateur {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.indicateur-groupe {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 6px;
+}
+
+.indicateur-case {
+  width: 48px;
+  height: 48px;
+  border: 2px solid black;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  background: transparent;
+  box-sizing: border-box;
+}
+
+.indicateur-case img {
+  width: 42px;
+  height: 42px;
+}
+
+
+/* =========================================================
+   15) MARCHÉ - BAS (STRUCTURE DES COLONNES)
+   ========================================================= */
+
+#bas-marche {
+  margin-top: -100px;
+  display: grid;
+  grid-template-columns: 430px 220px 220px 220px 220px 220px;
+  column-gap: 30px;
+  align-items: start;
+  width: fit-content;
+}F
+
+.colonne-bas-marche {
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  min-height: 340px;
+}
+
+.colonne-bas-double {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  width: 430px;
+}
+
+.slot-zone {
+  width: 205px;
+  display: flex;
+  justify-content: center;
+}
+
+
+/* =========================================================
+   16) MARCHÉ - CARTES VISIBLES DANS LES ZONES
+   ========================================================= */
+
+.zone-cartes-marche {
+  position: relative;
+  width: 180px;
+  height: 330px;
+}
+
+.zone-cartes-marche .carte {
+  transform: scale(var(--carte-scale));
+  transform-origin: top left;
+}
+
+.carte-dessus {
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 2;
+}
+
+.carte-dessous {
+  position: absolute;
+  top: 65px;
+  left: 0;
+  z-index: 1;
+}
+
+
+/* =========================================================
+   17) MARCHÉ - PILE VISIBLE
+   ========================================================= */
+
+.pile-visible {
+  position: relative;
+  width: 180px;
+  height: 330px;
+  overflow: visible;
+}
+
+.pile-visible .carte {
+  transform: scale(var(--carte-scale));
+  transform-origin: top left;
+}
+
+.compteur-pile-mini {
+  position: absolute;
+  left: calc(var(--carte-largeur) * var(--carte-scale) + var(--offset-compteur));
+  bottom: 6px;
+  width: 28px;
+  height: 28px;
+  border: 2px solid black;
+  background: white;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  font-size: 14px;
+  font-weight: bold;
+  box-sizing: border-box;
+}
+
+
+/* =========================================================
+   18) CARTE STATUT
+   ========================================================= */
+
+.carte-statut {
+  width: 260px;
+  height: 420px;
+  border-radius: 10px;
+  overflow: hidden;
+  box-shadow: 0 4px 10px rgba(0,0,0,0.18);
+  border: 1px solid rgba(0,0,0,0.15);
+  display: flex;
+  flex-direction: column;
+}
+
+.carte-statut.barbare {
+  background: #f3d6d1;
+  color: #c94d3f;
+}
+
+.carte-statut.empire {
+  background: #d9e6f2;
+  color: #4c79a8;
+}
+
+.bandeau-statut {
+  height: 26px;
+  color: white;
+  font-weight: bold;
+  font-size: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.zone-sous-bandeau-statut {
+  height: 34px;
+  display: grid;
+  grid-template-columns: 40px 1fr 40px;
+  align-items: center;
+  padding: 0 8px;
+  box-sizing: border-box;
+}
+
+.zone-illustration-statut {
+  flex: 1;
+  margin: 8px 14px;
+  border: 1px solid rgba(255,255,255,0.65);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.illustration-statut {
+  width: 70%;
+  height: 70%;
+}
+
+.bandeau-bas-statut {
+  height: 28px;
+  margin-top: auto;
+}
+
+
+/* =========================================================
+   19) JOUEUR - EMPLACEMENTS DES CARTES ET PILES
+   ========================================================= */
+
+.slot-joueur {
+  position: absolute;
+  box-sizing: border-box;
+  overflow: visible; 
+}
+
+/* Ligne du haut */
+#slot-etoile {
+  left: 0;
+  top: 0;
+  width: 260px;
+  height: 420px;
+  z-index: 1;
+}
+
+#slot-pleine {
+  left: 380px;
+  top: 0;
+  width: 260px;
+  height: 420px;
+  z-index: 1;
+}
+
+#slot-croissant {
+  left: 300px;
+  top: 100px;
+  width: 420px;
+  height: 260px;
+  z-index: 3;
+}
+
+/* Ligne du bas */
+#slot-statut {
+  left: 0;
+  top: 480px;
+  width: 260px;
+  height: 420px;
+  z-index: 1;
+}
+
+#slot-puissance {
+  left: 380px;
+  top: 480px;
+  width: 260px;
+  height: 420px;
+  z-index: 1;
+}
+
+#slot-base {
+  left: 760px;
+  top: 480px;
+  width: 260px;
+  height: 420px;
+  z-index: 1;
+}
+
+#slot-defausse {
+  left: 1140px;
+  top: 480px;
+  width: 260px;
+  height: 420px;
+  z-index: 1;
+}
+
+
+/* =========================================================
+   20) JOUEUR - PILES CACHÉES
+   ========================================================= */
+
+.pile-horizontale-cachee {
+  position: relative;
+  width: 420px;
+  height: 260px;
+}
+
+.dos-carte-horizontale {
+  width: 420px;
+  height: 260px;
+  background: #444;
+  border: 2px solid #222;
+  border-radius: 12px;
+  position: absolute;
+  top: 0;
+  left: 0;
+}
+
+.pile-verticale-cachee {
+  position: relative;
+  width: 260px;
+  height: 420px;
+}
+
+.dos-carte-verticale {
+  width: 260px;
+  height: 420px;
+  background: #444;
+  border: 2px solid #222;
+  border-radius: 12px;
+  position: absolute;
+  top: 0;
+  left: 0;
+}
+
+.compteur-pile-joueur {
+  position: absolute;
+  right: 8px;
+  bottom: 8px;
+  background: rgba(0,0,0,0.85);
+  color: white;
+  padding: 4px 8px;
+  border-radius: 8px;
+  font-weight: bold;
+}
+
+
+/* =========================================================
+   21) JOUEUR - BLOCS PRINCIPAUX
+   ========================================================= */
+
+#bloc-zone-joueur {
+  position: absolute;
+  left: 40px;
+  top: 20px;
+  width: 1420px;
+  height: 920px;
+  overflow:visible;
+}
+
+#bloc-main-joueur {
+  position: absolute;
+  left: 40px;
+  top: 950px;
+  width: 1420px;
+  height: 260px;
+  overflow:visible;
+}
+
+#slot-main {
+  position: relative;
+  width: 1420px;
+  height: 260px;
+  overflow: visible;
+}
+
+.carte-main-joueur {
+  position: absolute;
+  top: 0;
+  transform-origin: bottom center;
+  transition:
+    top 80ms ease-out,
+    transform 80ms ease-out,
+    box-shadow 80ms ease-out;
+}
+
+#bloc-tableau-joueur {
+  position: relative;
+  left: 1750px;
+  top: 120px;
+  width: 600px;
+  height: 1200px;
+  background: transparent;
+  padding: 16px;
+  box-sizing: border-box;
+  overflow: visible;
+}
+
+.titre-tableau-joueur {
+  font-size: 22px;
+  font-weight: bold;
+  margin-bottom: 16px;
+}
+
+#contenu-tableau-joueur {
+  display: grid;
+  grid-template-columns: repeat(4, 120px);
+  grid-template-rows: repeat(6, 180px);
+  gap: 10px;
+  justify-content: start;
+}
+
+.case-tableau-joueur {
+  width: 120px;
+  height: 180px;
+  border: 2px dashed #999;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.45);
+  box-sizing: border-box;
+  position: relative;
+  overflow: hidden;
+}
+
+.case-tableau-joueur .carte,
+#contenu-tableau-joueur .carte {
+  transform: scale(0.42);
+  transform-origin: top left;
+}
+
+/* Nom de carte */
+#contenu-tableau-joueur .nom,
+.case-tableau-joueur .nom {
+  font-size: 26px;
+}
+
+/* Texte d'effet */
+#contenu-tableau-joueur .effet.normal,
+.case-tableau-joueur .effet.normal {
+  font-size: 30px;
+}
+
+#contenu-tableau-joueur .effet.petit,
+.case-tableau-joueur .effet.petit {
+  font-size: 28px;
+}
+
+#contenu-tableau-joueur .effet.tres-petit,
+.case-tableau-joueur .effet.tres-petit {
+  font-size: 20px;
+}
+
+/* Icône catégorie */
+#contenu-tableau-joueur .icone-categorie,
+.case-tableau-joueur .icone-categorie {
+  width: 42px;
+  height: 42px;
+}
+
+/* Icônes de ressource dans le texte */
+#contenu-tableau-joueur .icone-ressource,
+.case-tableau-joueur .icone-ressource {
+  width: 40px;
+  height: 40px;
+}
+
+/* Icônes région PNG */
+#contenu-tableau-joueur img[src*="imperium-sac"],
+#contenu-tableau-joueur img[src*="imperium-ble"],
+#contenu-tableau-joueur img[src*="imperium-eau"],
+.case-tableau-joueur img[src*="imperium-sac"],
+.case-tableau-joueur img[src*="imperium-ble"],
+.case-tableau-joueur img[src*="imperium-eau"] {
+  width: 40px;
+  height: 40px;
+  object-fit: contain;
+}
+
+/* =========================================================
+   ZOOM CENTRAL DES CARTES
+   ========================================================= */
+
+#zoom-carte {
+  position: fixed;
+  top: 42%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 13000;
+  display: none;
+  pointer-events: none;
+  overflow: visible;
+}
+
+#zoom-carte > .carte,
+#zoom-carte .zoom-pile-reservees .carte {
+  box-shadow: 0 20px 50px rgba(0,0,0,0.45);
+  opacity: 0;
+  animation: apparitionZoom 140ms ease-out forwards;
+}
+
+/* =========================================================
+   EFFET HOVER SUR LES CARTES
+   ========================================================= */
+
+/* Marché : cartes déjà réduites */
+.zone-cartes-marche .carte:hover,
+.pile-visible .carte:hover {
+  transform: scale(calc(var(--carte-scale) * 1.06));
+  z-index: 10;
+  box-shadow:
+    0 8px 20px rgba(0,0,0,0.25),
+    0 2px 6px rgba(0,0,0,0.15);
+  transition:
+    transform 80ms ease-out,
+    box-shadow 80ms ease-out;
+}
+
+/* Zone joueur : cartes taille normale */
+#bloc-zone-joueur .carte:hover {
+  transform: translateY(-6px) scale(1.06);
+  z-index: 10;
+  box-shadow:
+    0 8px 20px rgba(0,0,0,0.25),
+    0 2px 6px rgba(0,0,0,0.15);
+  transition:
+    transform 80ms ease-out,
+    box-shadow 80ms ease-out;
+}
+
+/* Main : on garde le rotate de la carte et on ajoute juste un léger lift visuel via top */
+#slot-main .carte:hover {
+  z-index: 20;
+  box-shadow:
+    0 8px 20px rgba(0,0,0,0.25),
+    0 2px 6px rgba(0,0,0,0.15);
+  transition:
+    box-shadow 80ms ease-out;
+}
+
+/* =========================================================
+   COMPTEURS JOUEUR GLOBAL
+   ========================================================= */
+
+#bloc-compteurs-global {
+
+  position: fixed;
+
+  left: 20px;
+  bottom: 20px;
+
+  display: flex;
+  flex-direction: column;
+
+  gap: 12px;
+
+  z-index: 5000;
+}
+
+.compteur-joueur {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 14px;
+
+  background: rgb(247, 241, 241);
+  backdrop-filter: blur(3px);
+
+  border: 2px solid rgba(0,0,0,0.4);
+  border-radius: 12px;
+
+  box-shadow:
+    0 4px 10px rgba(0,0,0,0.2);
+
+  color: #222;
+}
+
+.compteur-joueur span {
+
+  font-size: 22px;
+  font-weight: bold;
+
+}
+
+.icone-compteur-personnalisee {
+
+  width: 34px;
+  height: 34px;
+}
+
+.icone-compteur-ressource {
+
+  width: 28px;
+  height: 28px;
+}
+
+/* =========================================================
+   FIN DE TOUR
+   ========================================================= */
+
+   .jeton-progres-marche {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  min-height: 30px;
+  padding: 4px 8px;
+  border: 2px solid #222;
+  border-radius: 999px;
+  background: white;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 14px;
+  font-weight: bold;
+  z-index: 20;
+  box-sizing: border-box;
+}
+
+.jeton-progres-marche img {
+  width: 16px;
+  height: 16px;
+  display: block;
+}
+
+.jeton-epuisement-carte {
+  position: absolute;
+  top: 50%;
+  right: 8px;
+  transform: translateY(-50%);
+  z-index: 8;
+  pointer-events: none;
+}
+
+.jeton-epuisement-carte img {
+  width: 34px;
+  height: 34px;
+  display: block;
+}
+
+.indicateur-reservees-carte {
+  position: absolute;
+  left: 50%;
+  bottom: -8px;
+  transform: translateX(-50%);
+  width: 70%;
+  height: 18px;
+  pointer-events: none;
+  z-index: 3;
+}
+
+.reservee-ombre {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 78%;
+  height: 14px;
+  border-radius: 0 0 10px 10px;
+  border: 1px solid rgba(0,0,0,0.18);
+  background: rgba(255,255,255,0.75);
+}
+
+.reservee-ombre-1 {
+  bottom: 0;
+}
+
+.reservee-ombre-2 {
+  bottom: -4px;
+  width: 72%;
+  opacity: 0.9;
+}
+
+.compteur-reservees-carte {
+  position: absolute;
+  right: 2px;
+  bottom: -2px;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 5px;
+  border-radius: 999px;
+  background: #222;
+  color: white;
+  font-size: 12px;
+  font-weight: bold;
+  line-height: 20px;
+  text-align: center;
+  box-sizing: border-box;
+}
+
+.zoom-pile-reservees {
+  position: relative;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  gap: 0;
+  flex-wrap: nowrap;
+  max-width: 1400px;
+  padding: 20px 40px;
+  overflow: visible;
+  isolation: isolate;
+}
+
+.zoom-pile-reservees .carte {
+  position: relative;
+  flex: 0 0 auto;
+  margin-left: -40px;
+  overflow: visible;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+  z-index: 1;
+}
+
+.zoom-pile-reservees .carte:first-child {
+  margin-left: 0;
+}
+
+.zoom-carte-principale {
+  transform: scale(1.02);
+  z-index: 2;
+}
+
+.zoom-carte-reservee {
+  transform: scale(0.96);
+  opacity: 0.98;
+  z-index: 1;
+}
+
+.zoom-carte-au-devant {
+  transform: translateY(-12px) scale(1.06) !important;
+  box-shadow: 0 12px 28px rgba(0,0,0,0.28);
+  z-index: 9999 !important;
+}
+
+@keyframes apparitionZoom {
+  from {
+    opacity: 0;
+  }
+
+  to {
+    opacity: 1;
+  }
+}
+
+#panneau-choix-marche {
+  position: fixed;
+  inset: 0;
+  display: none;
+  align-items: flex-start;
+  justify-content: center;
+  padding-top: 24px;
+  background: rgba(0,0,0,0.18);
+  z-index: 12000;
+}
+
+.contenu-panneau-choix-marche {
+  background: white;
+  border: 2px solid #222;
+  border-radius: 12px;
+  padding: 16px 20px;
+  box-shadow: 0 10px 30px rgba(0,0,0,0.25);
+  min-width: 320px;
+}
+
+.titre-choix-marche {
+  font-size: 20px;
+  font-weight: bold;
+  margin-bottom: 12px;
+  text-align: center;
+}
+
+.boutons-choix-marche {
+  display: flex;
+  gap: 12px;
+  justify-content: center;
+}
+
+.btn-choix-marche {
+  padding: 10px 16px;
+  font-size: 16px;
+  font-weight: bold;
+  cursor: pointer;
+  border: 2px solid #222;
+  border-radius: 8px;
+  background: white;
+}
+
+.panneau-defausse {
+  position: fixed;
+  inset: 0;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0,0,0,0.35);
+  z-index: 110000;
+}
+
+.boite-defausse {
+  width: min(1500px, 92vw);
+  height: min(900px, 88vh);
+  background: white;
+  border: 3px solid #222;
+  border-radius: 14px;
+  box-shadow: 0 18px 50px rgba(0,0,0,0.32);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.entete-defausse {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 14px 18px;
+  border-bottom: 2px solid #222;
+  background: #f7f7f7;
+}
+
+.titre-defausse {
+  font-size: 24px;
+  font-weight: bold;
+}
+
+.btn-fermer-defausse {
+  padding: 8px 14px;
+  font-size: 15px;
+  font-weight: bold;
+  cursor: pointer;
+  border: 2px solid #222;
+  border-radius: 8px;
+  background: white;
+}
+
+.contenu-defausse {
+  flex: 1;
+  padding: 30px 40px;
+  box-sizing: border-box;
+  overflow: auto;
+
+  display: flex;
+  flex-wrap: wrap;
+  align-content: flex-start;
+}
+
+.carte-defausse-mini {
+  transform: scale(0.46);
+  transform-origin: top left;
+
+  width: 260px;
+  height: 420px;
+
+  margin-right: -170px;
+  margin-bottom: -240px;
+
+  cursor: pointer;
+
+  transition:
+    transform 120ms ease-out,
+    box-shadow 120ms ease-out;
+}
+
+.message-defausse-vide {
+  font-size: 20px;
+  color: #555;
+}
+
+.carte-defausse-mini {
+  transform: scale(0.46);
+  transform-origin: top left;
+  width: 260px;
+  height: 420px;
+  margin-bottom: -225px;
+  cursor: pointer;
+
+  transition:
+    transform 120ms ease-out,
+    box-shadow 120ms ease-out;
+}
+
+.carte-defausse-mini:hover {
+  transform: translateY(-10px) scale(0.55);
+  z-index: 50;
+
+  box-shadow:
+    0 14px 30px rgba(0,0,0,0.28),
+    0 6px 12px rgba(0,0,0,0.18);
+}
+
+#zone-indicateurs-et-exil {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+  width: fit-content;
+  margin-top: 16px;
+}
+
+#zone-indicateurs-et-exil #barre-indicateurs {
+  margin-top: 0;
+}
+
+#pile-exil {
+  width: 180px;
+  min-height: 330px;
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+}
+
+.etiquette-pile-exil {
+  position: absolute;
+  left: 50%;
+  bottom: -28px;
+  transform: translateX(-50%);
+  font-size: 18px;
+  font-weight: bold;
+  color: #222;
+  white-space: nowrap;
+}
+
+.pile-exil-vide {
+  position: relative;
+}
+
+.panneau-etoile {
+  position: fixed;
+  inset: 0;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0,0,0,0.35);
+  z-index: 115000;
+}
+
+.boite-etoile {
+  width: min(1500px, 92vw);
+  height: min(900px, 88vh);
+  background: white;
+  border: 3px solid #222;
+  border-radius: 14px;
+  box-shadow: 0 18px 50px rgba(0,0,0,0.32);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.entete-etoile {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 14px 18px;
+  border-bottom: 2px solid #222;
+  background: #f7f7f7;
+}
+
+.titre-etoile {
+  font-size: 24px;
+  font-weight: bold;
+}
+
+.btn-fermer-etoile {
+  padding: 8px 14px;
+  font-size: 15px;
+  font-weight: bold;
+  cursor: pointer;
+  border: 2px solid #222;
+  border-radius: 8px;
+  background: white;
+}
+
+.contenu-etoile {
+  flex: 1;
+  padding: 18px;
+  box-sizing: border-box;
+  overflow: auto;
+  display: flex;
+  flex-wrap: wrap;
+  align-content: flex-start;
+}
+
+.carte-etoile-mini {
+  transform: scale(0.46);
+  transform-origin: top left;
+  width: 260px;
+  height: 420px;
+  margin-right: -170px;
+  margin-bottom: -240px;
+  cursor: pointer;
+  position: relative;
+  transition: transform 120ms ease-out, box-shadow 120ms ease-out;
+}
+
+.carte-etoile-mini:hover {
+  transform: translateY(-10px) scale(0.55);
+  z-index: 9999 !important;
+  box-shadow:
+    0 14px 30px rgba(0,0,0,0.28),
+    0 6px 12px rgba(0,0,0,0.18);
+}
+
+.panneau-ui-cache {
+  display: none;
+}
+
+#panneau-ui {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0,0,0,0.45);
+  align-items: center;
+  justify-content: center;
+  z-index: 50000;
+  display: none;
+}
+
+#panneau-ui.panneau-ui-ouvert {
+  display: flex;
+}
+
+.panneau-ui-contenu {
+  background: white;
+  padding: 24px;
+  border-radius: 10px;
+  min-width: 300px;
+  text-align: center;
+}
+
+#panneau-ui-message {
+  margin-bottom: 20px;
+  font-size: 18px;
+}
+
+#panneau-ui-boutons button {
+  margin: 6px;
+  padding: 8px 16px;
+  font-size: 16px;
+  cursor: pointer;
+}
+
+.pile-exil-vide .dos-carte-verticale {
+  transform: scale(var(--carte-scale));
+  transform-origin: top left;
+}
+
+#panneau-choix-texte {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0,0,0,0.45);
+  align-items: flex-start;
+  justify-content: center;
+  z-index: 50001;
+  display: none;
+  padding-top: 40px
+}
+
+#panneau-choix-texte.panneau-ui-ouvert {
+  display: flex;
+}
+
+#panneau-choix-texte-message {
+  margin-bottom: 18px;
+  font-size: 18px;
+  text-align: center;
+}
+
+#panneau-choix-texte-options {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.btn-choix-texte {
+  padding: 10px 14px;
+  font-size: 16px;
+  cursor: pointer;
+}
+
+#contenu-histoire {
+  flex: 1;
+  padding: 30px 40px;
+  box-sizing: border-box;
+  overflow: auto;
+  display: flex;
+  flex-wrap: wrap;
+  align-content: flex-start;
+}
+
+.carte-histoire-mini {
+  transform: scale(0.46);
+  transform-origin: top left;
+  width: 260px;
+  height: 420px;
+  margin-right: -170px;
+  margin-bottom: -240px;
+  cursor: pointer;
+  transition:
+    transform 120ms ease-out,
+    box-shadow 120ms ease-out;
+}
+
+.carte-histoire-mini:hover {
+  transform: translateY(-10px) scale(0.55);
+  z-index: 50;
+  box-shadow:
+    0 14px 30px rgba(0,0,0,0.28),
+    0 6px 12px rgba(0,0,0,0.18);
+}
+
+.contenu-panneau-selection-defausse {
+  max-width: 1500px;
+}
+
+.contenu-selection-defausse {
+  position: relative;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  gap: 0;
+  flex-wrap: nowrap;
+  max-width: 1400px;
+  padding: 20px 40px;
+  overflow-x: auto;
+  overflow-y: visible;
+  isolation: isolate;
+}
+
+.carte-selection-defausse {
+  position: relative;
+  flex: 0 0 auto;
+  margin-left: -40px;
+  overflow: visible;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+  z-index: 1;
+  cursor: pointer;
+}
+
+.carte-selection-defausse:first-child {
+  margin-left: 0;
+}
+
+.carte-selection-defausse:hover {
+  transform: translateY(-12px) scale(1.06);
+  box-shadow: 0 12px 28px rgba(0,0,0,0.28);
+  z-index: 9999 !important;
+}
+
+
+.pile-renommee-roi {
+  position: relative;
+  width: 180px;
+  height: 420px;
+  overflow: visible;
+}
+
+.carte-roi-des-rois-dessous {
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 1;
+  width: 180px;
+  height: 420px;
+  overflow: hidden;
+}
+
+.carte-roi-des-rois-dessous .carte {
+  transform: translateY(80px) scale(0.80);
+  transform-origin: top center;
+}
+
+.bloc-renommee-dessus {
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 2;
+}
+
+#bloc-controles-tour {
+  position: fixed;
+  top: 10px;
+  right: 130px;
+  z-index: 2000;
+  display: flex;
+  gap: 10px;
+}
+
+#vue-joueur,
+#vue-marche {
+  width: 100%;
+  min-height: 100vh;
+  margin: 0;
+  padding: 0;
+}
+
+#btn-musique {
+  position: fixed;
+  top: 10px;
+  right: 10px;
+  z-index: 30000;
+  padding: 10px 14px;
+  font-size: 14px;
+  cursor: pointer;
+}
+
+#bloc-musique {
+  position: fixed;
+  top: 50px;
+  right: 10px;
+  z-index: 2000;
+  display: flex;
+  gap: 8px;
+}
+
+#bloc-musique button {
+  padding: 4px 8px;
+  font-size: 14px;
+  cursor: pointer;
+}
+
+
+#slot-statut,
+#slot-etoile,
+#slot-pleine,
+#slot-croissant,
+#slot-puissance,
+#slot-base,
+#slot-defausse {
+  transform: scale(0.95);
+  transform-origin: top left;
+}
+
+/* =========================================================
+   PAGE D'ACCUEIL
+   ========================================================= */
+
+#vue-accueil {
+  min-height: 100vh;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  text-align: center;
+  padding: 40px;
+  box-sizing: border-box;
+
+  background:
+    linear-gradient(rgba(20, 14, 8, 0.55), rgba(20, 14, 8, 0.55)),
+    url("assets/backgrounds/fond-accueil.jpg");
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+}
+
+.menu-accueil {
+  width: 100%;
+  max-width: 620px;
+  padding: 36px 40px;
+  border-radius: 18px;
+
+  background: rgba(245, 236, 214, 0.90);
+  border: 3px solid rgba(120, 90, 40, 0.85);
+  box-shadow:
+    0 14px 40px rgba(0, 0, 0, 0.40),
+    inset 0 0 0 2px rgba(255, 248, 220, 0.45);
+}
+
+.titre-accueil {
+  margin: 0 0 10px 0;
+  font-size: 46px;
+  letter-spacing: 1px;
+  color: #4d3415;
+  text-transform: uppercase;
+}
+
+.sous-titre-accueil {
+  margin: 0 0 28px 0;
+  font-size: 18px;
+  color: #6a4b21;
+}
+
+.bloc-choix {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  text-align: left;
+  margin-bottom: 18px;
+}
+
+.bloc-choix label {
+  margin-bottom: 8px;
+  font-size: 16px;
+  font-weight: bold;
+  color: #4a3214;
+}
+
+#vue-accueil select {
+  width: 100%;
+  padding: 12px 14px;
+  font-size: 16px;
+  border-radius: 10px;
+  border: 2px solid #8b6a34;
+  background: rgba(255, 250, 238, 0.95);
+  color: #2f2415;
+  box-sizing: border-box;
+}
+
+#vue-accueil select:focus {
+  outline: none;
+  border-color: #b88a3b;
+  box-shadow: 0 0 0 3px rgba(184, 138, 59, 0.20);
+}
+
+.bouton-accueil {
+  margin-top: 16px;
+  padding: 14px 26px;
+  font-size: 18px;
+  font-weight: bold;
+  border: none;
+  border-radius: 12px;
+  cursor: pointer;
+
+  background: linear-gradient(to bottom, #caa35a, #9b6f2d);
+  color: #fff8e8;
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.28);
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.bouton-accueil:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 10px 22px rgba(0, 0, 0, 0.32);
+}
+
+.bouton-accueil:active {
+  transform: translateY(0);
+}
+
+@media (max-width: 700px) {
+  .menu-accueil {
+    padding: 28px 22px;
+  }
+
+  .titre-accueil {
+    font-size: 34px;
+  }
+
+  .sous-titre-accueil {
+    font-size: 16px;
+  }
+}
+
+#panneau-debug-cartes {
+  position: fixed;
+  right: 20px;
+  bottom: 20px;
+  left: auto;
+  z-index: 50000;
+  width: 340px;
+  background: transparent;
+  border: 2px solid #222;
+  border-radius: 12px;
+  padding: 12px;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.22);
+  pointer-events: auto;
+}
+
+#panneau-debug-cartes button {
+  padding: 4px 8px;
+  font-size: 12px;
+  height: 50px;
+}
+
+#panneau-debug-cartes * {
+  pointer-events: auto;
+}
+
+#debug-recherche-carte {
+  flex: 1;
+  min-width: 0;
+  padding: 8px 10px;
+  font-size: 14px;
+  pointer-events: auto;
+}
+
+.debug-ligne {
+  display: grid;
+  grid-template-columns: repeat(3, auto);
+  gap: 6px;
+}
+
+#debug-recherche-carte {
+  flex: 1 1 auto;
+  min-width: 120px; /* IMPORTANT */
+  padding: 10px 12px;
+  font-size: 14px;
+  box-sizing: border-box;
+}
+
+
+#debug-btn-rechercher,
+#debug-btn-ajouter-main {
+  padding: 8px 10px;
+  font-size: 14px;
+  cursor: pointer;
+}
+
+#debug-resultats-cartes {
+  max-height: 240px;
+  overflow: auto;
+  border-top: 1px solid #ccc;
+  padding-top: 8px;
+}
+
+.debug-carte-resultat {
+  padding: 8px;
+  border: 1px solid #ccc;
+  border-radius: 8px;
+  margin-bottom: 8px;
+  cursor: pointer;
+  background: white;
+}
+
+.debug-carte-resultat.debug-selectionnee {
+  border-color: #222;
+  background: #f3f3f3;
+}
+
+#debug-btn-boost {
+  width: 100%;
+  padding: 8px 10px;
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.ui-bloque-hover-cartes #zoom-carte {
+  display: none !important;
+}
+
+.ui-bloque-hover-cartes .zoom-carte-au-devant {
+  transform: none !important;
+  box-shadow: none !important;
+  z-index: auto !important;
+}
+
+.ui-bloque-hover-cartes .carte:hover,
+.ui-bloque-hover-cartes .carte-defausse-mini:hover,
+.ui-bloque-hover-cartes .carte-etoile-mini:hover,
+.ui-bloque-hover-cartes .carte-selection-defausse:hover,
+.ui-bloque-hover-cartes .zone-cartes-marche .carte:hover,
+.ui-bloque-hover-cartes .pile-visible .carte:hover,
+.ui-bloque-hover-cartes #bloc-zone-joueur .carte:hover,
+.ui-bloque-hover-cartes #slot-main .carte:hover {
+  transform: none !important;
+  box-shadow: none !important;
+  z-index: auto !important;
+}
+
+#panneau-choix-carte {
+  position: fixed;
+  inset: 0;
+  display: none;
+  align-items: flex-start;
+  justify-content: center;
+  padding-top: 40px;
+  background: linear-gradient(
+  to bottom,
+  rgba(0, 0, 0, 0.2),
+  rgba(0,0,0,0)
+);
+  z-index: 60000;
+  pointer-events: none;
+}
+
+#panneau-choix-carte.panneau-ui-ouvert {
+  display: flex;
+}
+
+#panneau-choix-carte .panneau-ui-contenu {
+  pointer-events: auto;
+}
+
+.carte-selectionnable {
+  outline: 4px solid #f0c94a;
+  outline-offset: 2px;
+  cursor: pointer;
+  box-shadow: 0 0 0 6px rgba(240, 201, 74, 0.25);
+}
+
+.carte-non-selectionnable-pendant-choix {
+  opacity: 0.4;
+}
+
+.carte-solstice-disponible {
+  box-shadow:
+    0 0 0 3px rgba(255, 215, 0, 0.6),
+    0 0 16px rgba(255, 215, 0, 0.8);
+  animation: solsticePulse 1.2s ease-in-out infinite;
+}
+
+.carte-solstice-disponible::after {
+  content: "☀️";
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  font-size: 20px;
+  z-index: 20;
+  pointer-events: none;
+}
+
+@keyframes solsticePulse {
+  0% { transform: scale(0.42); }
+  50% { transform: scale(0.429); }
+  100% { transform: scale(0.42); }
+}
+
+.contenu-archiver {
+  flex: 1;
+  padding: 20px 24px;
+  box-sizing: border-box;
+  overflow: auto;
+}
+
+.bloc-archiver-zone {
+  margin-bottom: 28px;
+}
+
+.titre-zone-archiver {
+  font-size: 22px;
+  font-weight: bold;
+  margin-bottom: 12px;
+}
+
+.message-zone-archiver-vide {
+  font-size: 18px;
+  color: #555;
+  padding: 8px 0 0 6px;
+}
+
+#contenu-archiver-main,
+#contenu-archiver-defausse {
+  position: relative;
+  display: flex;
+  align-items: flex-start;
+  justify-content: flex-start;
+  gap: 0;
+  flex-wrap: nowrap;
+  min-height: 240px;
+  padding: 20px 40px 10px 20px;
+  overflow-x: auto;
+  overflow-y: visible;
+  isolation: isolate;
+}
+
+.carte-archiver-selection {
+  transform: scale(0.46);
+  transform-origin: top left;
+  width: 260px;
+  height: 420px;
+  margin-left: -170px;
+  margin-bottom: -240px;
+  cursor: pointer;
+  position: relative;
+  transition: transform 120ms ease-out, box-shadow 120ms ease-out;
+}
+
+.carte-archiver-selection:first-child {
+  margin-left: 0;
+}
+
+.carte-archiver-selection:hover {
+  transform: translateY(-10px) scale(0.55);
+  z-index: 50;
+  box-shadow:
+    0 14px 30px rgba(0,0,0,0.28),
+    0 6px 12px rgba(0,0,0,0.18);
+}
+
+.carte-exil-mini {
+  transform: scale(0.46);
+  transform-origin: top left;
+  width: 260px;
+  height: 420px;
+  margin-right: -170px;
+  margin-bottom: -240px;
+  cursor: pointer;
+  transition:
+    transform 120ms ease-out,
+    box-shadow 120ms ease-out;
+}
+
+.carte-exil-mini:hover {
+  transform: translateY(-10px) scale(0.55);
+  z-index: 50;
+  box-shadow:
+    0 14px 30px rgba(0,0,0,0.28),
+    0 6px 12px rgba(0,0,0,0.18);
+}
+
+#panneau-choix-marche-selection {
+  position: fixed;
+  inset: 0;
+  display: none;
+  align-items: flex-start;
+  justify-content: center;
+  padding-top: 40px;
+  background: transparent;
+  z-index: 60020;
+  pointer-events: none;
+}
+
+#panneau-choix-marche-selection.panneau-ui-ouvert {
+  display: flex;
+}
+
+#panneau-choix-marche-selection .panneau-ui-contenu {
+  pointer-events: auto;
+}
+
+.marche-selectionnable {
+  outline: none;
+  border: none;
+  box-shadow: none;
+  filter: none;
+  transform: none;
+}
+.marche-non-selectionnable {
+  opacity: 0.35;
+  pointer-events: none;
+}
+
+[data-pioche-marche] {
+  position: relative;
+  transition:
+    transform 120ms ease-out,
+    filter 120ms ease-out,
+    opacity 120ms ease-out;
+}
+
+[data-pioche-marche].marche-selectionnable {
+  z-index: 20;
+}
+
+[data-pioche-marche].marche-selectionnable .dos-pioche {
+  outline: 4px solid #f0c94a;
+  outline-offset: 6px;
+  box-shadow:
+    0 0 0 6px rgba(240, 201, 74, 0.22),
+    0 0 18px rgba(240, 201, 74, 0.75);
+  transform: translateY(80px) scale(0.86);
+}
+
+[data-pioche-marche].marche-selectionnable.principale .dos-pioche,
+[data-pioche-marche].marche-selectionnable .bloc-pioche.principale .dos-pioche {
+  transform: translateY(80px) scale(0.86);
+}
+
+[data-pioche-marche].marche-non-selectionnable {
+  opacity: 0.42;
+  filter: grayscale(0.75);
+}
+
+@keyframes pulse-pioche-selectionnable {
+  0% {
+    box-shadow:
+      0 0 0 6px rgba(240, 201, 74, 0.18),
+      0 0 12px rgba(240, 201, 74, 0.55);
+  }
+  50% {
+    box-shadow:
+      0 0 0 7px rgba(240, 201, 74, 0.28),
+      0 0 24px rgba(240, 201, 74, 0.95);
+  }
+  100% {
+    box-shadow:
+      0 0 0 6px rgba(240, 201, 74, 0.18),
+      0 0 12px rgba(240, 201, 74, 0.55);
+  }
+}
+
+[data-pioche-marche].marche-selectionnable .dos-pioche {
+  animation: pulse-pioche-selectionnable 1.4s ease-in-out infinite;
+}
+
+.zoom-voie-sacree {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 18px;
+  pointer-events: auto;
+}
+
+.zoom-voie-sacree-actions {
+  display: flex;
+  gap: 12px;
+  justify-content: center;
+}
+
+.zoom-voie-sacree-actions button {
+  padding: 10px 18px;
+  font-size: 16px;
+  font-weight: bold;
+  cursor: pointer;
+  border: 2px solid #222;
+  border-radius: 10px;
+  background: white;
+  box-shadow: 0 6px 16px rgba(0,0,0,0.22);
+}
+
+.zoom-voie-sacree-message {
+  background: rgba(255,255,255,0.96);
+  border: 2px solid #222;
+  border-radius: 12px;
+  padding: 12px 16px;
+  font-size: 18px;
+  font-weight: bold;
+  text-align: center;
+  max-width: 700px;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.24);
+}
+
+
+
+.marche-choix-progres .carte-dessus {
+  transform: scale(calc(var(--carte-scale) * 1.05));
+  z-index: 12;
+}
+
+@keyframes pulse-choix-progres {
+  0% {
+    box-shadow:
+      0 0 0 6px rgba(111, 211, 255, 0.18),
+      0 0 10px rgba(111, 211, 255, 0.55);
+  }
+  50% {
+    box-shadow:
+      0 0 0 7px rgba(111, 211, 255, 0.28),
+      0 0 22px rgba(111, 211, 255, 0.95);
+  }
+  100% {
+    box-shadow:
+      0 0 0 6px rgba(111, 211, 255, 0.18),
+      0 0 10px rgba(111, 211, 255, 0.55);
+  }
+}
+
+.marche-choix-progres .zone-cartes-marche,
+.marche-choix-progres .pile-visible {
+  animation: pulse-choix-progres 1.4s ease-in-out infinite;
+}
+
+.zoom-choix-carte {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 18px;
+  pointer-events: auto;
+}
+
+.zoom-choix-carte-message {
+  background: rgba(255,255,255,0.96);
+  border: 2px solid #222;
+  border-radius: 12px;
+  padding: 12px 16px;
+  font-size: 18px;
+  font-weight: bold;
+  text-align: center;
+  max-width: 760px;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.24);
+}
+
+.zoom-choix-carte-actions {
+  display: flex;
+  gap: 12px;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+
+.zoom-choix-carte-actions button {
+  padding: 10px 18px;
+  font-size: 16px;
+  font-weight: bold;
+  cursor: pointer;
+  border: 2px solid #222;
+  border-radius: 10px;
+  background: white;
+  box-shadow: 0 6px 16px rgba(0,0,0,0.22);
+}
+
+.zoom-choix-cartes {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 18px;
+  pointer-events: auto;
+}
+
+.zoom-choix-cartes-liste {
+  display: flex;
+  gap: 30px;
+  align-items: flex-start;
+  justify-content: center;
+  flex-wrap: nowrap;
+}
+
+.zoom-choix-carte-option {
+  cursor: pointer;
+  transition: transform 0.12s ease-out, box-shadow 0.12s ease-out;
+}
+
+.zoom-choix-carte-option:hover {
+  transform: translateY(-10px) scale(1.04);
+  box-shadow:
+    0 14px 30px rgba(0,0,0,0.28),
+    0 6px 12px rgba(0,0,0,0.18);
+}
+
+.overlay-choix-oracle {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.72);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 300000;
+}
+
+
+
+.message-choix-oracle {
+  color: white;
+  font-size: 24px;
+  font-weight: bold;
+  text-align: center;
+  margin-bottom: 24px;
+}
+
+.liste-choix-oracle {
+  display: flex;
+  gap: 24px;
+  justify-content: center;
+  align-items: flex-start;
+  flex-wrap: wrap;
+}
+
+.zoom-choix-carte-option {
+  cursor: pointer;
+  transform: scale(1.0);
+  transition: transform 0.15s ease;
+}
+
+.zoom-choix-carte-option:hover {
+  transform: scale(1.06);
+}
+
+/* =========================================================
+   VUE BOT - mêmes bases que la vue joueur
+   ========================================================= */
+
+#vue-bot {
+  width: 100%;
+  height: 100vh;
+  overflow: hidden;
+  background-image: url("assets/backgrounds/fond-joueur.png");
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+}
+
+#vue-bot.vue-active {
+  display: flex;
+  flex: 1;
+}
+
+#bot-wrapper {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+}
+
+#bot-scale {
+  position: absolute;
+  top: 0;
+  left: 50%;
+  width: 1980px;
+  height: 1250px;
+  background: transparent;
+  border: none;
+  box-sizing: border-box;
+  transform-origin: top center;
+}
+
+#zone-bot {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  box-sizing: border-box;
+  padding: 0;
+  overflow: visible;
+  background: transparent;
+}
+
+#bot-carte-statut,
+#bot-carte-puissance {
+  transform: scale(0.95);
+  transform-origin: top left;
+}
+
+#bot-pioche-dynastie,
+#bot-deck-civ,
+#bot-defausse {
+  transform: none;
+
+}
+
+/* =========================================================
+   LAYOUT BOT
+   ========================================================= */
+
+#bot-layout {
+  display: grid;
+  grid-template-columns: 1fr 520px;
+  column-gap: 40px;
+  align-items: start;
+  justify-content: stretch;
+  width: 100%;
+  height: 100%;
+  box-sizing: border-box;
+}
+
+#bot-zone-gauche {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  min-width: 0;
+  width: 100%;
+}
+
+#bot-zone-droite {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  width: 600px;
+  min-width: 600px;
+
+}
+
+/* =========================================================
+   BLOCS BOT
+   ========================================================= */
+
+.bloc-bot {
+  background: rgba(255, 255, 255, 0.78);
+  border: 2px solid rgba(40, 40, 40, 0.7);
+  border-radius: 18px;
+  padding: 16px 18px;
+  box-sizing: border-box;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.14);
+}
+
+.bloc-bot h2,
+.bloc-bot h3 {
+  margin: 0 0 12px 0;
+}
+
+.ligne-bot {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.ligne-compteurs-bot {
+  display: flex;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+
+.compteur-bot {
+  background: rgba(255, 255, 255, 0.92);
+  border: 2px solid #333;
+  border-radius: 10px;
+  padding: 8px 12px;
+  font-weight: bold;
+}
+
+/* =========================================================
+   EMPLACEMENTS 1 À 5
+   ========================================================= */
+
+#grille-emplacements-bot {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 20px;
+  align-items: start;
+  justify-items: center;
+  width: 100%;
+}
+
+.colonne-emplacement-bot {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+}
+
+.titre-mini-zone {
+  font-weight: bold;
+  text-align: center;
+}
+
+.marqueur-bot {
+  min-width: 46px;
+  min-height: 34px;
+  padding: 4px 10px;
+  border-radius: 10px;
+  border: 2px solid rgba(0, 0, 0, 0.22);
+  background: rgba(255, 255, 255, 0.82);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 26px;
+  line-height: 1;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.10);
+}
+
+/* =========================================================
+   SLOTS BOT
+   mêmes dimensions que joueur
+   ========================================================= */
+
+.slot-carte-bot,
+.pile-bot-visuelle,
+.slot-bot-grand {
+  width: 260px;
+  height: 420px;
+  position: relative;
+  box-sizing: border-box;
+  overflow: visible;
+}
+
+.slot-carte-bot {
+  border: 2px dashed #666;
+  background: rgba(240, 240, 240, 0.45);
+  border-radius: 16px;
+}
+
+.slot-carte-bot.vide::before {
+  content: "Vide";
+  color: #777;
+  font-style: italic;
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.pile-bot-visuelle {
+  margin: 0 auto;
+  border: 2px solid #333;
+  border-radius: 16px;
+  background: linear-gradient(145deg, #d9d9d9, #bdbdbd);
+}
+
+
+/* les cartes rendues dedans ne doivent pas être rescalées une 2e fois */
+.slot-carte-bot .carte,
+.pile-bot-visuelle .carte,
+#bot-tableau .carte {
+  transform: none;
+  transform-origin: top left;
+}
+
+/* =========================================================
+   LIGNE DU BAS
+   ========================================================= */
+
+#ligne-bas-bot {
+  display: flex;
+  gap: 20px;
+  align-items: flex-start;
+  justify-content: space-between;
+  width: 100%;
+}
+
+#ligne-bas-bot .pile-bot {
+  width: 260px;
+  text-align: center;
+  flex: 0 0 260px;
+}
+
+.compteur-mini-bot {
+  margin-top: 8px;
+  font-weight: bold;
+}
+
+/* =========================================================
+   TABLEAU BOT
+   même logique de bloc que le joueur
+   ========================================================= */
+
+#bloc-tableau-bot {
+  position:absolute;
+  left: 1750px;
+  top: 137px;
+  width: 600px;
+  height: 1200px;
+  background: transparent;
+  padding: 16px;
+  box-sizing: border-box;
+  overflow: visible;
+}
+
+.titre-tableau-bot {
+  font-size: 22px;
+  font-weight: bold;
+  margin-bottom: 16px;
+}
+
+#bot-tableau {
+  position: relative;
+  top: 0;
+  left: 0;
+  display: grid;
+  grid-template-columns: repeat(4, 120px);
+  grid-template-rows: repeat(6, 180px);
+  gap: 10px;
+  justify-content: start;
+  overflow: visible;
+}
+
+.case-tableau-bot {
+  width: 120px;
+  height: 180px;
+  border: 2px dashed #999;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.45);
+  box-sizing: border-box;
+  position: relative;
+  overflow: hidden;
+}
+
+#bot-tableau .case-tableau-bot .carte {
+  transform: scale(1);
+  transform-origin: top left;
+}
+
+#vue-bot .pile-bot-visuelle .carte,
+#vue-bot .slot-bot-grand .carte {
+  transform: scale(1);
+  transform-origin: center;
+}
+
+/* Nom de carte */
+#bot-tableau .nom,
+.case-tableau-bot .nom {
+  font-size: 26px;
+}
+
+/* Texte d'effet */
+#bot-tableau .effet.normal,
+.case-tableau-bot .effet.normal {
+  font-size: 30px;
+}
+
+#bot-tableau .effet.petit,
+.case-tableau-bot .effet.petit {
+  font-size: 28px;
+}
+
+#bot-tableau .effet.tres-petit,
+.case-tableau-bot .effet.tres-petit {
+  font-size: 20px;
+}
+
+/* Icône catégorie */
+#bot-tableau .icone-categorie,
+.case-tableau-bot .icone-categorie {
+  width: 42px;
+  height: 42px;
+}
+
+/* Icônes de ressource dans le texte */
+#bot-tableau .icone-ressource,
+.case-tableau-bot .icone-ressource {
+  width: 40px;
+  height: 40px;
+}
+
+/* Icônes région PNG */
+#bot-tableau img[src*="imperium-sac"],
+#bot-tableau img[src*="imperium-ble"],
+#bot-tableau img[src*="imperium-eau"],
+.case-tableau-bot img[src*="imperium-sac"],
+.case-tableau-bot img[src*="imperium-ble"],
+.case-tableau-bot img[src*="imperium-eau"] {
+  width: 40px;
+  height: 40px;
+  object-fit: contain;
+}
+
+
+
+
+/* =========================================================
+   BOUTONS BOT
+   ========================================================= */
+
+#bloc-controles-bot button {
+  padding: 10px 14px;
+  font-size: 15px;
+  font-weight: bold;
+  cursor: pointer;
+  border: 2px solid #2f2f2f;
+  border-radius: 10px;
+  background: white;
+}
+
+/* =========================================================
+   PANNEAU BOT
+   ========================================================= */
+
+#panneau-bot {
+  position: fixed;
+  top: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 9999;
+  min-width: 360px;
+  max-width: 900px;
+  background: rgba(30, 25, 18, 0.95);
+  color: white;
+  border: 3px solid #d6b25e;
+  border-radius: 16px;
+  padding: 18px 22px;
+  text-align: center;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+}
+
+#panneau-bot-message {
+  font-size: 22px;
+  font-weight: bold;
+  line-height: 1.35;
+}
+
+/* =========================
+   CARTES BOT = mêmes effets que joueur
+   ========================= */
+
+#vue-bot .carte {
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+  box-shadow: 0 6px 12px rgba(0, 0, 0, 0.25);
+  transform-origin: center center;
+}
+
+/* Hover */
+#vue-bot .carte:hover {
+  transform: scale(1.08);
+  z-index: 10;
+  box-shadow: 0 12px 24px rgba(0, 0, 0, 0.4);
+}
+
+#vue-bot .carte-wrapper {
+  width: 100%;
+  height: 100%;
+}
+
+#vue-bot .carte {
+  width: 100%;
+  height: 100%;
+  transform: scale(0.95);
+  transform-origin: center;
+}
+
+#vue-bot .carte {
+  background: white;
+}
+
+#bot-pioche-dynastie,
+#bot-deck-civ,
+#bot-defausse {
+  width: 260px;
+  height: 420px;
+}
+
+#bot-pioche-dynastie .dos-carte-verticale,
+#bot-deck-civ .dos-carte-verticale,
+#bot-defausse .dos-carte-verticale {
+  width: 260px;
+  height: 420px;
+  transform: none;
+}
+
+#bot-pioche-dynastie .dos-carte-horizontale,
+#bot-deck-civ .dos-carte-horizontale,
+#bot-defausse .dos-carte-horizontale {
+  width: 420px;
+  height: 260px;
+  transform: none;
+}
+
+#btn-bot-suivant {
+  margin-top: 12px;
+  padding: 10px 16px;
+  font-size: 16px;
+  font-weight: bold;
+  cursor: pointer;
+  border: 2px solid #2f2f2f;
+  border-radius: 10px;
+  background: white;
+}
+
+#bot-tableau .carte:hover {
+  transform: scale(0.42) !important;
+  z-index: auto;
+  box-shadow: 0 6px 12px rgba(0, 0, 0, 0.25);
+}
+
+.case-tableau-bot {
+  width: 120px;
+  height: 180px;
+  border: 2px dashed #999;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.45);
+  box-sizing: border-box;
+  position: relative;
+  overflow: hidden;
+}
+
+.case-tableau-bot .carte-wrapper {
+  width: 120px;
+  height: 180px;
+  position: relative;
+  overflow: hidden;
+}
+
+.case-tableau-bot .carte,
+#bot-tableau .case-tableau-bot .carte {
+  width: 260px !important;
+  height: 420px !important;
+  transform: scale(0.42) !important;
+  transform-origin: top left;
+}
+
+#bot-carte-puissance {
+  cursor: pointer;
+}
+
+.panneau-ui-cache {
+  display: none;
+}
+
+.panneau-ui-ouvert {
+  display: flex;
+}
+
+#btn-pacifier,
+#btn-innover-tour {
+  margin-right: 8px;
+}
+
+.bouton-inactif,
+#btn-pacifier:disabled,
+#btn-innover-tour:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.conteneur-choix-regard-renommee {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+}
+
+.titre-choix-regard-renommee {
+  color: white;
+  font-weight: bold;
+  font-size: 22px;
+  text-align: center;
+  text-shadow: 0 2px 6px rgba(0, 0, 0, 0.7);
+}
+
+.carte-regard-renommee {
+  cursor: pointer;
+} 
+
+.carte-selection-desactivee {
+  opacity: 0.35;
+  filter: grayscale(0.9);
+  pointer-events: auto;
+}
+
+.carte-selection-active {
+  outline: 3px solid rgba(255, 215, 0, 0.9);
+  box-shadow: 0 0 14px rgba(255, 215, 0, 0.6);
+  cursor: pointer;
+}
+
+.slot-puissance-wrapper {
+  position: relative;
+  display: inline-block;
+}
+
+.bouton-epuiser-puissance {
+  position: absolute;
+  right: 8px;
+  bottom: 8px;
+  z-index: 20;
+  padding: 6px 10px;
+  font-size: 12px;
+  font-weight: bold;
+  border: 2px solid #222;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.95);
+  cursor: pointer;
+}
+
+.bouton-epuiser-puissance:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.carte-deck-nation-mini {
+  cursor: pointer;
+}
+
+.carte-deck-joueur-mini {
+  cursor: pointer;
+}
+.conteneur-choix-deck-nation {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 18px;
+  padding: 20px;
+}
+
+.titre-choix-deck-nation {
+  font-size: 24px;
+  font-weight: bold;
+  color: white;
+  text-align: center;
+  text-shadow: 0 2px 6px rgba(0, 0, 0, 0.6);
+}
+
+.carte-deck-nation-centree {
+  transform: scale(1);
+}
+
+.boutons-choix-deck-nation {
+  display: flex;
+  gap: 16px;
+}
+
+.boutons-choix-deck-nation button {
+  padding: 10px 22px;
+  font-size: 18px;
+  cursor: pointer;
+}
+
+.badge-materiaux-marche {
+  position: absolute;
+  top: 45px;
+  right: 10px;
+  min-width: 34px;
+  height: 34px;
+  padding: 0 8px;
+  border: 2px solid #222;
+  border-radius: 999px;
+  background: #f3e0a2;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  font-weight: bold;
+  z-index: 20;
+}
+
