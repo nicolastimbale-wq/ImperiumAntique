@@ -20896,7 +20896,65 @@ function calculerScoreZoneJoueur(cartes, zone, toutesLesCartes) {
   };
 }
 
+function calculerScoreJoueurFinal() {
+  const toutesLesCartes = toutesLesCartesJoueurPourScore();
 
+  const progres = Number(jeu.joueur.progres || 0);
+
+  const main = calculerScoreZoneJoueur(
+    jeu.joueurZones.mainJoueur || [],
+    "main",
+    toutesLesCartes
+  );
+
+  const tableau = calculerScoreZoneJoueur(
+    jeu.joueurZones.tableauJoueur || [],
+    "tableau",
+    toutesLesCartes
+  );
+
+  const deck = calculerScoreZoneJoueur(
+    jeu.joueurZones.deckJoueur || [],
+    "deck",
+    toutesLesCartes
+  );
+
+  const defausse = calculerScoreZoneJoueur(
+    jeu.joueurZones.defausseJoueur || [],
+    "defausse",
+    toutesLesCartes
+  );
+
+  const histoire = calculerScoreZoneJoueur(
+    jeu.joueurZones.histoireJoueur || [],
+    "histoire",
+    toutesLesCartes
+  );
+
+  const puissance = calculerScoreZoneJoueur(
+    jeu.joueurZones.cartePuissanceVisible ? [jeu.joueurZones.cartePuissanceVisible] : [],
+    "puissance",
+    toutesLesCartes
+  );
+
+  return {
+    progres,
+    main,
+    tableau,
+    deck,
+    defausse,
+    histoire,
+    puissance,
+    total:
+      progres +
+      main.total +
+      tableau.total +
+      deck.total +
+      defausse.total +
+      histoire.total +
+      puissance.total
+  };
+}
 
 function terminerPartieParScoreFinal() {
   if (jeu.finPartie.terminee) {
