@@ -7049,7 +7049,8 @@ const cartesNations = [
           effets: [
             {
               type: "gagnerMateriauxParTagRegion",
-              quantiteParSac: 1
+              tagRegion: "Sac",
+                quantiteParTag: 1
             }
           ]
         },
@@ -7394,7 +7395,8 @@ const cartesNations = [
           effets: [
             {
               type: "gagnerMateriauxParTagRegion",
-              quantiteParSac: 1
+              tagRegion: "Sac",
+                quantiteParTag: 1
             }
           ]
         },
