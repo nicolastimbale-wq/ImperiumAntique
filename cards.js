@@ -2143,6 +2143,7 @@ solsticeCode: [
   statut: "Aucun",
   typeCarte: "Aucun",
   typeRegion: [],
+    effet: "Choisir: payez 1 Population OU défaussez 2 cartes OU payez 3 Matériaux. Si vous le faites, renvoyez cette carte dans la pile Instabilité.",
    effetsCode: [
     {
       type: "resoudreInstabiliteStandard"
@@ -2474,6 +2475,7 @@ const cartesNations = [
 
   {
     nom: "Rhétie",  //---CHECK---//
+    styleBandeau: "Région",
     bandeau: "Jaune",
     pin: "Persistante",
     statut: "Aucun",
@@ -2507,6 +2509,7 @@ const cartesNations = [
 
   {
     nom: "Gaule aquitaine", //---CHECK---//
+    styleBandeau:"Région",
     bandeau: "Jaune",
     pin: "Persistante",
     statut: "Aucun",
@@ -2632,6 +2635,7 @@ const cartesNations = [
 
   {
     nom: "Dalmatie",  //---CHECK---//
+    styleBandeau: "Région",
     bandeau: "Jaune",
     pin: "Persistante",
     statut: "Aucun",
@@ -2844,7 +2848,7 @@ const cartesNations = [
         categorie: "Tradition"
       },
       {
-        type: "archiverSourceDepuisMain"
+        type: "archiverSourceDepuisContexte"
       }
     ],
     coutDeveloppement: "Aucun",
@@ -3205,6 +3209,7 @@ const cartesNations = [
 
   {
     nom: "Hibernie",  //---CHECK---// 
+    styleBandeau: "Région",
     bandeau: "Jaune",
     pin: "Persistante",
     statut: "Aucun",
@@ -4002,7 +4007,10 @@ const cartesNations = [
         {
           label: "Développer",
           effets: [
-            { type: "developperCarte" }
+	              {
+	                type: "developperCarte",
+	                nePasEpuiserPileEtoile: true
+	              }
           ]
         },
         {
@@ -5144,7 +5152,10 @@ const cartesNations = [
           {
             label: "Développer",
             effets: [
-              { type: "developperCarte" }
+	              {
+	                type: "developperCarte",
+	                nePasEpuiserPileEtoile: true
+	              }
             ]
           },
           {
@@ -7049,7 +7060,8 @@ const cartesNations = [
           effets: [
             {
               type: "gagnerMateriauxParTagRegion",
-              quantiteParSac: 1
+              tagRegion: "Sac",
+                quantiteParTag: 1
             }
           ]
         },
@@ -7394,7 +7406,8 @@ const cartesNations = [
           effets: [
             {
               type: "gagnerMateriauxParTagRegion",
-              quantiteParSac: 1
+              tagRegion: "Sac",
+                quantiteParTag: 1
             }
           ]
         },
@@ -13730,12 +13743,7 @@ function botArchiverPremiereRenommeeDansHistoire() {
 
       const carteRetiree = tableau.splice(index, 1)[0];
 
-      if (Array.isArray(carteRetiree.reservees) && carteRetiree.reservees.length > 0) {
-        jeu.joueurZones.defausseJoueur.push(...carteRetiree.reservees);
-        carteRetiree.reservees = [];
-      }
-
-      jeu.joueurZones.mainJoueur.unshift(carteRetiree);
+      deplacerCarteEtReserveesVersZone(carteRetiree, jeu.joueurZones.mainJoueur, "debut");
       journal(`Le joueur rappelle ${carteRetiree.nom}.`);
 
       nettoyerSelectionCarteBotJoueur();
@@ -13968,12 +13976,7 @@ async function forcerJoueurARappelerUneRegion(message = "Le joueur doit rappeler
 
       const carteRetiree = tableau.splice(index, 1)[0];
 
-if (Array.isArray(carteRetiree.reservees) && carteRetiree.reservees.length > 0) {
-  jeu.joueurZones.defausseJoueur.push(...carteRetiree.reservees);
-  carteRetiree.reservees = [];
-}
-
-jeu.joueurZones.mainJoueur.unshift(carteRetiree);
+deplacerCarteEtReserveesVersZone(carteRetiree, jeu.joueurZones.mainJoueur, "debut");
 journal(`Le joueur rappelle ${carteRetiree.nom}.`);
 
       nettoyerSelectionCarteBotJoueur();
@@ -14633,16 +14636,23 @@ function botPointsVictoireCarte(carte) {
 function comparerCartesPourBot(carteA, carteB) {
   const pvA = botPointsVictoireCarte(carteA);
   const pvB = botPointsVictoireCarte(carteB);
+  const progresA = Number(carteA?.jetons?.progres || 0);
+  const progresB = Number(carteB?.jetons?.progres || 0);
 
-  if (pvA !== pvB) {
-    return pvB - pvA;
+  const scorePrincipalA = pvA + progresA;
+  const scorePrincipalB = pvB + progresB;
+
+  if (scorePrincipalA !== scorePrincipalB) {
+    return scorePrincipalB - scorePrincipalA;
   }
 
-  const jetonsA = botValeurJetonsCarte(carteA);
-  const jetonsB = botValeurJetonsCarte(carteB);
+  const materiauxA = Number(carteA?.jetons?.materiaux || 0);
+  const materiauxB = Number(carteB?.jetons?.materiaux || 0);
+  const scoreSecondaireA = progresA + materiauxA;
+  const scoreSecondaireB = progresB + materiauxB;
 
-  if (jetonsA !== jetonsB) {
-    return jetonsB - jetonsA;
+  if (scoreSecondaireA !== scoreSecondaireB) {
+    return scoreSecondaireB - scoreSecondaireA;
   }
 
   const numeroA = botNumeroCarte(carteA);
@@ -14940,7 +14950,12 @@ function abandonnerRegionsBotSelonRegles(quantite = 1) {
 
     if (index >= 0) {
       const carte = etatBot.tableau.splice(index, 1)[0];
-      etatBot.defausse.push(carte);
+
+      if (!carte) {
+        continue;
+      }
+
+      deplacerCarteEtReserveesVersZone(carte, etatBot.defausse, "fin");
       succes += 1;
     }
   }
@@ -14963,7 +14978,12 @@ function rappelerDerniereRegionJoueeBotAuDessusDuDeck() {
   }
 
   const carte = etatBot.tableau.splice(index, 1)[0];
-  etatBot.deckCiv.unshift(carte);
+
+  if (!carte) {
+    return false;
+  }
+
+  deplacerCarteEtReserveesVersZone(carte, etatBot.deckCiv, "debut");
   afficherZoneBot?.();
   return true;
 }
@@ -15159,8 +15179,13 @@ function botRappelerCarteObjetVersDeckCiv(carte) {
     return false;
   }
 
-  etatBot.tableau.splice(index, 1);
-  etatBot.deckCiv.unshift(carte);
+  const carteRetiree = etatBot.tableau.splice(index, 1)[0];
+
+  if (!carteRetiree) {
+    return false;
+  }
+
+  deplacerCarteEtReserveesVersZone(carteRetiree, etatBot.deckCiv, "debut");
 
   afficherZoneBot?.();
   return true;
@@ -17983,7 +18008,24 @@ async function proposerEpuisementPuissanceCeltesSiTradition(categorie) {
   return true;
 }
 
-   function rappelerCarteObjetDepuisTableau(carte) {
+function deplacerCarteEtReserveesVersZone(carte, zoneDestination, position = "fin") {
+  if (!carte || !Array.isArray(zoneDestination)) {
+    return false;
+  }
+
+  const reservees = Array.isArray(carte.reservees) ? [...carte.reservees] : [];
+  carte.reservees = [];
+
+  if (position === "debut") {
+    zoneDestination.unshift(carte, ...reservees);
+  } else {
+    zoneDestination.push(carte, ...reservees);
+  }
+
+  return true;
+}
+
+function rappelerCarteObjetDepuisTableau(carte) {
   if (!carte) {
     return false;
   }
@@ -18002,7 +18044,7 @@ async function proposerEpuisementPuissanceCeltesSiTradition(categorie) {
   }
 
   // 👉 rappel = retour dans la main
-  jeu.joueurZones.mainJoueur.push(carteRetiree);
+  deplacerCarteEtReserveesVersZone(carteRetiree, jeu.joueurZones.mainJoueur, "fin");
 
   afficherZoneJoueur();
   return true;
@@ -20604,6 +20646,12 @@ function normaliserTexteScore(texte = "") {
 function compterOccurrencesScore(cible, toutesLesCartes = []) {
   const t = normaliserTexteScore(cible);
 
+  // Cas solo (ex: Infamie) : "Instabilité marquée par les autres joueurs"
+  // => on compte les Instabilités présentes chez l'adversaire (le Bot).
+  if (t.includes("instabilite") && t.includes("autres joueurs")) {
+    return compterInstabilitesRestantesBotPourScore();
+  }
+
   // Ressources joueur
   if (t === "population") return Number(jeu.joueur.population || 0);
   if (t === "materiaux" || t === "materiau") return Number(jeu.joueur.materiaux || 0);
@@ -20696,13 +20744,23 @@ function evaluerCarteJoueurPourScore(carte, zone, toutesLesCartes = []) {
 
   if (texte === "Conditionnel" || texte === "PV Conditionnel") {
     const nombres = extraireTousLesNombres(condition);
+    const contientAlternative = /\bou\b/i.test(condition);
+    const valeurAlternative = nombres.length > 0 ? Math.min(...nombres) : 0;
 
     if (/si en jeu/i.test(condition)) {
-      return zone === "tableau" ? Math.max(...nombres, 0) : 0;
+      if (zone === "tableau") {
+        return Math.max(...nombres, 0);
+      }
+
+      return contientAlternative && nombres.length > 1 ? valeurAlternative : 0;
     }
 
     if (/si dans votre histoire/i.test(condition)) {
-      return zone === "histoire" ? Math.max(...nombres, 0) : 0;
+      if (zone === "histoire") {
+        return Math.max(...nombres, 0);
+      }
+
+      return contientAlternative && nombres.length > 1 ? valeurAlternative : 0;
     }
 
     if (nombres.length > 0) {
@@ -20756,8 +20814,30 @@ function compterCartesCategorie(cartes = [], categorie = "") {
   return cartes.filter(carte => inclutCategorie(carte, categorie)).length;
 }
 
+function aplatirCartesAvecReservees(cartes = []) {
+  const resultat = [];
+  const vus = new Set();
+  const source = Array.isArray(cartes) ? cartes : [];
+
+  function parcourir(carte) {
+    if (!carte || vus.has(carte)) {
+      return;
+    }
+
+    vus.add(carte);
+    resultat.push(carte);
+
+    if (Array.isArray(carte.reservees) && carte.reservees.length > 0) {
+      carte.reservees.forEach(parcourir);
+    }
+  }
+
+  source.forEach(parcourir);
+  return resultat;
+}
+
 function toutesLesCartesJoueurPourScore() {
-  return [
+  const cartesBase = [
     ...(jeu.joueurZones.mainJoueur || []),
     ...(jeu.joueurZones.tableauJoueur || []),
     ...(jeu.joueurZones.deckJoueur || []),
@@ -20765,6 +20845,8 @@ function toutesLesCartesJoueurPourScore() {
     ...(jeu.joueurZones.histoireJoueur || []),
     ...(jeu.joueurZones.cartePuissanceVisible ? [jeu.joueurZones.cartePuissanceVisible] : [])
   ].filter(Boolean);
+
+  return aplatirCartesAvecReservees(cartesBase);
 }
 
 function toutesLesCartesBotPourScoreSansDynastieNiPuissance() {
@@ -20873,10 +20955,11 @@ function calculerScoreBotDetailleFinal() {
 }
 
 function calculerScoreZoneJoueur(cartes, zone, toutesLesCartes) {
+  const cartesZone = aplatirCartesAvecReservees(cartes || []);
   const detailsCartes = [];
   let total = 0;
 
-  (cartes || []).forEach(carte => {
+  cartesZone.forEach(carte => {
     const pv = evaluerCarteJoueurPourScore(carte, zone, toutesLesCartes);
 
     detailsCartes.push({
@@ -20896,7 +20979,65 @@ function calculerScoreZoneJoueur(cartes, zone, toutesLesCartes) {
   };
 }
 
+function calculerScoreJoueurFinal() {
+  const toutesLesCartes = toutesLesCartesJoueurPourScore();
 
+  const progres = Number(jeu.joueur.progres || 0);
+
+  const main = calculerScoreZoneJoueur(
+    jeu.joueurZones.mainJoueur || [],
+    "main",
+    toutesLesCartes
+  );
+
+  const tableau = calculerScoreZoneJoueur(
+    jeu.joueurZones.tableauJoueur || [],
+    "tableau",
+    toutesLesCartes
+  );
+
+  const deck = calculerScoreZoneJoueur(
+    jeu.joueurZones.deckJoueur || [],
+    "deck",
+    toutesLesCartes
+  );
+
+  const defausse = calculerScoreZoneJoueur(
+    jeu.joueurZones.defausseJoueur || [],
+    "defausse",
+    toutesLesCartes
+  );
+
+  const histoire = calculerScoreZoneJoueur(
+    jeu.joueurZones.histoireJoueur || [],
+    "histoire",
+    toutesLesCartes
+  );
+
+  const puissance = calculerScoreZoneJoueur(
+    jeu.joueurZones.cartePuissanceVisible ? [jeu.joueurZones.cartePuissanceVisible] : [],
+    "puissance",
+    toutesLesCartes
+  );
+
+  return {
+    progres,
+    main,
+    tableau,
+    deck,
+    defausse,
+    histoire,
+    puissance,
+    total:
+      progres +
+      main.total +
+      tableau.total +
+      deck.total +
+      defausse.total +
+      histoire.total +
+      puissance.total
+  };
+}
 
 function terminerPartieParScoreFinal() {
   if (jeu.finPartie.terminee) {
@@ -20908,6 +21049,7 @@ function terminerPartieParScoreFinal() {
   jeu.finPartie.raison = "Le Décompte est terminé.";
 
   tourBotEnCours = false;
+  retirerJusquaDeuxInstabilitesAvecSumeriens();
 
   const scoreBot = calculerScoreBotFinal();
   const scoreJoueur = calculerScoreJoueurFinal();
@@ -21342,7 +21484,12 @@ function prendreCarteNationPourRafraichissement() {
     jeu.joueurZones.cartePleineVisible = null;
     jeu.joueurZones.pileRafraichissementNationEpuisee = true;
 
-    passerJoueurEnEmpire();
+    if (configurationPartie.nationJoueur === "Vikings") {
+      declencherDecompte();
+    } else {
+      passerJoueurEnEmpire();
+    }
+
     return cartePleine;
   }
 
@@ -22646,7 +22793,7 @@ function innoverDepuisPiocheCategorie(categorie) {
 
     jeu.joueur.progres += 2;
     afficherZoneJoueur();
-    return false;
+    return "progres";
   }
 
   const piocheSecondaire = obtenirPiocheSecondaireParCategorie(categorie);
@@ -22671,7 +22818,7 @@ function innoverDepuisPiocheCategorie(categorie) {
 
   jeu.joueur.progres += 2;
   afficherZoneJoueur();
-  return false;
+  return "progres";
 }
 
 async function innoverCategorie(categorie) {
@@ -22690,20 +22837,24 @@ async function innoverCategorie(categorie) {
       },
 
       onChoose: async cle => {
-        let succes = false;
+        let resultatInnovation = false;
 
         if (zonesEligibles.includes(cle)) {
-          succes = innoverCarteDansZone(jeu.zonesMarche[cle]);
+          resultatInnovation = innoverCarteDansZone(jeu.zonesMarche[cle]);
         } else if (piochesEligibles.includes(cle)) {
-          succes = innoverDepuisPiocheCategorie(cle);
+          resultatInnovation = innoverDepuisPiocheCategorie(cle);
         }
 
-        if (succes) {
+        const innovationReussie =
+          !!resultatInnovation && resultatInnovation !== "progres";
+        const actionValidee = innovationReussie || resultatInnovation === "progres";
+
+        if (innovationReussie) {
           await declencherCeltesSiPossible(categorie);
         }
 
         afficherVue("vue-joueur");
-        resolve(!!succes);
+        resolve(actionValidee);
       },
 
       onCancel: () => {
@@ -23561,6 +23712,7 @@ async function payerPuisInnoverParmiCategories(ressource, quantite, categories) 
   afficherZoneJoueur();
 
   const succesInnovation = await innoverCategorieOuGagner2Progres(categorieChoisie);
+  const actionValidee = succesInnovation !== false;
 
 if (succesInnovation) {
   await proposerEpuisementPuissanceCeltesSiTradition(categorieChoisie);
@@ -23569,7 +23721,7 @@ if (succesInnovation) {
 afficherVue("vue-joueur");
 afficherZoneJoueur();
 
-return succesInnovation;
+return actionValidee;
 }
 
 async function choisirAcquerirOuInnoverDansCategories(mode, categories) {
@@ -26231,7 +26383,13 @@ autresJoueursPeuventPiocher(effet) {
       return false;
     }
 
-    return archiverCarteObjetDepuisNimporteOu(contexte.carteSource);
+    const succes = archiverCarteObjetDepuisNimporteOu(contexte.carteSource);
+
+    if (succes && contexte) {
+      contexte.carteSourceDejaDeplacee = true;
+    }
+
+    return succes;
   },
 
   async annoncerCategorieEtRevelerPrincipale(effet) {
@@ -26484,13 +26642,14 @@ autresJoueursPeuventPiocher(effet) {
   }
 
   const succes = await innoverCategorieOuGagner2Progres(effet.categorie);
+  const actionValidee = succes !== false;
 
   afficherVue("vue-joueur");
   afficherZoneJoueur();
   afficherBasMarche?.();
   afficherHautMarche?.();
 
-  return succes;
+  return actionValidee;
 },
 
   developper(effet) {
@@ -29035,17 +29194,7 @@ async function rappelerRegionChoisieAvecTag(tag) {
     return false;
   }
 
-  const indexTableau = jeu.joueurZones.tableauJoueur.indexOf(carteChoisie);
-
-  if (indexTableau === -1) {
-    return false;
-  }
-
-  jeu.joueurZones.tableauJoueur.splice(indexTableau, 1);
-  jeu.joueurZones.mainJoueur.push(carteChoisie);
-
-  afficherZoneJoueur();
-  return true;
+  return rappelerCarteObjetDepuisTableau(carteChoisie);
 }
 function initialiserPanneauDefausse() {
   const btnFermer = getElement("btn-fermer-defausse");
