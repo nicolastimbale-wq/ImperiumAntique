@@ -28306,10 +28306,38 @@ function obtenirCouleurNation(nation) {
    31) HELPERS TEXTE / BLOCS HTML DE CARTE
    ========================================================= */
 
-function remplacerRessources(texte = "") {
+function normaliserTexteSansAccents(valeur = "") {
+  return String(valeur || "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .trim()
+    .toLowerCase();
+}
+
+function motsSansIconePourCarte(carte = null) {
+  const nomNormalise = normaliserTexteSansAccents(carte?.nom || "");
+  const mots = new Set();
+
+  if (nomNormalise === "science") {
+    mots.add("Progrès");
+  }
+
+  if (nomNormalise === "empire mede") {
+    mots.add("Empire");
+  }
+
+  return mots;
+}
+
+function remplacerRessources(texte = "", options = {}) {
   let resultat = texte;
+  const motsExclus = new Set(options?.motsExclus || []);
 
   remplacementsTexteCarte.forEach(([source, remplacement]) => {
+    if (motsExclus.has(source)) {
+      return;
+    }
+
     resultat = resultat.replaceAll(source, remplacement);
   });
 
@@ -28330,12 +28358,12 @@ function classeTexteEffet(texte = "") {
   return "effet normal";
 }
 
-function affichageConditionVictoire(condition) {
+function affichageConditionVictoire(condition, options = {}) {
   if (!condition || condition === "Aucun") {
     return "";
   }
 
-  return `<div class="condition-victoire">${remplacerRessources(condition)}</div>`;
+  return `<div class="condition-victoire">${remplacerRessources(condition, options)}</div>`;
 }
 
 function affichagePointsVictoire(points) {
@@ -28362,7 +28390,7 @@ function affichagePointsVictoire(points) {
   return `<div class="points-victoire">${points}</div>`;
 }
 
-function affichageCoutDeveloppement(carte) {
+function affichageCoutDeveloppement(carte, options = {}) {
   if (!carte || !carte.coutDeveloppement || carte.coutDeveloppement === "Aucun") {
     return "";
   }
@@ -28374,7 +28402,7 @@ function affichageCoutDeveloppement(carte) {
   return `
     <div class="cout-developpement">
       <strong>Coût de développement :</strong>
-      ${remplacerRessources(carte.coutDeveloppement)}
+      ${remplacerRessources(carte.coutDeveloppement, options)}
     </div>
   `;
 }
@@ -28464,6 +28492,105 @@ function obtenirIconeLocalisation(localisation) {
   return "";
 }
 
+let ajustementNomCartesPlanifie = false;
+
+function ajusterTailleNomCarte(elementNom) {
+  if (!(elementNom instanceof HTMLElement)) {
+    return;
+  }
+
+  const texte = String(elementNom.textContent || "").trim();
+
+  if (!texte) {
+    return;
+  }
+
+  elementNom.style.fontSize = "";
+  elementNom.style.letterSpacing = "";
+  elementNom.style.transform = "";
+  elementNom.style.transformOrigin = "";
+
+  const largeurDisponible = elementNom.clientWidth;
+
+  if (largeurDisponible <= 0) {
+    return;
+  }
+
+  const styleCourant = window.getComputedStyle(elementNom);
+  const tailleInitiale = parseFloat(styleCourant.fontSize) || 16;
+  const espacementInitial = parseFloat(styleCourant.letterSpacing) || 0;
+  const tailleMinimale = Math.max(9.8, tailleInitiale * 0.55);
+
+  let taille = tailleInitiale;
+
+  while (elementNom.scrollWidth > largeurDisponible + 0.5 && taille > tailleMinimale) {
+    taille = Math.max(tailleMinimale, taille - 0.25);
+    elementNom.style.fontSize = `${taille.toFixed(2)}px`;
+
+    const reductionEspacement = (tailleInitiale - taille) * 0.06;
+    const nouvelEspacement = Math.max(-0.15, espacementInitial - reductionEspacement);
+    elementNom.style.letterSpacing = `${nouvelEspacement.toFixed(2)}px`;
+  }
+
+  if (elementNom.scrollWidth > largeurDisponible + 0.5) {
+    const ratio = largeurDisponible / Math.max(1, elementNom.scrollWidth);
+    const scaleX = Math.max(0.95, Math.min(1, ratio));
+    elementNom.style.transformOrigin = "center center";
+    elementNom.style.transform = `scaleX(${scaleX.toFixed(3)})`;
+  }
+}
+
+function ajusterTailleNomsCartes(racine = document) {
+  if (!racine || typeof racine.querySelectorAll !== "function") {
+    return;
+  }
+
+  const noms = racine.querySelectorAll(".nom");
+
+  noms.forEach(elementNom => {
+    ajusterTailleNomCarte(elementNom);
+  });
+}
+
+function planifierAjustementNomsCartes(racine = document) {
+  if (ajustementNomCartesPlanifie) {
+    return;
+  }
+
+  ajustementNomCartesPlanifie = true;
+
+  requestAnimationFrame(() => {
+    ajustementNomCartesPlanifie = false;
+    ajusterTailleNomsCartes(racine);
+  });
+}
+
+function initialiserAjustementNomsCartes() {
+  if (typeof MutationObserver === "undefined") {
+    return;
+  }
+
+  const observateur = new MutationObserver(mutations => {
+    for (const mutation of mutations) {
+      if (mutation.addedNodes && mutation.addedNodes.length > 0) {
+        planifierAjustementNomsCartes(document);
+        return;
+      }
+    }
+  });
+
+  observateur.observe(document.body, {
+    childList: true,
+    subtree: true
+  });
+
+  planifierAjustementNomsCartes(document);
+
+  window.addEventListener("resize", () => {
+    planifierAjustementNomsCartes(document);
+  });
+}
+
 /* =========================================================
    32) RENDU DES CARTES
    ========================================================= */
@@ -28474,10 +28601,11 @@ function creerCarteHTML(carte) {
       ? `<span class="statut">${iconeStatut(carte.statut)}</span>`
       : "";
 
+  const motsExclus = motsSansIconePourCarte(carte);
   const symboleCentreHTML = creerSymboleCentre(carte);
   const pointsVictoireHTML = affichagePointsVictoire(carte.pointsVictoire);
-  const conditionVictoireHTML = affichageConditionVictoire(carte.conditionVictoire);
-  const coutDeveloppementHTML = affichageCoutDeveloppement(carte);
+  const conditionVictoireHTML = affichageConditionVictoire(carte.conditionVictoire, { motsExclus });
+  const coutDeveloppementHTML = affichageCoutDeveloppement(carte, { motsExclus });
   const styleBandeau = carte.styleBandeau || carte.bandeau || "Aucun";
   const texteEffet = carte.effet || "";
   const jetonEpuisementHTML = affichageJetonEpuisement(carte);
@@ -28508,7 +28636,7 @@ function creerCarteHTML(carte) {
     </div>
 
     <div class="${classeTexteEffet(texteEffet)}">
-      ${remplacerRessources(texteEffet)}
+      ${remplacerRessources(texteEffet, { motsExclus })}
     </div>
 
     ${coutDeveloppementHTML}
@@ -30167,6 +30295,7 @@ function afficherVue(idVueAAfficher) {
   vueCible.classList.remove("vue-cachee");
   vueCible.classList.add("vue-active");
   mettreAJourEtatBoutonsVue(idVueAAfficher);
+  planifierAjustementNomsCartes(document);
 
   const blocMusique = getElement("bloc-musique");
   if (blocMusique) {
@@ -31324,6 +31453,7 @@ function initialiserAffichagesInitiaux() {
 function initialiserInterfaces() {
   initialiserRaccourcisClavier();
   initialiserZoomCartes();
+  initialiserAjustementNomsCartes();
   initialiserBoutonsTour();
   const btnReprendreSauvegarde = getElement("btn-reprendre-sauvegarde");
   if (btnReprendreSauvegarde) {
