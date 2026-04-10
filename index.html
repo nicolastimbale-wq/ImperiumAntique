@@ -48,14 +48,15 @@
   <button id="btn-pacifier">Pacifier</button>
   <button id="btn-innover-tour">Innover</button>
   <button id="btn-fin-tour">Fin du tour</button>
-  <button id="btn-fin-nettoyage">Terminer nettoyage</button>
   <button id="btn-commencer-tour-bot" disabled>Commencer tour Bot</button>
   <button id="btn-fin-solstice">Fin Solstice</button>
+  <button id="btn-sauvegarder-partie">Sauvegarder</button>
+  <button id="btn-charger-partie">Charger</button>
 </div>
 
     <div id="vue-accueil" class="vue-active">
   <div class="menu-accueil">
-    <h1 class="titre-accueil">Imperium</h1>
+    <h1 class="titre-accueil">Imperium Antique</h1>
     <p class="sous-titre-accueil">Choisissez votre nation et préparez la partie</p>
 
     <div class="bloc-choix">
@@ -68,17 +69,11 @@
       <select id="choix-nation-bot"></select>
     </div>
 
-    <div class="bloc-choix">
-      <label for="choix-difficulte-bot">Difficulté</label>
-      <select id="choix-difficulte-bot">
-        <option value="facile">Facile</option>
-        <option value="normal">Normal</option>
-        <option value="difficile">Difficile</option>
-      </select>
-    </div>
-
     <button class="bouton-accueil" onclick="commencerNouvellePartie()">
       Commencer la partie
+    </button>
+    <button id="btn-reprendre-sauvegarde" class="bouton-accueil" style="display:none;">
+      Reprendre la sauvegarde
     </button>
 </div>
 </div>

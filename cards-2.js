@@ -1,4 +1,4 @@
-﻿/* =========================================================
+/* =========================================================
    1) DONNÉES DES CARTES
    ========================================================= */
 
@@ -14099,9 +14099,7 @@ function nettoyerSelectionCarteBotJoueur() {
   jeu.ui.selectionCarteOnChoose = null;
   jeu.ui.selectionCarteOnCancel = null;
   jeu.ui.selectionCarteObligatoire = false;
-  if (!panneauDecompteEstVisible()) {
-    fermerPanneauUI?.();
-  }
+  fermerPanneauUI?.();
 }
 
 function botPeutAbandonnerRegions(quantite = 1) {
@@ -14699,29 +14697,15 @@ function obtenirCarteSommetPiocheMarche(clePioche) {
 
 function retirerCarteSommetPiocheMarche(clePioche) {
   switch (clePioche) {
-    case "principale-gauche": {
-      const carte = jeu.piles?.piochePrincipale?.shift?.() || null;
-
-      if (carte) {
-        verifierDeclenchementDecompteParPiochePrincipale();
-      }
-
-      return carte;
-    }
+    case "principale-gauche":
+      return jeu.piles?.piochePrincipale?.shift?.() || null;
 
     case "principale-droite": {
       const pioche = jeu.piles?.piochePrincipale;
       if (!Array.isArray(pioche) || pioche.length < 2) {
         return null;
       }
-
-      const carte = pioche.splice(1, 1)[0] || null;
-
-      if (carte) {
-        verifierDeclenchementDecompteParPiochePrincipale();
-      }
-
-      return carte;
+      return pioche.splice(1, 1)[0] || null;
     }
 
     case "civilise":
@@ -19939,8 +19923,7 @@ const jeu = {
   raison: "",
   resultat: "",
    decompteDeclenche: false,
-  mancheDeclenchementDecompte: null,
-  annonceDecompteAccusee: false
+  mancheDeclenchementDecompte: null
   
 },
 
@@ -20060,494 +20043,6 @@ callbackSelectionDansHistoire: null,
 /* =========================================================
    8) ACCÈS RAPIDE AUX ZONES DU MARCHÉ
    ========================================================= */
-
-const CLE_SAUVEGARDE_PARTIE = "imperium-save-v1";
-const VERSION_SAUVEGARDE_PARTIE = 1;
-const CLES_CARTE_CODE_RESTAUREES = new Set([
-  "effetsCode",
-  "epuiserCode",
-  "solsticeCode",
-  "conditionEpuiser"
-]);
-
-let cacheTemplatesSauvegardeCartes = null;
-
-function copierStructureAvecFonctions(valeur) {
-  if (Array.isArray(valeur)) {
-    return valeur.map(item => copierStructureAvecFonctions(item));
-  }
-
-  if (!valeur || typeof valeur !== "object") {
-    return valeur;
-  }
-
-  const copie = {};
-  Object.keys(valeur).forEach(cle => {
-    copie[cle] = copierStructureAvecFonctions(valeur[cle]);
-  });
-  return copie;
-}
-
-function creerSignatureCarteSauvegarde(carte = {}) {
-  const typeRegion = Array.isArray(carte.typeRegion) ? carte.typeRegion : [];
-
-  return JSON.stringify({
-    nom: carte.nom || "",
-    bandeau: carte.bandeau || "",
-    pin: carte.pin || "",
-    statut: carte.statut || "",
-    typeCarte: carte.typeCarte || "",
-    typeRegion,
-    effet: carte.effet || "",
-    coutDeveloppement: carte.coutDeveloppement || "",
-    categorie: carte.categorie || "",
-    styleBandeau: carte.styleBandeau || "",
-    nation: carte.nation || "",
-    localisationDepart: carte.localisationDepart || "",
-    pointsVictoire: carte.pointsVictoire ?? "",
-    conditionVictoire: carte.conditionVictoire || "",
-    jouable: carte.jouable ?? true,
-    reserveInterdite: carte.reserveInterdite ?? false
-  });
-}
-
-function obtenirTemplatesCartesSauvegarde() {
-  return [
-    ...(Array.isArray(cartesCommunes) ? cartesCommunes : []),
-    ...(Array.isArray(cartesNations) ? cartesNations : []),
-    carteRoiDesRois?.faceA,
-    carteRoiDesRois?.faceB,
-    carteStatutJoueur?.faceA,
-    carteStatutJoueur?.faceB
-  ].filter(Boolean);
-}
-
-function obtenirIndexTemplatesCartesSauvegarde() {
-  if (cacheTemplatesSauvegardeCartes) {
-    return cacheTemplatesSauvegardeCartes;
-  }
-
-  const index = new Map();
-  const templates = obtenirTemplatesCartesSauvegarde();
-
-  templates.forEach(carte => {
-    const signature = creerSignatureCarteSauvegarde(carte);
-    if (!index.has(signature)) {
-      index.set(signature, carte);
-    }
-  });
-
-  cacheTemplatesSauvegardeCartes = index;
-  return index;
-}
-
-function trouverTemplateCarteSauvegarde(carteSauvegardee) {
-  if (!carteSauvegardee || typeof carteSauvegardee !== "object") {
-    return null;
-  }
-
-  const signature = creerSignatureCarteSauvegarde(carteSauvegardee);
-  return obtenirIndexTemplatesCartesSauvegarde().get(signature) || null;
-}
-
-function rehydraterListeCartesSauvegardees(cartes = []) {
-  if (!Array.isArray(cartes)) {
-    return [];
-  }
-
-  return cartes
-    .map(carte => rehydraterCarteSauvegardee(carte))
-    .filter(Boolean);
-}
-
-function rehydraterCarteSauvegardee(carteSauvegardee) {
-  if (!carteSauvegardee || typeof carteSauvegardee !== "object") {
-    return null;
-  }
-
-  const template = trouverTemplateCarteSauvegarde(carteSauvegardee);
-  const baseTemplate = template ? copierStructureAvecFonctions(template) : {};
-  const copieSauvegardee = copierStructureAvecFonctions(carteSauvegardee);
-
-  if (template) {
-    CLES_CARTE_CODE_RESTAUREES.forEach(cle => {
-      if (cle in copieSauvegardee) {
-        delete copieSauvegardee[cle];
-      }
-    });
-  }
-
-  const reserveesSource = Array.isArray(carteSauvegardee.reservees)
-    ? carteSauvegardee.reservees
-    : [];
-
-  delete copieSauvegardee.reservees;
-
-  const carteRehydratee = normaliserCarte({
-    ...baseTemplate,
-    ...copieSauvegardee
-  });
-
-  carteRehydratee.reservees = rehydraterListeCartesSauvegardees(reserveesSource);
-  carteRehydratee.jetons = {
-    population: Number(carteRehydratee.jetons?.population || 0),
-    materiaux: Number(carteRehydratee.jetons?.materiaux || 0),
-    progres: Number(carteRehydratee.jetons?.progres || 0)
-  };
-
-  if (typeof carteSauvegardee.epuisee === "boolean") {
-    carteRehydratee.epuisee = carteSauvegardee.epuisee;
-  }
-
-  return carteRehydratee;
-}
-
-function lireSauvegardeLocalePartie() {
-  try {
-    const brut = localStorage.getItem(CLE_SAUVEGARDE_PARTIE);
-    if (!brut) {
-      return null;
-    }
-
-    return JSON.parse(brut);
-  } catch (erreur) {
-    console.error("Erreur lecture sauvegarde :", erreur);
-    return null;
-  }
-}
-
-function sauvegardePartieDisponible() {
-  return !!lireSauvegardeLocalePartie();
-}
-
-function mettreAJourDisponibiliteBoutonsSauvegarde() {
-  const disponible = sauvegardePartieDisponible();
-
-  const boutonCharger = getElement("btn-charger-partie");
-  if (boutonCharger) {
-    boutonCharger.disabled = !disponible;
-    boutonCharger.classList.toggle("bouton-inactif", !disponible);
-  }
-
-  const boutonReprendre = getElement("btn-reprendre-sauvegarde");
-  if (boutonReprendre) {
-    boutonReprendre.style.display = disponible ? "inline-block" : "none";
-    boutonReprendre.disabled = !disponible;
-  }
-}
-
-function creerSnapshotSauvegardePartie() {
-  return {
-    version: VERSION_SAUVEGARDE_PARTIE,
-    dateSauvegarde: new Date().toISOString(),
-    configurationPartie: JSON.parse(JSON.stringify(configurationPartie || {})),
-    jeu: JSON.parse(JSON.stringify({
-      manche: jeu.manche,
-      finPartie: jeu.finPartie,
-      joueur: jeu.joueur,
-      piles: jeu.piles,
-      zonesMarche: jeu.zonesMarche,
-      joueurZones: jeu.joueurZones,
-      ui: {
-        optionSpecialeDebutTourDisponible: jeu.ui.optionSpecialeDebutTourDisponible,
-        optionSpecialeDebutTourChoisie: jeu.ui.optionSpecialeDebutTourChoisie,
-        choixProgresMarcheActif: jeu.ui.choixProgresMarcheActif
-      }
-    })),
-    etatBot: JSON.parse(JSON.stringify(etatBot))
-  };
-}
-
-function appliquerConfigurationPartieSauvegardee(configurationSauvee = {}) {
-  if (!configurationSauvee || typeof configurationSauvee !== "object") {
-    return;
-  }
-
-  configurationPartie = {
-    ...configurationPartie,
-    ...configurationSauvee
-  };
-
-  const selectNationJoueur = getElement("choix-nation-joueur");
-  const selectNationBot = getElement("choix-nation-bot");
-
-  if (selectNationJoueur && configurationPartie.nationJoueur) {
-    selectNationJoueur.value = configurationPartie.nationJoueur;
-  }
-
-  if (selectNationBot && configurationPartie.nationBot) {
-    selectNationBot.value = configurationPartie.nationBot;
-  }
-
-}
-
-function reinitialiserEtatUIApresChargement(uiSauve = {}) {
-  jeu.ui.selectionRedressementActive = false;
-  jeu.ui.cartesEligiblesRedressement = [];
-  jeu.ui.callbackSelectionRedressement = null;
-
-  jeu.ui.optionSpecialeDebutTourDisponible =
-    uiSauve.optionSpecialeDebutTourDisponible !== false;
-  jeu.ui.optionSpecialeDebutTourChoisie =
-    !!uiSauve.optionSpecialeDebutTourChoisie;
-
-  jeu.ui.choixProgresMarcheActif =
-    jeu.manche.phase === PHASES.NETTOYAGE_CHOIX_PROGRES ||
-    !!uiSauve.choixProgresMarcheActif;
-
-  jeu.ui.resolveChoixRegardRenommee = null;
-  jeu.ui.regardRenommeeActif = false;
-  jeu.ui.cartesRegardRenommee = [];
-
-  jeu.ui.zoomVerrouille = false;
-  jeu.ui.sourceZoomVerrouille = null;
-  jeu.ui.actionMarcheEnAttente = null;
-
-  jeu.ui.selectionDansDefausseActive = false;
-  jeu.ui.callbackSelectionDansDefausse = null;
-  jeu.ui.defausseOuverte = false;
-  jeu.ui.callbackPanneauEtoile = null;
-  jeu.ui.panneauUIOuvert = false;
-  jeu.ui.blocageZoomJusquaMouseleave = false;
-  jeu.ui.ignorerProchainClicFermetureZoom = false;
-  jeu.ui.timestampOuvertureZoom = 0;
-
-  jeu.ui.selectionCarteActive = false;
-  jeu.ui.selectionCarteSource = null;
-  jeu.ui.selectionCarteMessage = "";
-  jeu.ui.selectionCartePredicate = null;
-  jeu.ui.selectionCarteOnChoose = null;
-  jeu.ui.selectionCarteOnCancel = null;
-  jeu.ui.selectionCarteObligatoire = false;
-
-  jeu.ui.selectionMarcheActive = false;
-  jeu.ui.selectionMarcheMessage = "";
-  jeu.ui.selectionMarchePredicate = null;
-  jeu.ui.selectionMarcheOnChoose = null;
-  jeu.ui.selectionMarcheOnCancel = null;
-  jeu.ui.selectionMarcheObligatoire = false;
-  jeu.ui.selectionMarcheAutoriserExil = false;
-  jeu.ui.selectionMarcheOnChooseExil = null;
-
-  jeu.ui.solsticeActif = jeu.manche.phase === PHASES.SOLSTICE;
-  jeu.ui.solsticeCartesTraitees = [];
-  jeu.ui.modeInteraction = null;
-
-  jeu.ui.histoireOuverte = false;
-  jeu.ui.selectionDansHistoireActive = false;
-  jeu.ui.callbackSelectionDansHistoire = null;
-}
-
-function appliquerSauvegardePartie(snapshot) {
-  const jeuSauve = snapshot?.jeu || {};
-  const pilesSauvees = jeuSauve.piles || {};
-  const zonesSauvees = jeuSauve.zonesMarche || {};
-  const zonesJoueurSauvees = jeuSauve.joueurZones || {};
-  const botSauve = snapshot?.etatBot || {};
-
-  appliquerConfigurationPartieSauvegardee(snapshot?.configurationPartie || {});
-
-  jeu.manche = {
-    ...jeu.manche,
-    ...(jeuSauve.manche || {})
-  };
-
-  jeu.finPartie = {
-    ...jeu.finPartie,
-    ...(jeuSauve.finPartie || {})
-  };
-
-  jeu.joueur = {
-    ...jeu.joueur,
-    ...(jeuSauve.joueur || {})
-  };
-
-  const clesPiles = [
-    "tradition",
-    "civilise",
-    "region",
-    "vassal",
-    "renommee",
-    "instabilite",
-    "exil",
-    "nationBase",
-    "nationCroissant",
-    "nationPleine",
-    "nationEtoile",
-    "piochePrincipale",
-    "piocheSecondaireCivilise",
-    "piocheSecondaireTradition",
-    "piocheSecondaireRegion",
-    "piocheSecondaireRenommee",
-    "piocheMarcheInstabilite"
-  ];
-
-  clesPiles.forEach(cle => {
-    jeu.piles[cle] = rehydraterListeCartesSauvegardees(pilesSauvees[cle]);
-  });
-
-  jeu.zonesMarche.zone1 = rehydraterListeCartesSauvegardees(zonesSauvees.zone1);
-  jeu.zonesMarche.zone2 = rehydraterListeCartesSauvegardees(zonesSauvees.zone2);
-  jeu.zonesMarche.zone3 = rehydraterListeCartesSauvegardees(zonesSauvees.zone3);
-  jeu.zonesMarche.zone4 = rehydraterListeCartesSauvegardees(zonesSauvees.zone4);
-  jeu.zonesMarche.zone5 = rehydraterListeCartesSauvegardees(zonesSauvees.zone5);
-  jeu.zonesMarche.roiDesRois = rehydraterCarteSauvegardee(zonesSauvees.roiDesRois);
-
-  jeu.joueurZones.carteStatutVisible = rehydraterCarteSauvegardee(zonesJoueurSauvees.carteStatutVisible);
-  jeu.joueurZones.cartePuissanceVisible = rehydraterCarteSauvegardee(zonesJoueurSauvees.cartePuissanceVisible);
-  jeu.joueurZones.cartePleineVisible = rehydraterCarteSauvegardee(zonesJoueurSauvees.cartePleineVisible);
-  jeu.joueurZones.pileEtoileJoueur = rehydraterListeCartesSauvegardees(zonesJoueurSauvees.pileEtoileJoueur);
-  jeu.joueurZones.pileCroissantJoueur = rehydraterListeCartesSauvegardees(zonesJoueurSauvees.pileCroissantJoueur);
-  jeu.joueurZones.deckJoueur = rehydraterListeCartesSauvegardees(zonesJoueurSauvees.deckJoueur);
-  jeu.joueurZones.tableauJoueur = rehydraterListeCartesSauvegardees(zonesJoueurSauvees.tableauJoueur);
-  jeu.joueurZones.mainJoueur = rehydraterListeCartesSauvegardees(zonesJoueurSauvees.mainJoueur);
-  jeu.joueurZones.defausseJoueur = rehydraterListeCartesSauvegardees(zonesJoueurSauvees.defausseJoueur);
-  jeu.joueurZones.histoireJoueur = rehydraterListeCartesSauvegardees(zonesJoueurSauvees.histoireJoueur);
-  jeu.joueurZones.pileRafraichissementNationEpuisee = !!zonesJoueurSauvees.pileRafraichissementNationEpuisee;
-  jeu.joueurZones.pileEtoileEpuisee = !!zonesJoueurSauvees.pileEtoileEpuisee;
-
-  etatBot.nation = botSauve.nation || etatBot.nation;
-  etatBot.statut = botSauve.statut || etatBot.statut;
-  etatBot.population = Number(botSauve.population || 0);
-  etatBot.materiaux = Number(botSauve.materiaux || 0);
-  etatBot.progres = Number(botSauve.progres || 0);
-  etatBot.deckCiv = rehydraterListeCartesSauvegardees(botSauve.deckCiv);
-  etatBot.defausse = rehydraterListeCartesSauvegardees(botSauve.defausse);
-  etatBot.piocheDynastie = rehydraterListeCartesSauvegardees(botSauve.piocheDynastie);
-  etatBot.histoire = rehydraterListeCartesSauvegardees(botSauve.histoire);
-  etatBot.tableau = rehydraterListeCartesSauvegardees(botSauve.tableau);
-  etatBot.cartePuissance = rehydraterCarteSauvegardee(botSauve.cartePuissance);
-  etatBot.carteMiseDeCote = rehydraterCarteSauvegardee(botSauve.carteMiseDeCote);
-  etatBot.emplacements = {
-    1: rehydraterCarteSauvegardee(botSauve.emplacements?.["1"] ?? botSauve.emplacements?.[1]),
-    2: rehydraterCarteSauvegardee(botSauve.emplacements?.["2"] ?? botSauve.emplacements?.[2]),
-    3: rehydraterCarteSauvegardee(botSauve.emplacements?.["3"] ?? botSauve.emplacements?.[3]),
-    4: rehydraterCarteSauvegardee(botSauve.emplacements?.["4"] ?? botSauve.emplacements?.[4]),
-    5: rehydraterCarteSauvegardee(botSauve.emplacements?.["5"] ?? botSauve.emplacements?.[5])
-  };
-
-  reinitialiserEtatUIApresChargement(jeuSauve.ui || {});
-
-  botUI.fileEtapes = [];
-  botUI.animationEnCours = false;
-  botUI.cartesSurlignees = [];
-  botUI.resoudreEtapeSuivante = null;
-  botUI.emplacementsReveles = {
-    1: false,
-    2: false,
-    3: false,
-    4: false,
-    5: false
-  };
-
-  tourBotEnCours = false;
-}
-
-function determinerVueApresChargement() {
-  if (jeu.finPartie?.terminee) {
-    return "vue-joueur";
-  }
-
-  if (jeu.manche.phase === "attente-tour-bot") {
-    return "vue-bot";
-  }
-
-  if (jeu.ui.choixProgresMarcheActif || jeu.manche.phase === PHASES.NETTOYAGE_CHOIX_PROGRES) {
-    return "vue-marche";
-  }
-
-  return "vue-joueur";
-}
-
-function sauvegarderPartie({ silencieux = false, origine = "manuel" } = {}) {
-  try {
-    const snapshot = creerSnapshotSauvegardePartie();
-    localStorage.setItem(CLE_SAUVEGARDE_PARTIE, JSON.stringify(snapshot));
-    mettreAJourDisponibiliteBoutonsSauvegarde();
-
-    if (!silencieux) {
-      ouvrirPanneauUI("Partie sauvegardee.", [{ label: "OK" }]);
-    } else {
-      journal(`Sauvegarde automatique (${origine}) effectuee.`);
-    }
-
-    return true;
-  } catch (erreur) {
-    console.error("Erreur sauvegarde :", erreur);
-
-    if (!silencieux) {
-      ouvrirPanneauUI("Impossible de sauvegarder la partie.", [{ label: "OK" }]);
-    }
-
-    return false;
-  }
-}
-
-function chargerPartieSauvegardee({ silencieux = false } = {}) {
-  const snapshot = lireSauvegardeLocalePartie();
-
-  if (!snapshot) {
-    if (!silencieux) {
-      ouvrirPanneauUI("Aucune sauvegarde trouvee.", [{ label: "OK" }]);
-    }
-    return false;
-  }
-
-  if (snapshot.version !== VERSION_SAUVEGARDE_PARTIE) {
-    if (!silencieux) {
-      ouvrirPanneauUI("Cette sauvegarde est incompatible avec la version actuelle.", [{ label: "OK" }]);
-    }
-    return false;
-  }
-
-  try {
-    appliquerSauvegardePartie(snapshot);
-
-    afficherUIPartie();
-    document.getElementById("barre-navigation-vues")?.classList.remove("ui-cachee");
-
-    afficherHautMarche();
-    afficherBarreIndicateurs();
-    afficherBasMarche();
-    afficherZoneJoueur();
-    afficherPileExil();
-    afficherZoneBot?.();
-
-    const phase = jeu?.manche?.phase;
-    definirEtatBoutonTourBot(phase === "attente-tour-bot");
-    mettreAJourBoutonsPhaseJoueur();
-
-    if (jeu.finPartie?.terminee) {
-      if (jeu.finPartie.resultat === "score") {
-        afficherEcranScoreFinal();
-      } else {
-        afficherEcranFinDePartie();
-      }
-    } else {
-      afficherVue(determinerVueApresChargement());
-    }
-
-    mettreAJourDisponibiliteBoutonsSauvegarde();
-
-    if (!silencieux) {
-      ouvrirPanneauUI("Partie chargee.", [{ label: "OK" }]);
-    }
-
-    return true;
-  } catch (erreur) {
-    console.error("Erreur chargement sauvegarde :", erreur);
-
-    if (!silencieux) {
-      ouvrirPanneauUI("Impossible de charger la sauvegarde.", [{ label: "OK" }]);
-    }
-
-    return false;
-  }
-}
-
-function reprendrePartieSauvegardee() {
-  return chargerPartieSauvegardee();
-}
 
 function getZonesMarche() {
   return [
@@ -21150,12 +20645,6 @@ function normaliserTexteScore(texte = "") {
 
 function compterOccurrencesScore(cible, toutesLesCartes = []) {
   const t = normaliserTexteScore(cible);
-
-  // Cas solo (ex: Infamie) : "Instabilité marquée par les autres joueurs"
-  // => on compte les Instabilités présentes chez l'adversaire (le Bot).
-  if (t.includes("instabilite") && t.includes("autres joueurs")) {
-    return compterInstabilitesRestantesBotPourScore();
-  }
 
   // Ressources joueur
   if (t === "population") return Number(jeu.joueur.population || 0);
@@ -21821,61 +21310,7 @@ function afficherEcranScoreAvance() {
 }
 
 
-   const MESSAGE_DECOMPTE_DECLENCHE =
-  "D\u00e9compte d\u00e9clench\u00e9 : terminez la manche actuelle, puis jouez une derni\u00e8re manche compl\u00e8te.";
-
-function normaliserTexteDecompteUI(texte = "") {
-  return String(texte)
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .toLowerCase();
-}
-
-function panneauDecompteEstVisible() {
-  const panneau = getElement("panneau-ui");
-  const messageDiv = getElement("panneau-ui-message");
-
-  if (!panneau || !messageDiv) {
-    return false;
-  }
-
-  if (!panneau.classList.contains("panneau-ui-ouvert")) {
-    return false;
-  }
-
-  const messageNormalise = normaliserTexteDecompteUI(messageDiv.textContent || "");
-  return messageNormalise.includes("decompte declenche");
-}
-
-function ouvrirPanneauDecompteDeclenche() {
-  ouvrirPanneauUI(
-    MESSAGE_DECOMPTE_DECLENCHE,
-    [
-      {
-        label: "OK",
-        callback: () => {
-          jeu.finPartie.annonceDecompteAccusee = true;
-        }
-      }
-    ]
-  );
-}
-
-function verifierAnnonceDecompteSiMasquee() {
-  if (
-    !jeu.finPartie.decompteDeclenche ||
-    jeu.finPartie.terminee ||
-    jeu.finPartie.annonceDecompteAccusee
-  ) {
-    return;
-  }
-
-  if (!panneauDecompteEstVisible()) {
-    ouvrirPanneauDecompteDeclenche();
-  }
-}
-
-function verifierDeclenchementDecompteParPiochePrincipale() {
+   function verifierDeclenchementDecompteParPiochePrincipale() {
   if (jeu.finPartie.decompteDeclenche) {
     return false;
   }
@@ -21888,20 +21323,18 @@ function verifierDeclenchementDecompteParPiochePrincipale() {
   return false;
 }
 
-function declencherDecompte() {
+   function declencherDecompte() {
   if (jeu.finPartie.decompteDeclenche) {
     return;
   }
 
   jeu.finPartie.decompteDeclenche = true;
   jeu.finPartie.mancheDeclenchementDecompte = jeu.manche.numero;
-  jeu.finPartie.annonceDecompteAccusee = false;
 
-  ouvrirPanneauDecompteDeclenche();
-
-  // Securise les cas ou un autre flux UI ecrase le panneau juste apres le trigger.
-  setTimeout(verifierAnnonceDecompteSiMasquee, 0);
-  setTimeout(verifierAnnonceDecompteSiMasquee, 100);
+  ouvrirPanneauUI(
+    "Décompte déclenché : terminez la manche actuelle, puis jouez une dernière manche complète.",
+    [{ label: "OK" }]
+  );
 }
 
 function verifierFinParDecompte() {
@@ -22240,7 +21673,7 @@ function initialiserPanneauExil() {
   });
 }  
 
-function ouvrirPanneauChoixMarcheSelection(message, obligatoire = false, configuration = {}) {
+   function ouvrirPanneauChoixMarcheSelection(message, obligatoire = false) {
   const panneau = getElement("panneau-choix-marche-selection");
   const messageDiv = getElement("panneau-choix-marche-selection-message");
   const btn = getElement("btn-fermer-choix-marche-selection");
@@ -22251,28 +21684,13 @@ function ouvrirPanneauChoixMarcheSelection(message, obligatoire = false, configu
 
   messageDiv.textContent = message || "Choisissez une carte du marché.";
 
-  const boutonVisible = configuration.afficherBouton === true || !obligatoire;
-  const libelleBouton = configuration.libelleBouton || "OK";
-  const actionBouton = configuration.actionBouton || null;
-  const boutonGrand = configuration.boutonGrand === true;
-
-  btn.classList.remove("btn-panneau-marche-grand");
-  if (boutonGrand) {
-    btn.classList.add("btn-panneau-marche-grand");
-  }
-
-  if (!boutonVisible) {
+  if (obligatoire) {
     btn.style.display = "none";
     btn.onclick = null;
   } else {
     btn.style.display = "inline-block";
-    btn.textContent = libelleBouton;
+    btn.textContent = "OK";
     btn.onclick = () => {
-      if (typeof actionBouton === "function") {
-        actionBouton();
-        return;
-      }
-
       panneau.classList.remove("panneau-ui-ouvert");
       panneau.classList.add("panneau-ui-cache");
     };
@@ -24697,16 +24115,6 @@ async function choisirPiocheViaSelectionMarche(clePioche) {
  function appliquerEtatSelectionMarche() {
   const zones = document.querySelectorAll("[data-zone-marche]");
 
-  // Sécurité anti-softlock : si l'étape "ajouter 1 Progrès" est active
-  // mais qu'aucune carte du marché n'est visible, on passe directement
-  // à l'étape suivante du nettoyage.
-  if (jeu.ui.choixProgresMarcheActif && obtenirCartesVisiblesMarche().length === 0) {
-    terminerChoixProgresMarcheEtPasserAuNettoyage(
-      "Le marché est vide : ajout de Progrès ignoré. Vous pouvez maintenant défausser des cartes puis terminer le nettoyage."
-    );
-    return;
-  }
-
   zones.forEach(elementZone => {
     const cleZone = elementZone.dataset.zoneMarche;
     const selectionnable = marcheEstSelectionnable(cleZone);
@@ -24767,7 +24175,20 @@ async function choisirPiocheViaSelectionMarche(clePioche) {
   }
 
   ajouterProgresSurCarteMarche(cartePrincipale);
-  terminerChoixProgresMarcheEtPasserAuNettoyage();
+
+  jeu.ui.choixProgresMarcheActif = false;
+  jeu.manche.phase = PHASES.NETTOYAGE_DEFAUSSE;
+  mettreAJourBoutonsPhaseJoueur();
+
+  reinitialiserActionsJoueur();
+  reinitialiserEpuisementJoueur();
+
+  afficherBasMarche();
+  afficherHautMarche();
+  afficherZoneJoueur();
+  afficherVue("vue-joueur");
+
+  avertir("Vous pouvez maintenant défausser autant de cartes que vous voulez de votre main, puis terminer le nettoyage.");
   return;
 }
 
@@ -27703,56 +27124,15 @@ function defausserTouteLaMainJoueur() {
   afficherZoneJoueur();
 }
 
-function terminerChoixProgresMarcheEtPasserAuNettoyage(
-  message = "Vous pouvez maintenant défausser autant de cartes que vous voulez de votre main, puis terminer le nettoyage."
-) {
-  jeu.ui.choixProgresMarcheActif = false;
-  fermerPanneauChoixMarcheSelection();
-  jeu.manche.phase = PHASES.NETTOYAGE_DEFAUSSE;
-  mettreAJourBoutonsPhaseJoueur();
-
-  reinitialiserActionsJoueur();
-  reinitialiserEpuisementJoueur();
-
-  afficherBasMarche();
-  afficherHautMarche?.();
-  afficherZoneJoueur();
-  afficherVue("vue-joueur");
-
-  ouvrirPanneauChoixMarcheSelection(message, true, {
-    afficherBouton: true,
-    libelleBouton: "Terminer le nettoyage",
-    boutonGrand: true,
-    actionBouton: () => {
-      terminerNettoyage();
-    }
-  });
-}
-
-function demarrerChoixProgresMarcheFinTour() {
+function passerAuNettoyageJoueur() {
   jeu.manche.phase = PHASES.NETTOYAGE_CHOIX_PROGRES;
   jeu.ui.choixProgresMarcheActif = true;
-  mettreAJourBoutonsPhaseJoueur();
 
   afficherVue("vue-marche");
   afficherZoneJoueur();
   afficherBasMarche();
 
-  if (obtenirCartesVisiblesMarche().length === 0) {
-    terminerChoixProgresMarcheEtPasserAuNettoyage(
-      "Fin du tour. Le marché est vide : ajout de Progrès ignoré. Vous pouvez maintenant défausser des cartes puis terminer le nettoyage."
-    );
-    return false;
-  }
-  ouvrirPanneauChoixMarcheSelection(
-    "Fin du tour. Choisissez une carte du marché pour y ajouter 1 Progrès.",
-    true
-  );
-  return true;
-}
-
-function passerAuNettoyageJoueur() {
-  demarrerChoixProgresMarcheFinTour();
+  avertir("Fin du tour. Choisissez une carte du marché pour y ajouter 1 Progrès.");
   journal("passerAuNettoyageJoueur ->", jeu.manche.phase);
 }
 
@@ -27942,7 +27322,15 @@ function terminerTourJoueur() {
   jeu.joueurZones.pileEtoileEpuisee = false;
 
   // 🔽 Passage au nettoyage
-  demarrerChoixProgresMarcheFinTour();
+  jeu.manche.phase = PHASES.NETTOYAGE_CHOIX_PROGRES;
+  jeu.ui.choixProgresMarcheActif = true;
+  mettreAJourBoutonsPhaseJoueur();
+
+  afficherVue("vue-marche");
+  afficherZoneJoueur();
+  afficherBasMarche();
+
+  avertir("Fin du tour. Choisissez une carte du marché pour y ajouter 1 Progrès.");
   journal("terminerTourJoueur ->", jeu.manche.phase);
 }
 
@@ -27959,7 +27347,19 @@ function cliquerCarteMarche(nomCarte) {
   }
 
   ajouterProgresSurCarteMarche(carte);
-  terminerChoixProgresMarcheEtPasserAuNettoyage();
+
+  jeu.ui.choixProgresMarcheActif = false;
+  jeu.manche.phase = PHASES.NETTOYAGE_DEFAUSSE;
+  mettreAJourBoutonsPhaseJoueur();
+
+  reinitialiserActionsJoueur();
+  reinitialiserEpuisementJoueur();
+
+  afficherBasMarche();
+  afficherZoneJoueur();
+  afficherVue("vue-joueur");
+
+  avertir("Vous pouvez maintenant défausser autant de cartes que vous voulez de votre main, puis terminer le nettoyage.");
   journal("cliquerCarteMarche ->", jeu.manche.phase);
   console.log("PHASE =", jeu.manche.phase);
 console.log("PHASES.NETTOYAGE_DEFAUSSE =", PHASES.NETTOYAGE_DEFAUSSE);
@@ -27975,8 +27375,6 @@ function terminerNettoyage() {
   if (jeu.manche.phase !== PHASES.NETTOYAGE_DEFAUSSE) {
     return;
   }
-
-  fermerPanneauChoixMarcheSelection();
 
   piocherJusquaLimiteMain(async () => {
     jeu.manche.phase = "attente-tour-bot";
@@ -28006,8 +27404,6 @@ async function finaliserFinDeMancheApresSolstice() {
   if (verifierFinParDecompte()) {
     return;
   }
-
-  sauvegarderPartie({ silencieux: true, origine: "auto-fin-solstice" });
 
   afficherZoneJoueur();
 
@@ -28184,7 +27580,7 @@ const iconesStatut = {
 
 const iconesRegion = {
   Sac: `<img class="icone-centre" src="icons/imperium-sac.png" alt="Sac">`,
-  "Blé": `<img class="icone-centre" src="icons/imperium-ble.png" alt="Blé">`,
+  Blé: `<img class="icone-centre" src="icons/imperium-ble.png" alt="Blé">`,
   Eau: `<img class="icone-centre" src="icons/imperium-eau.png" alt="Eau">`
 };
 
@@ -28215,14 +27611,14 @@ const iconesIndicateur = {
 };
 
 const couleursBandeau = {
-  [CATEGORIES.REGION]: "#caa24a",
-  [CATEGORIES.CIVILISE]: "#b7afa1",
-  [CATEGORIES.TRADITION]: "#5d8b4a",
-  [CATEGORIES.INSTABILITE]: "#c15345",
-  [CATEGORIES.VASSAL]: "#4f6fa3",
-  [CATEGORIES.RENOMMEE]: "#b56798",
-  Aucun: "#8e8479",
-  Noir: "#2a2622"
+  [CATEGORIES.REGION]: "#d4af37",
+  [CATEGORIES.CIVILISE]: "#b0b0b0",
+  [CATEGORIES.TRADITION]: "#2f8f2f",
+  [CATEGORIES.INSTABILITE]: "#d62828",
+  [CATEGORIES.VASSAL]: "#2d558e",
+  [CATEGORIES.RENOMMEE]: "#c05a9d",
+  Aucun: "#777575",
+  Noir: "#111111"
 };
 
 const remplacementsTexteCarte = [
@@ -28291,7 +27687,7 @@ function obtenirCouleurNation(nation) {
   const couleurs = {
     Romains: "#ff1e1e",
     Celtes: "#015020",
-    "Macédoniens": "#970192",
+    Macédoniens: "#970192",
     Perses: "#c426bf",
     Grecs: "#ffffff",
     Vikings: "#f0b12a",
@@ -28529,18 +27925,40 @@ function creerCarteHTML(carte) {
 
 function creerCarteStatutHTML(face) {
   const estBarbare = face.couleur === "rouge";
-  const couleur = estBarbare ? "#E32320" : "#4699D4";
+  const couleur = estBarbare ? "#d62828" : "#2d558e";
   const classeCarte = estBarbare ? "carte-statut barbare" : "carte-statut empire";
   const iconeStatutHTML = `<span class="statut">${iconeStatut(face.statut)}</span>`;
 
   let iconeCentreHTML = "";
 
   if (face.iconeCentrale === "hache") {
-    iconeCentreHTML = `<img src="icons/hache-barbare.png" class="illustration-statut" alt="Hache barbare">`;
+    iconeCentreHTML = `
+      <svg viewBox="0 0 100 100" class="illustration-statut">
+        <circle cx="50" cy="45" r="22" fill="currentColor" opacity="0.18"></circle>
+        <rect x="47" y="30" width="6" height="42" rx="3" fill="currentColor" opacity="0.25"></rect>
+        <path d="M35 28 C22 32, 18 46, 28 56 C36 64, 48 60, 52 50 L52 28 C46 25, 41 25, 35 28Z"
+              fill="currentColor" opacity="0.25"></path>
+        <path d="M65 28 C78 32, 82 46, 72 56 C64 64, 52 60, 48 50 L48 28 C54 25, 59 25, 65 28Z"
+              fill="currentColor" opacity="0.25"></path>
+      </svg>
+    `;
   }
 
   if (face.iconeCentrale === "couronne") {
-    iconeCentreHTML = `<img src="icons/Couronne-empire.png" class="illustration-statut" alt="Couronne empire">`;
+    iconeCentreHTML = `
+      <svg viewBox="0 0 100 100" class="illustration-statut">
+        <path d="M22 68 L30 38 L44 52 L50 30 L56 52 L70 38 L78 68 Z"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="6"
+              opacity="0.22"></path>
+        <rect x="24" y="68" width="52" height="10" rx="2"
+              fill="currentColor" opacity="0.22"></rect>
+        <circle cx="30" cy="36" r="3" fill="currentColor" opacity="0.22"></circle>
+        <circle cx="50" cy="28" r="3" fill="currentColor" opacity="0.22"></circle>
+        <circle cx="70" cy="36" r="3" fill="currentColor" opacity="0.22"></circle>
+      </svg>
+    `;
   }
 
   return `
@@ -28644,9 +28062,8 @@ function creerZoneMarcheHTML(zone) {
 
         ${materiauxSurCarte > 0 ? `
           <div class="badge-materiaux-marche">
-            <span>+</span>
-            <span>${materiauxSurCarte}</span>
             <img src="icons/imperium-materiaux.png" class="icone-ressource" alt="Matériaux">
+            <span>${materiauxSurCarte}</span>
           </div>
         ` : ""}
       </div>
@@ -28955,8 +28372,6 @@ function afficherSlotPuissance() {
 
   const aEffetEpuiser =
     Array.isArray(carte.epuiserCode) && carte.epuiserCode.length > 0;
-  const afficherBoutonEpuiserPuissance =
-    aEffetEpuiser && carte.nom !== "Carthaginois";
 
   zone.innerHTML = `
     <div class="slot-puissance-wrapper">
@@ -28964,7 +28379,7 @@ function afficherSlotPuissance() {
         ${creerCarteHTML(carte)}
       </div>
       ${
-        afficherBoutonEpuiserPuissance
+        aEffetEpuiser
           ? `<button class="bouton-epuiser-puissance" type="button">Épuiser</button>`
           : ""
       }
@@ -29161,7 +28576,7 @@ function afficherSlotDefausse() {
   if (!defausse || defausse.length === 0) {
     zone.innerHTML = `
       <div class="pile-verticale-cachee">
-        <div class="contour-defausse-vide"></div>
+        <div class="dos-carte-verticale" style="background: #e8e8e8;"></div>
       </div>
     `;
     return;
@@ -29861,7 +29276,7 @@ function afficherPileExil() {
   if (!pile || pile.length === 0) {
     zone.innerHTML = `
       <div class="pile-visible pile-exil-vide">
-        <div class="dos-carte-verticale"></div>
+        <div class="dos-carte-verticale" style="background:#ddd;"></div>
       </div>
     `;
   } else {
@@ -30122,25 +29537,6 @@ function desactiverScrollPagesScore() {
   }
 }
 
-function mettreAJourEtatBoutonsVue(idVueActive) {
-  const correspondances = [
-    ["btn-vue-marche", "vue-marche"],
-    ["btn-vue-joueur", "vue-joueur"],
-    ["btn-vue-bot", "vue-bot"]
-  ];
-
-  correspondances.forEach(([idBouton, idVue]) => {
-    const bouton = document.getElementById(idBouton);
-    if (!bouton) {
-      return;
-    }
-
-    const estActif = idVue === idVueActive;
-    bouton.classList.toggle("est-actif-vue", estActif);
-    bouton.setAttribute("aria-pressed", estActif ? "true" : "false");
-  });
-}
-
 function afficherVue(idVueAAfficher) {
   const idsVues = [
     "vue-accueil",
@@ -30166,16 +29562,6 @@ function afficherVue(idVueAAfficher) {
 
   vueCible.classList.remove("vue-cachee");
   vueCible.classList.add("vue-active");
-  mettreAJourEtatBoutonsVue(idVueAAfficher);
-
-  const blocMusique = getElement("bloc-musique");
-  if (blocMusique) {
-    if (idVueAAfficher === "vue-accueil") {
-      blocMusique.classList.add("ui-cachee");
-    } else {
-      blocMusique.classList.remove("ui-cachee");
-    }
-  }
 
   requestAnimationFrame(() => {
     if (
@@ -30901,7 +30287,8 @@ function choisirCarteRegardRenommee(indexChoisi) {
 
    let configurationPartie = {
   nationJoueur: null,
-  nationBot: null
+  nationBot: null,
+  difficulteBot: null
 };
 
 function obtenirListeNationsDepuisCartes(listeCartes) {
@@ -30980,9 +30367,11 @@ function obtenirCartesDuneNation(nomNation, listeCartes) {
 function commencerNouvellePartie() {
   const selectNationJoueur = document.getElementById("choix-nation-joueur");
   const selectNationBot = document.getElementById("choix-nation-bot");
+  const selectDifficulteBot = document.getElementById("choix-difficulte-bot");
 
   configurationPartie.nationJoueur = selectNationJoueur.value;
   configurationPartie.nationBot = selectNationBot.value;
+  configurationPartie.difficulteBot = selectDifficulteBot.value;
 
   initialiserJeu();
   initialiserBot();
@@ -31020,8 +30409,6 @@ function initialiserBoutonsTour() {
   const btnFinNettoyage = getElement("btn-fin-nettoyage");
   const btnCommencerTourBot = getElement("btn-commencer-tour-bot");
   const btnFinSolstice = getElement("btn-fin-solstice");
-  const btnSauvegarderPartie = getElement("btn-sauvegarder-partie");
-  const btnChargerPartie = getElement("btn-charger-partie");
 
   if (btnFinTour) {
     btnFinTour.onclick = terminerTourJoueur;
@@ -31043,21 +30430,8 @@ function initialiserBoutonsTour() {
     };
   }
 
-  if (btnSauvegarderPartie) {
-    btnSauvegarderPartie.onclick = () => {
-      sauvegarderPartie();
-    };
-  }
-
-  if (btnChargerPartie) {
-    btnChargerPartie.onclick = () => {
-      chargerPartieSauvegardee();
-    };
-  }
-
   definirEtatBoutonTourBot(false);
   mettreAJourBoutonsPhaseJoueur();
-  mettreAJourDisponibiliteBoutonsSauvegarde();
 }
 
 function mettreAJourBoutonsPhaseJoueur() {
@@ -31325,13 +30699,6 @@ function initialiserInterfaces() {
   initialiserRaccourcisClavier();
   initialiserZoomCartes();
   initialiserBoutonsTour();
-  const btnReprendreSauvegarde = getElement("btn-reprendre-sauvegarde");
-  if (btnReprendreSauvegarde) {
-    btnReprendreSauvegarde.onclick = () => {
-      reprendrePartieSauvegardee();
-    };
-  }
-  mettreAJourDisponibiliteBoutonsSauvegarde();
   initialiserFermetureZoomVerrouille();
   initialiserPanneauDefausse();
   initialiserPanneauEtoile();
@@ -31497,6 +30864,4 @@ document.addEventListener("keydown", function(event) {
   }
 
 });
-
-
 
