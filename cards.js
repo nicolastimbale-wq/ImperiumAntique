@@ -1,4 +1,4 @@
-﻿/* =========================================================
+/* =========================================================
    1) DONNÉES DES CARTES
    ========================================================= */
 
@@ -8678,6 +8678,79 @@ const carteStatutJoueur = {
   }
 };
 
+function normaliserSegmentTemplateId(valeur = "") {
+  return String(valeur || "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    || "x";
+}
+
+function construireTemplateIdCarte(prefixe, carte, index) {
+  const nom = normaliserSegmentTemplateId(carte?.nom || "carte");
+  const nation = normaliserSegmentTemplateId(carte?.nation || "aucun");
+  const localisation = normaliserSegmentTemplateId(carte?.localisationDepart || "aucun");
+  return `${prefixe}:${nation}:${nom}:${localisation}:${index + 1}`;
+}
+
+function attribuerTemplateIdsSurListe(listeCartes, prefixe) {
+  if (!Array.isArray(listeCartes)) {
+    return;
+  }
+
+  listeCartes.forEach((carte, index) => {
+    if (!carte || typeof carte !== "object") {
+      return;
+    }
+
+    if (!carte.templateId) {
+      carte.templateId = construireTemplateIdCarte(prefixe, carte, index);
+    }
+  });
+}
+
+function validerTemplateIdsCartes() {
+  const ids = new Map();
+  const erreurs = [];
+
+  obtenirTemplatesCartesSauvegarde().forEach(carte => {
+    const id = carte?.templateId;
+    const nom = carte?.nom || "(sans nom)";
+
+    if (typeof id !== "string" || id.trim() === "") {
+      erreurs.push(`templateId manquant: ${nom}`);
+      return;
+    }
+
+    if (ids.has(id)) {
+      erreurs.push(`templateId duplique: ${id} (${ids.get(id)} / ${nom})`);
+      return;
+    }
+
+    ids.set(id, nom);
+  });
+
+  if (erreurs.length > 0) {
+    throw new Error(`Validation templateId impossible:\n${erreurs.join("\n")}`);
+  }
+}
+
+function initialiserTemplateIdsCartes() {
+  attribuerTemplateIdsSurListe(cartesCommunes, "commune");
+  attribuerTemplateIdsSurListe(cartesNations, "nation");
+
+  carteRoiDesRois.faceA.templateId = carteRoiDesRois.faceA.templateId || "special:roi-des-rois:face-a";
+  carteRoiDesRois.faceB.templateId = carteRoiDesRois.faceB.templateId || "special:roi-des-rois:face-b";
+  carteStatutJoueur.faceA.templateId = carteStatutJoueur.faceA.templateId || "special:statut-joueur:face-a";
+  carteStatutJoueur.faceB.templateId = carteStatutJoueur.faceB.templateId || "special:statut-joueur:face-b";
+
+  validerTemplateIdsCartes();
+}
+
+initialiserTemplateIdsCartes();
+
 
 /* =========================================================
    2) CONFIGURATION / CONSTANTES
@@ -8758,22 +8831,22 @@ const UI = Object.freeze({
     }
   }
 
-  console.log("=== BOT DYNASTIE | CARTES SOURCE ===");
+  debugLog("=== BOT DYNASTIE | CARTES SOURCE ===");
 Object.keys(etoilesParPV)
   .sort((a, b) => Number(b) - Number(a))
   .forEach(pv => {
-    console.log(
+    debugLog(
       `Étoiles ${pv} PV (avant mélange) :`,
       etoilesParPV[pv].map(c => c.nom)
     );
   });
 
-console.log(
+debugLog(
   "Pleine :",
   cartePleine ? `${cartePleine.nom} [PV:${cartePleine.pointsVictoire}]` : "aucune"
 );
 
-console.log(
+debugLog(
   "Croissants (avant mélange) :",
   croissants.map(c => `${c.nom} [PV:${c.pointsVictoire}]`)
 );
@@ -8786,7 +8859,7 @@ Object.keys(etoilesParPV)
     const groupe = [...etoilesParPV[pv]];
     melanger(groupe);
 
-    console.log(
+    debugLog(
       `Étoiles ${pv} PV (après mélange) :`,
       groupe.map(c => c.nom)
     );
@@ -8797,7 +8870,7 @@ Object.keys(etoilesParPV)
 const croissantsMelanges = [...croissants];
 melanger(croissantsMelanges);
 
-console.log(
+debugLog(
   "Croissants (après mélange) :",
   croissantsMelanges.map(c => `${c.nom} [PV:${c.pointsVictoire}]`)
 );
@@ -8808,9 +8881,9 @@ const piocheFinale = [
   ...etoilesTrieesEtMelangeesParEgalite
 ].filter(Boolean);
 
-console.log("=== BOT DYNASTIE | ORDRE FINAL DE LA PILE ===");
+debugLog("=== BOT DYNASTIE | ORDRE FINAL DE LA PILE ===");
 piocheFinale.forEach((carte, index) => {
-  console.log(
+  debugLog(
     `${index + 1}. ${carte.nom} | localisation=${carte.localisationDepart} | PV=${carte.pointsVictoire}`
   );
 });
@@ -10062,7 +10135,7 @@ const ACTIONS_BOT = {
         `${carte.nom} ferait perdre 1 Matériaux et 1 Progrès au joueur.`
       );
 
-      console.log("CAP TEST | bloque =", bloque);
+      debugLog("CAP TEST | bloque =", bloque);
 
       if (bloque) {
         journal(`Le joueur rappelle Cap pour éviter l'effet de ${carte.nom}.`);
@@ -14233,14 +14306,14 @@ function renvoyerInstabiliteReveleeBot(carte) {
 }
 
 function botCarteDynastieVersDefausseCiv() {
-  console.log(
+  debugLog(
     "DYNASTIE AVANT =",
     (etatBot.piocheDynastie || []).map(c => `${c.nom} [${c.localisationDepart}]`)
   );
 
   const carte = etatBot.piocheDynastie.shift() || null;
 
-  console.log(
+  debugLog(
     "CARTE RETIRÉE =",
     carte ? `${carte.nom} [${carte.localisationDepart}]` : null
   );
@@ -14253,10 +14326,10 @@ function botCarteDynastieVersDefausseCiv() {
 
   if (String(carte.localisationDepart || "").trim() === "Pleine") {
     etatBot.statut = STATUTS.EMPIRE;
-    console.log("BOT -> passage en Empire :", carte.nom);
+    debugLog("BOT -> passage en Empire :", carte.nom);
   }
 
-  console.log("STATUT BOT APRÈS RETRAIT =", etatBot.statut);
+  debugLog("STATUT BOT APRÈS RETRAIT =", etatBot.statut);
 
   afficherZoneBot?.();
   return carte;
@@ -14757,7 +14830,7 @@ function obtenirCartesAcquerablesBot(categories = []) {
 
   cartes.sort((a, b) => comparerCartesPourBot(a.carte, b.carte));
 
-  console.log(
+  debugLog(
     "BOT ACQUÉRIR candidats =",
     cartes.map(obj => `${obj.cle}:${obj.carte.nom}`)
   );
@@ -14775,7 +14848,7 @@ function obtenirCartesInnovablesBot(categories = []) {
   cartesBas.sort((a, b) => comparerCartesPourBot(a.carte, b.carte));
 
   if (cartesBas.length > 0) {
-    console.log(
+    debugLog(
       "BOT INNOVER candidats bas =",
       cartesBas.map(obj => `${obj.cle}:${obj.carte.nom}`)
     );
@@ -14788,7 +14861,7 @@ function obtenirCartesInnovablesBot(categories = []) {
 
   cartesHaut.sort((a, b) => comparerCartesPourBot(a.carte, b.carte));
 
-  console.log(
+  debugLog(
     "BOT INNOVER candidats haut =",
     cartesHaut.map(obj => `${obj.cle}:${obj.carte.nom}`)
   );
@@ -14806,7 +14879,7 @@ function obtenirCartesExilablesBot() {
     .filter(obj => !!obj.carte)
     .filter(obj => botValeurJetonsCarte(obj.carte) === 0);
 
-  console.log(
+  debugLog(
     "BOT EXIL candidats =",
     cartes.map(obj => `${obj.cle}:${obj.carte.nom}`)
   );
@@ -14848,7 +14921,7 @@ function botChoisirMeilleureCarteInnovation(categories = []) {
 
   cartesBas.sort((a, b) => comparerCartesPourBot(a.carte, b.carte));
 
-  console.log(
+  debugLog(
     "BOT INNOVER candidats bas =",
     cartesBas.map(obj => `${obj.cle}:${obj.carte.nom}`)
   );
@@ -14863,7 +14936,7 @@ function botChoisirMeilleureCarteInnovation(categories = []) {
 
   cartesHaut.sort((a, b) => comparerCartesPourBot(a.carte, b.carte));
 
-  console.log(
+  debugLog(
     "BOT INNOVER candidats haut =",
     cartesHaut.map(obj => `${obj.cle}:${obj.carte.nom}`)
   );
@@ -14919,7 +14992,7 @@ function innoverCarteBotSelonPriorite(categories = []) {
 function exilerCarteSelonReglesBot() {
   const choix = botChoisirMeilleureCarteExil();
 
-  console.log("CHOIX EXIL BOT =", choix?.cle, choix?.carte?.nom);
+  debugLog("CHOIX EXIL BOT =", choix?.cle, choix?.carte?.nom);
 
   if (!choix || !choix.cle || !choix.carte) {
     return false;
@@ -15513,7 +15586,7 @@ function botChoisirMeilleureCarteParmiZonesVisibles(categories = []) {
 function botAcquerirCarteSelonPriorite(categories = []) {
   const choix = botChoisirMeilleureCarteAcquisition(categories);
 
-  console.log("BOT ACQUÉRIR choix =", choix?.cle, choix?.carte?.nom);
+  debugLog("BOT ACQUÉRIR choix =", choix?.cle, choix?.carte?.nom);
 
   if (!choix || !choix.cle || !choix.carte) {
     return false;
@@ -15547,12 +15620,12 @@ function botAcquerirCarteSelonPriorite(categories = []) {
 function botInnoverCarteSelonPriorite(categories = []) {
   const choix = botChoisirMeilleureCarteInnovation(categories);
 
-  console.log("RAW CHOIX INNOVER =", choix);
-  console.log("BOT INNOVER choix =", choix?.cle, choix?.carte?.nom);
+  debugLog("RAW CHOIX INNOVER =", choix);
+  debugLog("BOT INNOVER choix =", choix?.cle, choix?.carte?.nom);
 
   if (!choix || !choix.cle || !choix.carte) {
     botGagneProgres(2);
-    console.log("BOT INNOVER impossible -> +2 Progrès");
+    debugLog("BOT INNOVER impossible -> +2 Progrès");
     afficherZoneBot?.();
     return "progres";
   }
@@ -15567,7 +15640,7 @@ function botInnoverCarteSelonPriorite(categories = []) {
 
   if (!carte) {
     botGagneProgres(2);
-    console.log("BOT INNOVER retrait impossible -> +2 Progrès");
+    debugLog("BOT INNOVER retrait impossible -> +2 Progrès");
     afficherBasMarche?.();
     afficherHautMarche?.();
     afficherZoneBot?.();
@@ -15576,7 +15649,7 @@ function botInnoverCarteSelonPriorite(categories = []) {
 
   ajouterCarteAuDeckCivBot(carte);
 
-  console.log("BOT INNOVER carte ajoutée au deck C.I.V. =", carte.nom);
+  debugLog("BOT INNOVER carte ajoutée au deck C.I.V. =", carte.nom);
 
   afficherBasMarche?.();
   afficherHautMarche?.();
@@ -16993,7 +17066,7 @@ function retirerMateriauxSurCarteMarche(carte) {
 }
 
    async function chercherRegionDansDefaussePourErik() {
-  console.log("DEBUG ERIK | entrée chercherRegionDansDefaussePourErik");
+  debugLog("DEBUG ERIK | entrée chercherRegionDansDefaussePourErik");
 
   fermerZoomVerrouille?.();
   fermerZoomTemporaire?.();
@@ -17003,48 +17076,48 @@ function retirerMateriauxSurCarteMarche(carte) {
     carte && inclutCategorie(carte, CATEGORIES.REGION)
   );
 
-  console.log("DEBUG ERIK | régions défausse =", regions.map(c => c.nom));
+  debugLog("DEBUG ERIK | régions défausse =", regions.map(c => c.nom));
 
   if (regions.length === 0) {
-    console.log("DEBUG ERIK | aucune région dans défausse");
+    debugLog("DEBUG ERIK | aucune région dans défausse");
     return null;
   }
 
   const carteChoisie = await new Promise(resolve => {
-    console.log("DEBUG ERIK | ouverture vue défausse");
+    debugLog("DEBUG ERIK | ouverture vue défausse");
     ouvrirVueDefausse(
       true,
       valeur => {
-        console.log("DEBUG ERIK | Promise défausse résolue avec =", valeur?.nom || null);
+        debugLog("DEBUG ERIK | Promise défausse résolue avec =", valeur?.nom || null);
         resolve(valeur);
       },
       carte => carte && inclutCategorie(carte, CATEGORIES.REGION)
     );
   });
 
-  console.log("DEBUG ERIK | sortie await défausse avec =", carteChoisie?.nom || null);
+  debugLog("DEBUG ERIK | sortie await défausse avec =", carteChoisie?.nom || null);
 
   fermerZoomVerrouille?.();
   fermerZoomTemporaire?.();
 
   if (!carteChoisie) {
-    console.log("DEBUG ERIK | aucune carte choisie dans défausse");
+    debugLog("DEBUG ERIK | aucune carte choisie dans défausse");
     return null;
   }
 
   const index = defausse.indexOf(carteChoisie);
 
   if (index === -1) {
-    console.log("DEBUG ERIK | carte choisie introuvable dans défausse");
+    debugLog("DEBUG ERIK | carte choisie introuvable dans défausse");
     return null;
   }
 
-  console.log("DEBUG ERIK | carte retirée de la défausse =", carteChoisie.nom);
+  debugLog("DEBUG ERIK | carte retirée de la défausse =", carteChoisie.nom);
   return defausse.splice(index, 1)[0];
 }
 
 async function chercherRegionDansDeckJoueurPourErik() {
-  console.log("DEBUG ERIK | entrée chercherRegionDansDeckJoueurPourErik");
+  debugLog("DEBUG ERIK | entrée chercherRegionDansDeckJoueurPourErik");
 
   fermerZoomVerrouille?.();
   fermerZoomTemporaire?.();
@@ -17054,10 +17127,10 @@ async function chercherRegionDansDeckJoueurPourErik() {
     carte && inclutCategorie(carte, CATEGORIES.REGION)
   );
 
-  console.log("DEBUG ERIK | régions deck joueur =", regions.map(c => c.nom));
+  debugLog("DEBUG ERIK | régions deck joueur =", regions.map(c => c.nom));
 
   if (regions.length === 0) {
-    console.log("DEBUG ERIK | aucune région dans deck joueur");
+    debugLog("DEBUG ERIK | aucune région dans deck joueur");
     return null;
   }
 
@@ -17065,7 +17138,7 @@ async function chercherRegionDansDeckJoueurPourErik() {
     carte => carte && inclutCategorie(carte, CATEGORIES.REGION)
   );
 
-  console.log("DEBUG ERIK | retour demanderCarteDepuisDeckJoueur =", carteChoisie?.nom || null);
+  debugLog("DEBUG ERIK | retour demanderCarteDepuisDeckJoueur =", carteChoisie?.nom || null);
 
   if (!carteChoisie) {
     return null;
@@ -17074,7 +17147,7 @@ async function chercherRegionDansDeckJoueurPourErik() {
   const index = deck.indexOf(carteChoisie);
 
   if (index === -1) {
-    console.log("DEBUG ERIK | carte choisie introuvable dans deck joueur");
+    debugLog("DEBUG ERIK | carte choisie introuvable dans deck joueur");
     return null;
   }
 
@@ -17082,22 +17155,22 @@ async function chercherRegionDansDeckJoueurPourErik() {
 }
 
 async function chercherRegionDansDeckNationPourErik() {
-  console.log("DEBUG ERIK | entrée chercherRegionDansDeckNationPourErik");
+  debugLog("DEBUG ERIK | entrée chercherRegionDansDeckNationPourErik");
 
   fermerZoomVerrouille?.();
   fermerZoomTemporaire?.();
 
   const deck = obtenirDeckNationJoueur() || [];
-  console.log("DEBUG ERIK | deck nation brut =", deck.map(c => c?.nom || null));
+  debugLog("DEBUG ERIK | deck nation brut =", deck.map(c => c?.nom || null));
 
   const regions = deck.filter(carte =>
     carte && inclutCategorie(carte, CATEGORIES.REGION)
   );
 
-  console.log("DEBUG ERIK | régions deck nation =", regions.map(c => c.nom));
+  debugLog("DEBUG ERIK | régions deck nation =", regions.map(c => c.nom));
 
   if (regions.length === 0) {
-    console.log("DEBUG ERIK | aucune région dans deck nation");
+    debugLog("DEBUG ERIK | aucune région dans deck nation");
     return null;
   }
 
@@ -17105,65 +17178,65 @@ async function chercherRegionDansDeckNationPourErik() {
     carte => carte && inclutCategorie(carte, CATEGORIES.REGION)
   );
 
-  console.log("DEBUG ERIK | retour demanderCarteDepuisDeckNation =", carteChoisie?.nom || null);
+  debugLog("DEBUG ERIK | retour demanderCarteDepuisDeckNation =", carteChoisie?.nom || null);
 
   fermerZoomVerrouille?.();
   fermerZoomTemporaire?.();
 
   if (!carteChoisie) {
-    console.log("DEBUG ERIK | aucune carte choisie dans deck nation");
+    debugLog("DEBUG ERIK | aucune carte choisie dans deck nation");
     return null;
   }
 
   const index = deck.indexOf(carteChoisie);
 
   if (index === -1) {
-    console.log("DEBUG ERIK | carte choisie introuvable dans deck nation");
+    debugLog("DEBUG ERIK | carte choisie introuvable dans deck nation");
     return null;
   }
 
-  console.log("DEBUG ERIK | carte retirée du deck nation =", carteChoisie.nom);
+  debugLog("DEBUG ERIK | carte retirée du deck nation =", carteChoisie.nom);
   return deck.splice(index, 1)[0];
 }
 
 async function trouverRegionPourErikLeRouge() {
-  console.log("DEBUG ERIK | début trouverRegionPourErikLeRouge");
+  debugLog("DEBUG ERIK | début trouverRegionPourErikLeRouge");
 
   fermerZoomVerrouille?.();
   fermerZoomTemporaire?.();
 
   const regionDefausse = await chercherRegionDansDefaussePourErik();
-  console.log("DEBUG ERIK | après défausse =", regionDefausse?.nom || null);
+  debugLog("DEBUG ERIK | après défausse =", regionDefausse?.nom || null);
 
   if (regionDefausse) {
     return regionDefausse;
   }
 
-  console.log("DEBUG ERIK | passe à deck joueur");
+  debugLog("DEBUG ERIK | passe à deck joueur");
   melangerDeckJoueur();
   afficherZoneJoueur?.();
   await new Promise(resolve => requestAnimationFrame(resolve));
 
   const regionDeckJoueur = await chercherRegionDansDeckJoueurPourErik();
-  console.log("DEBUG ERIK | après deck joueur =", regionDeckJoueur?.nom || null);
+  debugLog("DEBUG ERIK | après deck joueur =", regionDeckJoueur?.nom || null);
 
   if (regionDeckJoueur) {
     return regionDeckJoueur;
   }
 
-  console.log("DEBUG ERIK | passe à deck nation");
+  debugLog("DEBUG ERIK | passe à deck nation");
   melangerDeckNationJoueur();
   afficherZoneJoueur?.();
   await new Promise(resolve => requestAnimationFrame(resolve));
 
   const regionDeckNation = await chercherRegionDansDeckNationPourErik();
-  console.log("DEBUG ERIK | après deck nation =", regionDeckNation?.nom || null);
+  debugLog("DEBUG ERIK | après deck nation =", regionDeckNation?.nom || null);
 
   if (regionDeckNation) {
     return regionDeckNation;
   }
 
-  console.log("DEBUG ERIK | aucune région trouvée");
+  debugLog("DEBUG ERIK | aucune région trouvée");
   return null;
 }
 
@@ -17304,7 +17377,7 @@ async function trouverRegionPourErikLeRouge() {
    function ouvrirVueDeckJoueur(modeSelection = false, callbackSelection = null, predicateCarte = null) {
   const panneau = getElement("panneau-deck-joueur");
   const contenu = getElement("contenu-deck-joueur");
-  console.log("DEBUG ERIK | ouvrirVueDeckJoueur appelé", {
+  debugLog("DEBUG ERIK | ouvrirVueDeckJoueur appelé", {
   modeSelection,
   nbCartesDeck: (obtenirDeckJoueur() || []).length
 });
@@ -17368,7 +17441,7 @@ async function trouverRegionPourErikLeRouge() {
       contenu.appendChild(div);
     });
   }
-  console.log("DEBUG ERIK | ouverture visuelle panneau deck joueur");
+  debugLog("DEBUG ERIK | ouverture visuelle panneau deck joueur");
 
   panneau.style.display = "flex";
 panneau.style.visibility = "visible";
@@ -17408,12 +17481,12 @@ function fermerVueDeckJoueur(confirmerAnnulationSelection = true) {
 }
 
    async function regarderPremiereCarteDeckNationPuisMelangeOptionnel() {
-  console.log("DEBUG GOTHJA | entrée regarderPremiereCarteDeckNationPuisMelangeOptionnel");
+  debugLog("DEBUG GOTHJA | entrée regarderPremiereCarteDeckNationPuisMelangeOptionnel");
 
   const carte = obtenirPremiereCarteDeckNation();
 
   if (!carte) {
-    console.log("DEBUG GOTHJA | aucune carte de deck nation");
+    debugLog("DEBUG GOTHJA | aucune carte de deck nation");
     return false;
   }
 
@@ -17422,14 +17495,14 @@ function fermerVueDeckJoueur(confirmerAnnulationSelection = true) {
       carte,
       "Voulez-vous mélanger le deck Nation ?",
       async () => {
-        console.log("DEBUG GOTHJA | clic OUI deck nation");
+        debugLog("DEBUG GOTHJA | clic OUI deck nation");
         melangerDeckNationJoueur();
         afficherZoneJoueur?.();
         fermerZoomDeckNationAvecChoix();
         resolve(true);
       },
       async () => {
-        console.log("DEBUG GOTHJA | clic NON deck nation");
+        debugLog("DEBUG GOTHJA | clic NON deck nation");
         fermerZoomDeckNationAvecChoix();
         resolve(true);
       }
@@ -17479,12 +17552,12 @@ function fermerVueDeckJoueur(confirmerAnnulationSelection = true) {
    async function demanderCarteDepuisDeckNation(predicateCarte = null) {
   const deckNation = obtenirDeckNationJoueur();
 
-  console.log("DEBUG ERIK | demanderCarteDepuisDeckNation appelé", {
+  debugLog("DEBUG ERIK | demanderCarteDepuisDeckNation appelé", {
     nbCartesDeckNation: Array.isArray(deckNation) ? deckNation.length : null
   });
 
   if (!Array.isArray(deckNation) || deckNation.length === 0) {
-    console.log("DEBUG ERIK | demanderCarteDepuisDeckNation -> deck vide");
+    debugLog("DEBUG ERIK | demanderCarteDepuisDeckNation -> deck vide");
     ouvrirPanneauUI("Aucune carte dans le deck Nation.", [
       { label: "OK" }
     ]);
@@ -17492,9 +17565,9 @@ function fermerVueDeckJoueur(confirmerAnnulationSelection = true) {
   }
 
   return await new Promise(resolve => {
-    console.log("DEBUG ERIK | ouverture vue deck nation");
+    debugLog("DEBUG ERIK | ouverture vue deck nation");
     ouvrirVueDeckNation(true, valeur => {
-      console.log("DEBUG ERIK | Promise deck nation résolue avec =", valeur?.nom || null);
+      debugLog("DEBUG ERIK | Promise deck nation résolue avec =", valeur?.nom || null);
       resolve(valeur);
     }, predicateCarte);
   });
@@ -18115,7 +18188,7 @@ async function proposerBlocageAvecCap(messageAttaque = "Éviter cette attaque ?"
 
 
   function fermerZoomCarte(source = "inconnue") {
-  console.log("DEBUG ZOOM | fermerZoomCarte appelé depuis :", source);
+  debugLog("DEBUG ZOOM | fermerZoomCarte appelé depuis :", source);
   console.trace("TRACE fermeture zoom carte");
 
   const zoomCarte = getElement("zoom-carte");
@@ -19736,9 +19809,9 @@ function avertir(message) {
    ========================================================= */
 
    function debugAfficherPiocheDynastieBot() {
-  console.log("=== PIOCHE DYNASTIE BOT ===");
+  debugLog("=== PIOCHE DYNASTIE BOT ===");
   (etatBot.piocheDynastie || []).forEach((carte, index) => {
-    console.log(
+    debugLog(
       index,
       carte.nom,
       "| localisation =", carte.localisationDepart,
@@ -19917,6 +19990,16 @@ if (btnBarbare) {
 }
 
 function journal(...args) {
+  debugLog(...args);
+}
+
+const DEBUG_LOGS = false;
+
+function debugLog(...args) {
+  if (!DEBUG_LOGS) {
+    return;
+  }
+
   console.log(...args);
 }
 
@@ -20061,8 +20144,8 @@ callbackSelectionDansHistoire: null,
    8) ACCÈS RAPIDE AUX ZONES DU MARCHÉ
    ========================================================= */
 
-const CLE_SAUVEGARDE_PARTIE = "imperium-save-v1";
-const VERSION_SAUVEGARDE_PARTIE = 1;
+const CLE_SAUVEGARDE_PARTIE = "imperium-save-v2";
+const VERSION_SAUVEGARDE_PARTIE = 2;
 const CLES_CARTE_CODE_RESTAUREES = new Set([
   "effetsCode",
   "epuiserCode",
@@ -20088,29 +20171,6 @@ function copierStructureAvecFonctions(valeur) {
   return copie;
 }
 
-function creerSignatureCarteSauvegarde(carte = {}) {
-  const typeRegion = Array.isArray(carte.typeRegion) ? carte.typeRegion : [];
-
-  return JSON.stringify({
-    nom: carte.nom || "",
-    bandeau: carte.bandeau || "",
-    pin: carte.pin || "",
-    statut: carte.statut || "",
-    typeCarte: carte.typeCarte || "",
-    typeRegion,
-    effet: carte.effet || "",
-    coutDeveloppement: carte.coutDeveloppement || "",
-    categorie: carte.categorie || "",
-    styleBandeau: carte.styleBandeau || "",
-    nation: carte.nation || "",
-    localisationDepart: carte.localisationDepart || "",
-    pointsVictoire: carte.pointsVictoire ?? "",
-    conditionVictoire: carte.conditionVictoire || "",
-    jouable: carte.jouable ?? true,
-    reserveInterdite: carte.reserveInterdite ?? false
-  });
-}
-
 function obtenirTemplatesCartesSauvegarde() {
   return [
     ...(Array.isArray(cartesCommunes) ? cartesCommunes : []),
@@ -20131,9 +20191,13 @@ function obtenirIndexTemplatesCartesSauvegarde() {
   const templates = obtenirTemplatesCartesSauvegarde();
 
   templates.forEach(carte => {
-    const signature = creerSignatureCarteSauvegarde(carte);
-    if (!index.has(signature)) {
-      index.set(signature, carte);
+    const templateId = carte?.templateId;
+    if (typeof templateId !== "string" || templateId.trim() === "") {
+      return;
+    }
+
+    if (!index.has(templateId)) {
+      index.set(templateId, carte);
     }
   });
 
@@ -20146,8 +20210,12 @@ function trouverTemplateCarteSauvegarde(carteSauvegardee) {
     return null;
   }
 
-  const signature = creerSignatureCarteSauvegarde(carteSauvegardee);
-  return obtenirIndexTemplatesCartesSauvegarde().get(signature) || null;
+  const templateId = carteSauvegardee.templateId;
+  if (typeof templateId !== "string" || templateId.trim() === "") {
+    return null;
+  }
+
+  return obtenirIndexTemplatesCartesSauvegarde().get(templateId) || null;
 }
 
 function rehydraterListeCartesSauvegardees(cartes = []) {
@@ -20166,16 +20234,20 @@ function rehydraterCarteSauvegardee(carteSauvegardee) {
   }
 
   const template = trouverTemplateCarteSauvegarde(carteSauvegardee);
-  const baseTemplate = template ? copierStructureAvecFonctions(template) : {};
+  if (!template) {
+    const nomCarte = carteSauvegardee.nom || "(sans nom)";
+    const templateId = carteSauvegardee.templateId || "(absent)";
+    throw new Error(`Template introuvable pour "${nomCarte}" (templateId: ${templateId}).`);
+  }
+
+  const baseTemplate = copierStructureAvecFonctions(template);
   const copieSauvegardee = copierStructureAvecFonctions(carteSauvegardee);
 
-  if (template) {
-    CLES_CARTE_CODE_RESTAUREES.forEach(cle => {
-      if (cle in copieSauvegardee) {
-        delete copieSauvegardee[cle];
-      }
-    });
-  }
+  CLES_CARTE_CODE_RESTAUREES.forEach(cle => {
+    if (cle in copieSauvegardee) {
+      delete copieSauvegardee[cle];
+    }
+  });
 
   const reserveesSource = Array.isArray(carteSauvegardee.reservees)
     ? carteSauvegardee.reservees
@@ -20200,6 +20272,108 @@ function rehydraterCarteSauvegardee(carteSauvegardee) {
   }
 
   return carteRehydratee;
+}
+
+function estObjetCartePourSauvegarde(valeur) {
+  if (!valeur || typeof valeur !== "object") {
+    return false;
+  }
+
+  return (
+    "templateId" in valeur ||
+    "nom" in valeur ||
+    "categorie" in valeur ||
+    "jetons" in valeur ||
+    "reservees" in valeur
+  );
+}
+
+function validerCarteAvantSauvegarde(carte, chemin, indexTemplates, erreurs) {
+  const nom = carte?.nom || "(sans nom)";
+  const templateId = carte?.templateId;
+
+  if (typeof templateId !== "string" || templateId.trim() === "") {
+    erreurs.push(`${chemin}: templateId manquant (${nom})`);
+    return;
+  }
+
+  if (!indexTemplates.has(templateId)) {
+    erreurs.push(`${chemin}: templateId inconnu "${templateId}" (${nom})`);
+  }
+}
+
+function parcourirStructureCartesPourSauvegarde(valeur, chemin, indexTemplates, erreurs, visites) {
+  if (valeur == null) {
+    return;
+  }
+
+  if (Array.isArray(valeur)) {
+    valeur.forEach((item, index) => {
+      parcourirStructureCartesPourSauvegarde(item, `${chemin}[${index}]`, indexTemplates, erreurs, visites);
+    });
+    return;
+  }
+
+  if (typeof valeur !== "object") {
+    return;
+  }
+
+  if (visites.has(valeur)) {
+    return;
+  }
+  visites.add(valeur);
+
+  if (estObjetCartePourSauvegarde(valeur)) {
+    validerCarteAvantSauvegarde(valeur, chemin, indexTemplates, erreurs);
+
+    if (Array.isArray(valeur.reservees)) {
+      valeur.reservees.forEach((carteReservee, index) => {
+        parcourirStructureCartesPourSauvegarde(
+          carteReservee,
+          `${chemin}.reservees[${index}]`,
+          indexTemplates,
+          erreurs,
+          visites
+        );
+      });
+    }
+    return;
+  }
+
+  Object.keys(valeur).forEach(cle => {
+    parcourirStructureCartesPourSauvegarde(
+      valeur[cle],
+      `${chemin}.${cle}`,
+      indexTemplates,
+      erreurs,
+      visites
+    );
+  });
+}
+
+function validerIntegriteCartesAvantSauvegarde() {
+  const indexTemplates = obtenirIndexTemplatesCartesSauvegarde();
+  const erreurs = [];
+  const visites = new Set();
+
+  const racines = [
+    { chemin: "jeu.piles", valeur: jeu.piles },
+    { chemin: "jeu.zonesMarche", valeur: jeu.zonesMarche },
+    { chemin: "jeu.joueurZones", valeur: jeu.joueurZones },
+    { chemin: "etatBot", valeur: etatBot }
+  ];
+
+  racines.forEach(({ chemin, valeur }) => {
+    parcourirStructureCartesPourSauvegarde(valeur, chemin, indexTemplates, erreurs, visites);
+  });
+
+  if (erreurs.length > 0) {
+    const maxErreursAffichees = 8;
+    const erreursAffichees = erreurs.slice(0, maxErreursAffichees);
+    const reste = erreurs.length - erreursAffichees.length;
+    const suffixe = reste > 0 ? `\n... ${reste} autre(s) erreur(s)` : "";
+    throw new Error(`Validation cartes avant sauvegarde échouée:\n${erreursAffichees.join("\n")}${suffixe}`);
+  }
 }
 
 function lireSauvegardeLocalePartie() {
@@ -20461,12 +20635,14 @@ function determinerVueApresChargement() {
 
 function sauvegarderPartie({ silencieux = false, origine = "manuel" } = {}) {
   try {
+    validerIntegriteCartesAvantSauvegarde();
+
     const snapshot = creerSnapshotSauvegardePartie();
     localStorage.setItem(CLE_SAUVEGARDE_PARTIE, JSON.stringify(snapshot));
     mettreAJourDisponibiliteBoutonsSauvegarde();
 
     if (!silencieux) {
-      ouvrirPanneauUI("Partie sauvegardee.", [{ label: "OK" }]);
+      ouvrirPanneauUI("Partie sauvegardée.", [{ label: "OK" }]);
     } else {
       journal(`Sauvegarde automatique (${origine}) effectuee.`);
     }
@@ -22613,7 +22789,7 @@ function initialiserPanneauEtoile() {
 
 function ouvrirPanneauChoixTexte(message, options, callback, autoriserAnnulation = true) {
   fermerZoomCarte();
-  console.log("ouvrirPanneauChoixTexte appelé avec :", message, options);
+  debugLog("ouvrirPanneauChoixTexte appelé avec :", message, options);
 
   const panneau = getElement("panneau-choix-texte");
   const messageDiv = getElement("panneau-choix-texte-message");
@@ -23465,6 +23641,36 @@ function analyserCoutDeveloppement(coutTexte) {
   };
 }
 
+function calculerPaiementMateriauxOptimise(quantite, materiauxDisponibles, progresDisponibles) {
+  const quantiteCible = Number(quantite || 0);
+  const materiaux = Number(materiauxDisponibles || 0);
+  const progres = Number(progresDisponibles || 0);
+
+  if (quantiteCible <= 0) {
+    return { materiaux: 0, progres: 0 };
+  }
+
+  const depenseMateriauxInitiale = Math.min(materiaux, quantiteCible);
+  const resteInitial = quantiteCible - depenseMateriauxInitiale;
+  const depenseProgres = Math.ceil(resteInitial / 2);
+
+  if (depenseProgres > progres) {
+    return null;
+  }
+
+  let depenseMateriaux = depenseMateriauxInitiale;
+
+  // Si le manque est impair, on retire 1 matériau pour éviter de surpayer.
+  if (resteInitial > 0 && (resteInitial % 2 === 1) && depenseMateriaux > 0) {
+    depenseMateriaux -= 1;
+  }
+
+  return {
+    materiaux: depenseMateriaux,
+    progres: depenseProgres
+  };
+}
+
 function peutPayerCout(coutTexte) {
   if (coutEstGratuit(coutTexte)) {
     return true;
@@ -23506,14 +23712,18 @@ function payerCoutDeveloppement(coutTexte) {
   }
 
   if (resteMateriaux > 0) {
-    const depenseMateriaux = Math.min(jeu.joueur.materiaux, resteMateriaux);
-    jeu.joueur.materiaux -= depenseMateriaux;
-    resteMateriaux -= depenseMateriaux;
+    const paiementMateriaux = calculerPaiementMateriauxOptimise(
+      resteMateriaux,
+      jeu.joueur.materiaux,
+      jeu.joueur.progres
+    );
 
-    if (resteMateriaux > 0) {
-      const progresNecessaires = Math.ceil(resteMateriaux / 2);
-      jeu.joueur.progres -= progresNecessaires;
+    if (!paiementMateriaux) {
+      return false;
     }
+
+    jeu.joueur.materiaux -= paiementMateriaux.materiaux;
+    jeu.joueur.progres -= paiementMateriaux.progres;
   }
 
   jeu.joueur.population = Math.max(0, jeu.joueur.population);
@@ -23979,8 +24189,8 @@ function ouvrirVueDefausse(modeSelection = false, callbackSelection = null, pred
   const panneau = getElement("panneau-defausse");
   const contenu = getElement("contenu-defausse");
 
-  console.log("TEST ouvrirVueDefausse: appelée", { modeSelection, predicateCarte, panneau, contenu });
-  console.log("TEST defausse brute =", (jeu.joueurZones.defausseJoueur || []).map(c => ({
+  debugLog("TEST ouvrirVueDefausse: appelée", { modeSelection, predicateCarte, panneau, contenu });
+  debugLog("TEST defausse brute =", (jeu.joueurZones.defausseJoueur || []).map(c => ({
     nom: c.nom,
     categorie: c.categorie,
     typeCarte: c.typeCarte,
@@ -24004,7 +24214,7 @@ function ouvrirVueDefausse(modeSelection = false, callbackSelection = null, pred
     typeof predicateCarte === "function" ? predicateCarte(carte) : true
   );
 
-  console.log("TEST cartes filtrées =", cartes.map(c => ({
+  debugLog("TEST cartes filtrées =", cartes.map(c => ({
     nom: c.nom,
     categorie: c.categorie,
     typeCarte: c.typeCarte,
@@ -24057,7 +24267,7 @@ function ouvrirVueDefausse(modeSelection = false, callbackSelection = null, pred
   panneau.style.opacity = "1";
   panneau.style.zIndex = "9999";
 
-  console.log("TEST style panneau =", {
+  debugLog("TEST style panneau =", {
     display: panneau.style.display,
     visibility: panneau.style.visibility,
     opacity: panneau.style.opacity,
@@ -24070,14 +24280,14 @@ function fermerVueDefausse(confirmerAnnulationSelection = true) {
   const contenu = getElement("contenu-defausse");
 
   if (!panneau || !contenu) {
-    console.log("DEBUG ERIK | fermerVueDefausse: panneau ou contenu introuvable");
+    debugLog("DEBUG ERIK | fermerVueDefausse: panneau ou contenu introuvable");
     return;
   }
 
   const etaitEnModeSelection = jeu.ui.selectionDansDefausseActive;
   const callback = jeu.ui.callbackSelectionDansDefausse;
 
-  console.log("DEBUG ERIK | fermerVueDefausse AVANT reset", {
+  debugLog("DEBUG ERIK | fermerVueDefausse AVANT reset", {
     confirmerAnnulationSelection,
     etaitEnModeSelection,
     callbackExiste: typeof callback === "function"
@@ -24091,10 +24301,10 @@ function fermerVueDefausse(confirmerAnnulationSelection = true) {
   contenu.innerHTML = "";
 
   if (confirmerAnnulationSelection && etaitEnModeSelection && typeof callback === "function") {
-    console.log("DEBUG ERIK | fermerVueDefausse -> callback(null)");
+    debugLog("DEBUG ERIK | fermerVueDefausse -> callback(null)");
     callback(null);
   } else {
-    console.log("DEBUG ERIK | fermerVueDefausse -> PAS de callback(null)");
+    debugLog("DEBUG ERIK | fermerVueDefausse -> PAS de callback(null)");
   }
 }
 
@@ -24150,13 +24360,18 @@ function payerRessource(typeRessource, quantite) {
   }
 
   if (typeRessource === "materiaux") {
-    const depenseMateriaux = Math.min(jeu.joueur.materiaux, quantite);
-    jeu.joueur.materiaux -= depenseMateriaux;
+    const paiementMateriaux = calculerPaiementMateriauxOptimise(
+      quantite,
+      jeu.joueur.materiaux,
+      jeu.joueur.progres
+    );
 
-    const reste = quantite - depenseMateriaux;
-    if (reste > 0) {
-      jeu.joueur.progres -= Math.ceil(reste / 2);
+    if (!paiementMateriaux) {
+      return false;
     }
+
+    jeu.joueur.materiaux -= paiementMateriaux.materiaux;
+    jeu.joueur.progres -= paiementMateriaux.progres;
 
     return true;
   }
@@ -25958,7 +26173,7 @@ autresJoueursGagnentPopulation(effet) {
  async renvoyerEpuisementUtilise(effet) {
   const quantite = effet.quantite || 1;
 
-  console.log("OUXIENS | renvoyerEpuisementUtilise démarré", { quantite });
+  debugLog("OUXIENS | renvoyerEpuisementUtilise démarré", { quantite });
 
   for (let i = 0; i < quantite; i++) {
     const cartesEligibles = [];
@@ -25984,7 +26199,7 @@ autresJoueursGagnentPopulation(effet) {
       }
     });
 
-    console.log(
+    debugLog(
       "OUXIENS | cartes éligibles =",
       cartesEligibles.map(carte => ({
         nom: carte.nom,
@@ -26002,10 +26217,10 @@ autresJoueursGagnentPopulation(effet) {
 
     const carteChoisie = await demanderCarteAEpuisementUtilise(cartesEligibles);
 
-    console.log("OUXIENS | carte choisie =", carteChoisie?.nom || null);
+    debugLog("OUXIENS | carte choisie =", carteChoisie?.nom || null);
 
     if (!carteChoisie) {
-      console.log("OUXIENS | annulation de sélection");
+      debugLog("OUXIENS | annulation de sélection");
       return true;
     }
 
@@ -26015,13 +26230,13 @@ autresJoueursGagnentPopulation(effet) {
       (jeu.joueur.epuisement || 0) + 1
     );
 
-    console.log("OUXIENS | carte redressée =", carteChoisie.nom);
-    console.log("OUXIENS | épuisement joueur =", jeu.joueur.epuisement);
+    debugLog("OUXIENS | carte redressée =", carteChoisie.nom);
+    debugLog("OUXIENS | épuisement joueur =", jeu.joueur.epuisement);
 
     afficherZoneJoueur();
   }
 
-  console.log("OUXIENS | fin OK");
+  debugLog("OUXIENS | fin OK");
   return true;
 },
 
@@ -27236,7 +27451,7 @@ autresJoueursPeuventPiocher(effet) {
 async optionnel(effet, contexte) {
   if (typeof effet.condition === "function") {
     if (!effet.condition(contexte)) {
-      console.log("OPTIONNEL: condition false");
+      debugLog("OPTIONNEL: condition false");
       return true;
     }
   }
@@ -27245,15 +27460,15 @@ async optionnel(effet, contexte) {
     effet.message || "Voulez-vous effectuer cette action ?"
   );
 
-  console.log("OPTIONNEL: confirmer =", confirmer, "message =", effet.message);
+  debugLog("OPTIONNEL: confirmer =", confirmer, "message =", effet.message);
 
   if (!confirmer) {
     return true;
   }
 
-  console.log("OPTIONNEL: avant executerListeEffets", effet.effetSiOui);
+  debugLog("OPTIONNEL: avant executerListeEffets", effet.effetSiOui);
   const succes = await executerListeEffets(effet.effetSiOui || [], contexte);
-  console.log("OPTIONNEL: après executerListeEffets, succes =", succes);
+  debugLog("OPTIONNEL: après executerListeEffets, succes =", succes);
 
   return succes;
 },
@@ -27961,10 +28176,10 @@ function cliquerCarteMarche(nomCarte) {
   ajouterProgresSurCarteMarche(carte);
   terminerChoixProgresMarcheEtPasserAuNettoyage();
   journal("cliquerCarteMarche ->", jeu.manche.phase);
-  console.log("PHASE =", jeu.manche.phase);
-console.log("PHASES.NETTOYAGE_DEFAUSSE =", PHASES.NETTOYAGE_DEFAUSSE);
-console.log("BTN FIN NETTOYAGE =", getElement("btn-fin-nettoyage"));
-console.log("BTN DISABLED =", getElement("btn-fin-nettoyage")?.disabled);
+  debugLog("PHASE =", jeu.manche.phase);
+debugLog("PHASES.NETTOYAGE_DEFAUSSE =", PHASES.NETTOYAGE_DEFAUSSE);
+debugLog("BTN FIN NETTOYAGE =", getElement("btn-fin-nettoyage"));
+debugLog("BTN DISABLED =", getElement("btn-fin-nettoyage")?.disabled);
 }
 
 function terminerNettoyage() {
@@ -28915,7 +29130,7 @@ function afficherTableauJoueur() {
   event.preventDefault();
   event.stopPropagation();
 
-  console.log("TABLEAU CLICK |", carte.nom, {
+  debugLog("TABLEAU CLICK |", carte.nom, {
   selectionRedressementActive: jeu.ui.selectionRedressementActive,
   eligibleRedressement: carteEstEligiblePourRedressement(carte)
 });
@@ -29104,6 +29319,14 @@ function afficherSlotPuissance() {
 
   if (!cartePuissance) {
     return;
+  }
+
+  if (boutonEpuiser) {
+    const conditionVictoire = cartePuissance.querySelector(".condition-victoire");
+    if (conditionVictoire) {
+      conditionVictoire.classList.add("condition-victoire-avec-bouton-epuiser");
+      conditionVictoire.prepend(boutonEpuiser);
+    }
   }
 
   if (carte.epuisee) {
@@ -29701,7 +29924,7 @@ function fermerZoomDeckNationAvecChoix() {
 
 function demanderCarteAEpuisementUtilise(cartesEligibles) {
   return new Promise(resolve => {
-    console.log(
+    debugLog(
       "OUXIENS | demanderCarteAEpuisementUtilise",
       (cartesEligibles || []).map(c => c.nom)
     );
@@ -29709,7 +29932,7 @@ function demanderCarteAEpuisementUtilise(cartesEligibles) {
     jeu.ui.selectionRedressementActive = true;
     jeu.ui.cartesEligiblesRedressement = cartesEligibles || [];
     jeu.ui.callbackSelectionRedressement = carte => {
-      console.log("OUXIENS | callbackSelectionRedressement appelée avec", carte?.nom || null);
+      debugLog("OUXIENS | callbackSelectionRedressement appelée avec", carte?.nom || null);
 
       jeu.ui.selectionRedressementActive = false;
       jeu.ui.cartesEligiblesRedressement = [];
@@ -31478,7 +31701,7 @@ function initialiserInterfaces() {
 
 if (btnFermerDefausse) {
   btnFermerDefausse.onclick = () => {
-    console.log("DEBUG ERIK | clic sur btn-fermer-defausse");
+    debugLog("DEBUG ERIK | clic sur btn-fermer-defausse");
     fermerVueDefausse();
   };
 }

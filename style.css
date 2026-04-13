@@ -439,6 +439,22 @@ body {
   word-break: break-word;
 }
 
+.condition-victoire-avec-bouton-epuiser {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 4px;
+}
+
+.condition-victoire-avec-bouton-epuiser .bouton-epuiser-puissance {
+  position: static;
+  right: auto;
+  bottom: auto;
+  margin: 0;
+  align-self: flex-end;
+  z-index: auto;
+}
+
 .points-victoire {
   display: flex;
   align-items: center;
@@ -3919,6 +3935,10 @@ body {
 }
 
 .bouton-epuiser-puissance {
+  position: absolute;
+  right: 8px;
+  bottom: 32px;
+  z-index: 20;
   min-height: 0;
   padding: 3px 6px;
   font-size: 9px;
