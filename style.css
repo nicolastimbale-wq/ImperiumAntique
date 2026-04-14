@@ -220,6 +220,22 @@ body {
   z-index: 1;
 }
 
+.carte,
+#zoom-carte,
+#marche-scale,
+#joueur-scale,
+#bot-scale {
+  -webkit-backface-visibility: hidden;
+  backface-visibility: hidden;
+}
+
+#zoom-carte,
+#marche-scale,
+#joueur-scale,
+#bot-scale {
+  will-change: transform;
+}
+
 
 /* =========================================================
    6) CARTE STANDARD - HAUT DE CARTE
