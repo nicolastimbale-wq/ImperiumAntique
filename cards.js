@@ -51,7 +51,7 @@ const cartesCommunes = [
     statut: "Barbare",
     typeCarte: "Aucun",
     typeRegion: [],
-    effet: "Épuiser: tous les joueurs PEUVENT gagner 2 Matériaux. Solstice: vous POUVEZ gagner 2 Progrès. Si vous le faites, Choisir: abandonnez cette Ville OU archivez-la dans votre Histoire.",
+    effet: "Épuiser: tous les joueurs PEUVENT gagner 2 Matériaux. Solstice: vous POUVEZ gagner 2 Progrès. Si vous le faites, Choisir: abandonnez cette <i>Ville</i> OU archivez-la dans votre Histoire.",
     epuiserCode: [
   {
     type: "optionnel",
@@ -103,7 +103,7 @@ solsticeCode: [
     statut: "Barbare",
     typeCarte: "Aucun",
     typeRegion: [],
-    effet: "Épuiser: tous les joueurs PEUVENT gagner 2 Matériaux. Solstice: vous POUVEZ gagner 2 Progrès. Si vous le faites, Choisir: abandonnez cette Ville OU archivez-la dans votre Histoire.",
+    effet: "Épuiser: tous les joueurs PEUVENT gagner 2 Matériaux. Solstice: vous POUVEZ gagner 2 Progrès. Si vous le faites, Choisir: abandonnez cette <i>Ville</i> OU archivez-la dans votre Histoire.",
     epuiserCode: [
   {
     type: "optionnel",
@@ -1151,7 +1151,7 @@ solsticeCode: [
   statut: "Aucun",
   typeCarte: "Aucun",
   typeRegion: ["Sac", "Eau"],
-  effet: "Exilez 1 carte du Marché. Vous POUVEZ réserver 1 carte. Passif: vous POUVEZ rappeler Cap pour éviter les effets d’une épée.",
+  effet: "Exilez 1 carte du Marché. Vous POUVEZ réserver 1 carte. Passif: vous POUVEZ rappeler <i>Cap</i> pour éviter les effets d’une épée.",
   effetsCode: [
     {
       type: "exilerCarteVisibleDuMarche"
@@ -1654,7 +1654,7 @@ solsticeCode: [
   statut: "Aucun",
   typeCarte: "Aucun",
   typeRegion: [],
-  effet: "Action gratuite. Renvoyez jusqu’à 2 Instabilité de votre main ou de la défausse. Archivez Ioniens dans votre Histoire.",
+  effet: "Action gratuite. Renvoyez jusqu’à 2 Instabilité de votre main ou de la défausse. Archivez <i>Ioniens</i> dans votre Histoire.",
   effetsCode: [
     {
       type: "renvoyerJusquaNInstabilitesDepuisMainOuDefausse",
@@ -1703,7 +1703,7 @@ solsticeCode: [
   statut: "Aucun",
   typeCarte: "Aucun",
   typeRegion: [],
-  effet: "Acquérez Tradition. Archivez Arméniens dans votre Histoire.",
+  effet: "Acquérez Tradition. Archivez <i>Arméniens</i> dans votre Histoire.",
   effetsCode: [
     {
       type: "acquerir",
@@ -1728,7 +1728,7 @@ solsticeCode: [
   statut: "Aucun",
   typeCarte: "Aucun",
   typeRegion: [],
-  effet: "Si vous êtes en Barbare, placez la première carte de votre deck Nation dans votre défausse. Si vous êtes en Empire, développez 1 carte. Archivez Égyptiens dans votre Histoire.",
+  effet: "Si vous êtes en Barbare, placez la première carte de votre deck Nation dans votre défausse. Si vous êtes en Empire, développez 1 carte. Archivez <i>Égyptiens</i> dans votre Histoire.",
   effetsCode: [
     {
       type: "conditionStatut",
@@ -1830,7 +1830,7 @@ solsticeCode: [
   statut: "Aucun",
   typeCarte: "Aucun",
   typeRegion: [],
-  effet: "Action gratuite. Si vous êtes en Barbare, piochez jusqu’à 4 cartes. Si vous êtes en Empire, développez 1 carte sans payer son coût. Archivez Glorieux dans votre Histoire.",
+  effet: "Action gratuite. Si vous êtes en Barbare, piochez jusqu’à 4 cartes. Si vous êtes en Empire, développez 1 carte sans payer son coût. Archivez <i>Glorieux</i> dans votre Histoire.",
   effetsCode: [
     {
       type: "conditionStatut",
@@ -1998,7 +1998,7 @@ solsticeCode: [
   statut: "Aucun",
   typeCarte: "Aucun",
   typeRegion: [],
-  effet: "Choisir: archivez Éloges dans votre Histoire OU innovez en Tradition/Civilisé/Région/Vassal.",
+  effet: "Choisir: archivez <i>Éloges</i> dans votre Histoire OU innovez en Tradition/Civilisé/Région/Vassal.",
   effetsCode: [
     {
       type: "choisir",
@@ -2234,7 +2234,7 @@ const cartesNations = [
   statut: "Empire",
   typeCarte: "Aucun",
   typeRegion: [],
-  effet: "Action gratuite. Choisir: piochez 2 cartes OU vous POUVEZ acquérir Région/Vassal. Archivez Jules César dans votre Histoire",
+  effet: "Action gratuite. Choisir: piochez 2 cartes OU vous POUVEZ acquérir Région/Vassal. Archivez <i>Jules César</i> dans votre Histoire",
   effetsCode: [
     {
       type: "choisir",
@@ -2273,7 +2273,7 @@ const cartesNations = [
     statut: "Empire",
     typeCarte: "Aucun",
     typeRegion: [],
-    effet: "Acquérez Tradition/Civilisé/Région/Vassal. Archivez Empereur Trajan dans votre Histoire",
+    effet: "Acquérez Tradition/Civilisé/Région/Vassal. Archivez <i>Empereur Trajan</i> dans votre Histoire",
     effetsCode: [
   {
     type: "acquerirParmiCategories",
@@ -2298,7 +2298,7 @@ const cartesNations = [
     statut: "Empire",
     typeCarte: "Duplex",
     typeRegion: [],
-    effet: "Ne peut être joué que si Cité de Rome est en jeu. Archivez Cité de Rome dans votre Histoire. Solstice: Choisir: gagnez 1 Matériaux OU gagnez 1 Population OU piochez 1 carte.",
+    effet: "Ne peut être joué que si Cité de Rome est en jeu. Archivez <i>Cité de Rome</i> dans votre Histoire. Solstice: Choisir: gagnez 1 Matériaux OU gagnez 1 Population OU piochez 1 carte.",
      conditionJeu: {
     nomCarteDansTableau: "Cité de Rome"
   },
@@ -2841,7 +2841,7 @@ const cartesNations = [
     statut: "Barbare",
     typeCarte: "Aucun",
     typeRegion: [],
-    effet: "Innovez en Tradition. Archivez Triumvirat dans votre Histoire.",
+    effet: "Innovez en Tradition. Archivez <i>Triumvirat</i> dans votre Histoire.",
     effetsCode: [
       {
         type: "innover",
@@ -2922,7 +2922,7 @@ const cartesNations = [
     statut: "Barbare",
     typeCarte: "Aucun",
     typeRegion: [],
-    effet: "Acquérez Région. Vous POUVEZ à nouveau acquérir Région. Chaque autre joueur rappelle une Région. Archivez Expansion romaine dans votre Histoire.",
+    effet: "Acquérez Région. Vous POUVEZ à nouveau acquérir Région. Chaque autre joueur rappelle une Région. Archivez <i>Expansion romaine</i> dans votre Histoire.",
     effetsCode: [
       {
         type: "acquerirParmiCategories",
@@ -3029,7 +3029,7 @@ const cartesNations = [
   statut: "Empire",
   typeCarte: "Aucun",
   typeRegion: [],
-  effet: "Vous POUVEZ acquérir Tradition/Civilisé/Région/Vassal. Archivez Vercingétorix dans votre Histoire.",
+  effet: "Vous POUVEZ acquérir Tradition/Civilisé/Région/Vassal. Archivez <i>Vercingétorix</i> dans votre Histoire.",
   effetsCode: [
     {
       type: "acquerirParmiCategories",
@@ -3410,7 +3410,7 @@ const cartesNations = [
     statut: "Barbare",
     typeCarte: "Aucun",
     typeRegion: [],
-    effet: "Gagnez 1 Progrès. Chaque autre joueur abandonne une Région. Archivez Boadicée dans votre Histoire.",
+    effet: "Gagnez 1 Progrès. Chaque autre joueur abandonne une Région. Archivez <i>Boadicée</i> dans votre Histoire.",
     effetsCode: [
       {
         type: "gagner",
@@ -3885,7 +3885,7 @@ const cartesNations = [
   statut: "Barbare",
   typeCarte: "Aucun",
   typeRegion: [],
-  effet: "Gagnez 4 Matériaux. Archivez Empire Mède dans votre Histoire.",
+  effet: "Gagnez 4 Matériaux. Archivez <i>Empire Mède</i> dans votre Histoire.",
   effetsCode: [
     {
       type: "gagner",
@@ -4042,7 +4042,7 @@ const cartesNations = [
   statut: "Empire",
   typeCarte: "Aucun",
   typeRegion: [],
-  effet: "Acquérez Tradition/Civilisé/Région/Vassal. Archivez Darius I dans votre Histoire.",
+  effet: "Acquérez Tradition/Civilisé/Région/Vassal. Archivez <i>Darius I</i> dans votre Histoire.",
   effetsCode: [
     {
       type: "acquerirParmiCategories",
@@ -4068,7 +4068,7 @@ const cartesNations = [
   statut: "Empire",
   typeCarte: "Aucun",
   typeRegion: [],
-  effet: "Action gratuite. Acquérez Tradition/Civilisé/Région/Vassal. Archivez Babyloniens dans votre Histoire.",
+  effet: "Action gratuite. Acquérez Tradition/Civilisé/Région/Vassal. Archivez <i>Babyloniens</i> dans votre Histoire.",
   effetsCode: [
     {
       type: "acquerirParmiCategories",
@@ -4455,7 +4455,7 @@ const cartesNations = [
   statut: "Barbare",
   typeCarte: "Aucun",
   typeRegion: [],
-  effet: "Gagnez 2 Population. Archivez Lydiens dans votre Histoire.",
+  effet: "Gagnez 2 Population. Archivez <i>Lydiens</i> dans votre Histoire.",
   effetsCode: [
     {
       type: "gagner",
@@ -4605,7 +4605,7 @@ const cartesNations = [
     statut: "Barbare",
     typeCarte: "Aucun",
     typeRegion: [],
-    effet: "Acquérez Tradition/Civilisé/Région/Vassal, puis archivez Philippe II dans votre Histoire.",
+    effet: "Acquérez Tradition/Civilisé/Région/Vassal, puis archivez <i>Philippe II</i> dans votre Histoire.",
     effetsCode: [
       {
         type: "acquerirParmiCategories",
@@ -5005,7 +5005,7 @@ const cartesNations = [
     statut: "Aucun",
     typeCarte: "Aucun",
     typeRegion: [],
-    effet: "Piochez 1 carte. Vous POUVEZ innover en Région/Vassal. Archivez Alexandre dans votre Histoire.",
+    effet: "Piochez 1 carte. Vous POUVEZ innover en Région/Vassal. Archivez <i>Alexandre</i> dans votre Histoire.",
     effetsCode: [
       {
         type: "piocher",
@@ -5207,7 +5207,7 @@ const cartesNations = [
   statut: "Empire",
   typeCarte: "Aucun",
   typeRegion: [],
-  effet: "Ne peut pas être jouée si la carte Alexandre n’est pas archivée dans votre Histoire. Action gratuite. Vous POUVEZ acquérir Région deux fois, y compris parmi les cartes exilées. Archivez Alexandre le grand dans votre Histoire.",
+  effet: "Ne peut pas être jouée si la carte Alexandre n’est pas archivée dans votre Histoire. Action gratuite. Vous POUVEZ acquérir Région deux fois, y compris parmi les cartes exilées. Archivez <i>Alexandre le grand</i> dans votre Histoire.",
   conditionJeu: {
     nomCarteDansHistoire: "Alexandre"
   },
@@ -5251,7 +5251,7 @@ const cartesNations = [
   statut: "Empire",
   typeCarte: "Aucun",
   typeRegion: [],
-  effet: "Vous POUVEZ acquérir Région/Vassal et la jouer en Action gratuite. Archivez Parménion dans votre Histoire.",
+  effet: "Vous POUVEZ acquérir Région/Vassal et la jouer en Action gratuite. Archivez <i>Parménion</i> dans votre Histoire.",
   effetsCode: [
     {
       type: "optionnel",
@@ -5436,7 +5436,7 @@ const cartesNations = [
   statut: "Empire",
   typeCarte: "Aucun",
   typeRegion: [],
-  effet: "Action gratuite. Acquérez Tradition/Civilisé/Région/Vassal. Archivez Périclès dans votre Histoire.",
+  effet: "Action gratuite. Acquérez Tradition/Civilisé/Région/Vassal. Archivez <i>Périclès</i> dans votre Histoire.",
   effetsCode: [
     {
       type: "acquerirParmiCategories",
@@ -6119,7 +6119,7 @@ const cartesNations = [
   statut: "Barbare",
   typeCarte: "Aucun",
   typeRegion: [],
-  effet: "Piochez une Renommée. Exilez Rollon le Marcheur.",
+  effet: "Piochez une Renommée. Exilez <i>Rollon le Marcheur</i>.",
   effetsCode: [
     {
       type: "piocherRenommee"
@@ -6558,7 +6558,7 @@ const cartesNations = [
   statut: "Barbare",
   typeCarte: "Aucun",
   typeRegion: [],
-  effet: "Abandonnez la Scandinavie et payez 1 Population pour trouver une Région que vous ajoutez à votre main. Exilez Erik le Rouge.",
+  effet: "Abandonnez la <i>Scandinavie</i> et payez 1 Population pour trouver une Région que vous ajoutez à votre main. Exilez <i>Erik le Rouge</i>.",
   effetsCode: [
     {
       type: "erikLeRouge"
@@ -7639,7 +7639,7 @@ const cartesNations = [
   statut: "Barbare",
   typeCarte: "Aucun",
   typeRegion: [],
-  effet: "Gagnez 1 Population. Vous POUVEZ acquérir une Région et la jouer en Action gratuite. Archivez Didon, reine de Carthage dans votre Histoire.",
+  effet: "Gagnez 1 Population. Vous POUVEZ acquérir une Région et la jouer en Action gratuite. Archivez <i>Didon, reine de Carthage</i> dans votre Histoire.",
   effetsCode: [
     {
       type: "gagner",
@@ -7699,7 +7699,7 @@ const cartesNations = [
   statut: "Empire",
   typeCarte: "Aucun",
   typeRegion: [],
-  effet: "Vous POUVEZ acquérir Tradition/Civilisé/Région/Vassal. Vous POUVEZ piocher 1 carte. Vous POUVEZ récupérer 1 carte de votre Histoire. Archivez Hannibal dans votre Histoire.",
+  effet: "Vous POUVEZ acquérir Tradition/Civilisé/Région/Vassal. Vous POUVEZ piocher 1 carte. Vous POUVEZ récupérer 1 carte de votre Histoire. Archivez <i>Hannibal</i> dans votre Histoire.",
   effetsCode: [
     {
       type: "optionnel",
@@ -7850,7 +7850,7 @@ const cartesNations = [
   statut: "Empire",
   typeCarte: "Aucun",
   typeRegion: [],
-  effet: "Vous POUVEZ acquérir Région. Vous POUVEZ renvoyer une Instabilité. Archivez Ateas dans votre Histoire.",
+  effet: "Vous POUVEZ acquérir Région. Vous POUVEZ renvoyer une Instabilité. Archivez <i>Ateas</i> dans votre Histoire.",
   effetsCode: [
     {
       type: "optionnel",
@@ -28643,6 +28643,7 @@ function remplacerRessources(texte = "", options = {}) {
 
 const MOTS_CLES_EFFET_GRAS_PAR_DEFAUT = [
 
+  "Abandonne",
   "Abandonnée",
   "Abandonner",
   "Abandonnez",
