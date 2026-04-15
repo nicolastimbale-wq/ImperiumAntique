@@ -50,8 +50,6 @@
   <button id="btn-fin-tour">Fin du tour</button>
   <button id="btn-commencer-tour-bot" disabled>Commencer tour Bot</button>
   <button id="btn-fin-solstice">Fin Solstice</button>
-  <button id="btn-sauvegarder-partie">Sauvegarder</button>
-  <button id="btn-charger-partie">Charger</button>
 </div>
 
     <div id="vue-accueil" class="vue-active">
@@ -347,6 +345,41 @@
   <button id="btn-musique">🔊 Musique</button>
   <button id="btn-musique-suivante">⏭️ Suivante</button>
 </div>
+
+  <div id="panneau-menu-echap" class="panneau-ui-cache" aria-hidden="true">
+    <div class="panneau-ui-contenu menu-echap-contenu" role="dialog" aria-modal="true" aria-labelledby="menu-echap-titre">
+      <div id="menu-echap-titre" class="menu-echap-titre">Menu</div>
+
+      <div class="menu-echap-actions">
+        <button id="btn-sauvegarder-partie" type="button">Sauvegarder</button>
+        <button id="btn-charger-partie" type="button">Charger</button>
+      </div>
+
+      <div class="menu-echap-audio">
+        <label for="menu-volume-musique" class="menu-echap-libelle">Volume musique</label>
+        <div class="menu-echap-volume-ligne">
+          <input id="menu-volume-musique" type="range" min="0" max="100" value="40" step="1">
+          <span id="menu-volume-musique-valeur" class="menu-echap-volume-valeur">40%</span>
+        </div>
+
+        <label class="menu-echap-muet">
+          <input id="menu-musique-muet" type="checkbox">
+          <span>Muet</span>
+        </label>
+      </div>
+
+      <section id="menu-lexique" class="menu-echap-lexique">
+        <div class="menu-echap-sous-titre">Lexique</div>
+        <div id="menu-lexique-contenu" class="menu-lexique-contenu">
+          <p class="menu-lexique-vide">Les definitions seront ajoutees ici.</p>
+        </div>
+      </section>
+
+      <div class="menu-echap-pied">
+        <button id="btn-fermer-menu-echap" type="button">Fermer</button>
+      </div>
+    </div>
+  </div>
 
   <div id="panneau-choix-carte" class="panneau-ui-cache">
   <div class="panneau-ui-contenu">

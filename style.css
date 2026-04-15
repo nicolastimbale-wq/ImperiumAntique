@@ -384,6 +384,10 @@ body {
   filter: drop-shadow(0 1px 0 rgba(255, 255, 255, 0.32));
 }
 
+.effet .mot-cle-effet {
+  font-weight: 700;
+}
+
 
 /* =========================================================
    8B) CARTE STANDARD - COÛT DE DÉVELOPPEMENT
@@ -2151,7 +2155,8 @@ body {
   display: none;
 }
 
-#panneau-ui {
+#panneau-ui,
+#panneau-menu-echap {
   position: fixed;
   top: 0;
   left: 0;
@@ -2164,7 +2169,8 @@ body {
   display: none;
 }
 
-#panneau-ui.panneau-ui-ouvert {
+#panneau-ui.panneau-ui-ouvert,
+#panneau-menu-echap.panneau-ui-ouvert {
   display: flex;
 }
 
@@ -3668,6 +3674,7 @@ body {
 
 #bloc-controles-tour button,
 #bloc-musique button,
+#panneau-menu-echap button,
 #panneau-ui-boutons button,
 #panneau-choix-texte-actions button,
 #panneau-choix-marche-selection button,
@@ -3718,6 +3725,7 @@ body {
 
 #bloc-controles-tour button::after,
 #bloc-musique button::after,
+#panneau-menu-echap button::after,
 #panneau-ui-boutons button::after,
 #panneau-choix-texte-actions button::after,
 #panneau-choix-marche-selection button::after,
@@ -3745,6 +3753,7 @@ body {
 
 #bloc-controles-tour button:hover,
 #bloc-musique button:hover,
+#panneau-menu-echap button:hover,
 #panneau-ui-boutons button:hover,
 #panneau-choix-texte-actions button:hover,
 #panneau-choix-marche-selection button:hover,
@@ -3769,6 +3778,7 @@ body {
 
 #bloc-controles-tour button:active,
 #bloc-musique button:active,
+#panneau-menu-echap button:active,
 #panneau-ui-boutons button:active,
 #panneau-choix-texte-actions button:active,
 #panneau-choix-marche-selection button:active,
@@ -3793,6 +3803,7 @@ body {
 
 #bloc-controles-tour button:focus-visible,
 #bloc-musique button:focus-visible,
+#panneau-menu-echap button:focus-visible,
 #panneau-ui-boutons button:focus-visible,
 #panneau-choix-texte-actions button:focus-visible,
 #panneau-choix-marche-selection button:focus-visible,
@@ -3815,6 +3826,7 @@ body {
 .bouton-inactif,
 #bloc-controles-tour button:disabled,
 #bloc-musique button:disabled,
+#panneau-menu-echap button:disabled,
 #panneau-ui-boutons button:disabled,
 #panneau-choix-texte-actions button:disabled,
 #panneau-choix-marche-selection button:disabled,
@@ -3894,7 +3906,8 @@ body {
 
 #btn-sauvegarder-partie,
 #btn-charger-partie,
-#btn-reprendre-sauvegarde {
+#btn-reprendre-sauvegarde,
+#btn-fermer-menu-echap {
   --btn-ton-haut: #73889b;
   --btn-ton-milieu: #5a6f84;
   --btn-ton-bas: #42596e;
@@ -3933,6 +3946,128 @@ body {
 
 #btn-musique {
   order: 2;
+}
+
+.menu-echap-contenu {
+  width: min(680px, 92vw);
+  max-height: 88vh;
+  overflow: auto;
+}
+
+.menu-echap-titre {
+  font-family: "Palatino Linotype", "Book Antiqua", Georgia, serif;
+  font-size: 24px;
+  font-weight: 700;
+  color: #3b2815;
+  text-align: center;
+  margin-bottom: 12px;
+}
+
+.menu-echap-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: center;
+  margin-bottom: 14px;
+}
+
+.menu-echap-audio {
+  border: 1px solid rgba(116, 85, 43, 0.35);
+  border-radius: 10px;
+  background: rgba(255, 248, 234, 0.6);
+  padding: 10px 12px;
+}
+
+.menu-echap-libelle,
+.menu-echap-sous-titre {
+  font-family: "Palatino Linotype", "Book Antiqua", Georgia, serif;
+  font-weight: 700;
+  color: #3a2a17;
+}
+
+.menu-echap-libelle {
+  display: block;
+  margin-bottom: 8px;
+  font-size: 15px;
+}
+
+.menu-echap-volume-ligne {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+#menu-volume-musique {
+  flex: 1;
+  accent-color: #4e6c88;
+  cursor: pointer;
+}
+
+.menu-echap-volume-valeur {
+  min-width: 44px;
+  text-align: right;
+  font-family: "Palatino Linotype", "Book Antiqua", Georgia, serif;
+  font-weight: 700;
+  color: #3a2a17;
+}
+
+.menu-echap-muet {
+  margin-top: 10px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: #3a2a17;
+  font-family: "Palatino Linotype", "Book Antiqua", Georgia, serif;
+  font-weight: 700;
+}
+
+.menu-echap-lexique {
+  margin-top: 12px;
+}
+
+.menu-echap-sous-titre {
+  margin-bottom: 8px;
+  font-size: 18px;
+}
+
+.menu-lexique-contenu {
+  border: 1px solid rgba(106, 76, 39, 0.3);
+  border-radius: 10px;
+  background: rgba(255, 249, 238, 0.65);
+  padding: 10px 12px;
+  max-height: min(38vh, 280px);
+  overflow-y: auto;
+}
+
+.menu-lexique-vide {
+  margin: 0;
+  font-family: "Palatino Linotype", "Book Antiqua", Georgia, serif;
+  color: #4c3824;
+}
+
+.menu-lexique-liste {
+  margin: 0;
+  display: grid;
+  gap: 8px;
+}
+
+.menu-lexique-terme {
+  margin: 0;
+  font-family: "Palatino Linotype", "Book Antiqua", Georgia, serif;
+  font-weight: 700;
+  color: #2f2214;
+}
+
+.menu-lexique-definition {
+  margin: 0;
+  color: #4a3926;
+  font-family: "Palatino Linotype", "Book Antiqua", Georgia, serif;
+}
+
+.menu-echap-pied {
+  margin-top: 14px;
+  display: flex;
+  justify-content: center;
 }
 
 .btn-fermer-defausse,
@@ -3993,10 +4128,24 @@ body {
 
 @media (max-width: 900px) {
   #bloc-controles-tour button,
-  #bloc-musique button {
+  #bloc-musique button,
+  #panneau-menu-echap button {
     padding: 3px 6px;
     min-height: 22px;
     font-size: 10px;
+  }
+
+  .menu-echap-contenu {
+    width: min(660px, 96vw);
+    max-height: 92vh;
+  }
+
+  .menu-echap-titre {
+    font-size: 20px;
+  }
+
+  .menu-echap-sous-titre {
+    font-size: 16px;
   }
 
   #panneau-ui-boutons button:only-child,
@@ -4024,6 +4173,7 @@ body {
    ========================================================= */
 
 #panneau-ui,
+#panneau-menu-echap,
 #panneau-choix-texte,
 #panneau-choix-marche,
 .overlay-choix-oracle {
@@ -4287,4 +4437,3 @@ body {
   color: #1f3550;
   text-shadow: 0 1px 0 rgba(244, 250, 255, 0.44);
 }
-

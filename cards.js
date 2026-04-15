@@ -1,4 +1,4 @@
-/* =========================================================
+﻿/* =========================================================
    1) DONNÉES DES CARTES
    ========================================================= */
 
@@ -20149,6 +20149,7 @@ const jeu = {
   callbackSelectionDansDefausse: null,
     defausseOuverte: false,
     callbackPanneauEtoile: null,
+    menuEchapOuvert: false,
     panneauUIOuvert: false,
     blocageZoomJusquaMouseleave: false,
     ignorerProchainClicFermetureZoom: false,
@@ -20523,6 +20524,7 @@ function reinitialiserEtatUIApresChargement(uiSauve = {}) {
   jeu.ui.callbackSelectionDansDefausse = null;
   jeu.ui.defausseOuverte = false;
   jeu.ui.callbackPanneauEtoile = null;
+  jeu.ui.menuEchapOuvert = false;
   jeu.ui.panneauUIOuvert = false;
   jeu.ui.blocageZoomJusquaMouseleave = false;
   jeu.ui.ignorerProchainClicFermetureZoom = false;
@@ -20748,7 +20750,7 @@ function chargerPartieSauvegardee({ silencieux = false } = {}) {
     mettreAJourDisponibiliteBoutonsSauvegarde();
 
     if (!silencieux) {
-      ouvrirPanneauUI("Partie chargee.", [{ label: "OK" }]);
+      ouvrirPanneauUI("Partie chargée.", [{ label: "OK" }]);
     }
 
     return true;
@@ -28639,6 +28641,95 @@ function remplacerRessources(texte = "", options = {}) {
   return resultat;
 }
 
+const MOTS_CLES_EFFET_GRAS_PAR_DEFAUT = [
+
+  "Abandonnée",
+  "Abandonner",
+  "Abandonnez",
+  "Acquérez",
+  "Acquérir",
+  "Action gratuite",
+  "Archivée",
+  "Archivées",
+  "Archiver",
+  "Archivez",
+  "Choisir",
+  "Épuiser",
+  "Exil",
+  "Exilée",
+  "Exiler",
+  "Exilez",
+  "Histoire",
+  "Innover",
+  "Innovez",
+  "Passif",
+  "Piocher",
+  "Rappeler",
+  "Rappelez",
+  "Rappelle",
+  "Récupère",
+  "Récupérée",
+  "Récupérer",
+  "Récupérez",
+  "Renvoyer",
+  "Renvoyez",
+  "Réservée",
+  "Réserver",
+  "Réservez",
+  "Solstice",
+  "Trouver"
+
+
+  
+];
+
+let motsClesEffetEnGras = [...MOTS_CLES_EFFET_GRAS_PAR_DEFAUT];
+let motifsMotsClesEffetEnGras = [];
+
+function echapperExpressionReguliere(texte = "") {
+  return String(texte || "").replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function reconstruireMotifsMotsClesEffetEnGras() {
+  motifsMotsClesEffetEnGras = [...new Set(
+    (motsClesEffetEnGras || [])
+      .map(mot => String(mot || "").trim())
+      .filter(Boolean)
+  )]
+    .sort((a, b) => b.length - a.length)
+    .map(mot => ({
+      mot,
+      regex: new RegExp(
+        `(^|[^\\p{L}\\p{N}_])(${echapperExpressionReguliere(mot)})(?=[:\\s]|$|[^\\p{L}\\p{N}_])`,
+        "giu"
+      )
+    }));
+}
+
+function definirMotsClesEffetEnGras(mots = []) {
+  if (!Array.isArray(mots) || mots.length === 0) {
+    motsClesEffetEnGras = [...MOTS_CLES_EFFET_GRAS_PAR_DEFAUT];
+  } else {
+    motsClesEffetEnGras = mots;
+  }
+
+  reconstruireMotifsMotsClesEffetEnGras();
+}
+
+function mettreMotsClesEffetEnGras(texte = "") {
+  let resultat = String(texte || "");
+
+  motifsMotsClesEffetEnGras.forEach(({ regex }) => {
+    resultat = resultat.replace(regex, (correspondance, prefixe, motTrouve) => {
+      return `${prefixe}<strong class="mot-cle-effet">${motTrouve}</strong>`;
+    });
+  });
+
+  return resultat;
+}
+
+reconstruireMotifsMotsClesEffetEnGras();
+
 function classeTexteEffet(texte = "") {
   const longueur = texte.length;
 
@@ -28903,6 +28994,7 @@ function creerCarteHTML(carte) {
   const coutDeveloppementHTML = affichageCoutDeveloppement(carte, { motsExclus });
   const styleBandeau = carte.styleBandeau || carte.bandeau || "Aucun";
   const texteEffet = carte.effet || "";
+  const texteEffetFormate = mettreMotsClesEffetEnGras(texteEffet);
   const jetonEpuisementHTML = affichageJetonEpuisement(carte);
   const reserveesHTML = affichageReserveesCarte(carte);
 
@@ -28931,7 +29023,7 @@ function creerCarteHTML(carte) {
     </div>
 
     <div class="${classeTexteEffet(texteEffet)}">
-      ${remplacerRessources(texteEffet, { motsExclus })}
+      ${remplacerRessources(texteEffetFormate, { motsExclus })}
     </div>
 
     ${coutDeveloppementHTML}
@@ -30151,6 +30243,7 @@ function demanderCarteAEpuisementUtilise(cartesEligibles) {
    function interfaceBloqueZoomCarte() {
   return !!(
     jeu.ui?.panneauUIOuvert ||
+    jeu.ui?.menuEchapOuvert ||
     jeu.ui?.regardRenommeeActif ||
     jeu.ui?.defausseOuverte
   );
@@ -30604,6 +30697,7 @@ function afficherVue(idVueAAfficher) {
   if (blocMusique) {
     if (idVueAAfficher === "vue-accueil") {
       blocMusique.classList.add("ui-cachee");
+      fermerMenuEchap({ silencieux: true });
     } else {
       blocMusique.classList.remove("ui-cachee");
     }
@@ -30692,6 +30786,10 @@ function recalculerEchelleAvecSecurite() {
 
 function initialiserRaccourcisClavier() {
   document.addEventListener("keydown", event => {
+    if (jeu?.ui?.menuEchapOuvert) {
+      return;
+    }
+
     if (event.key === "1") {
       afficherVue("vue-marche");
     }
@@ -30848,7 +30946,8 @@ function initialiserZoomCartes() {
       jeu.ui.zoomVerrouille ||
       jeu.ui.regardRenommeeActif ||
       jeu.ui.defausseOuverte ||
-      jeu.ui.panneauUIOuvert
+      jeu.ui.panneauUIOuvert ||
+      jeu.ui.menuEchapOuvert
     ) {
       return;
     }
@@ -30871,7 +30970,8 @@ function initialiserZoomCartes() {
         jeu.ui.zoomVerrouille ||
         jeu.ui.regardRenommeeActif ||
         jeu.ui.defausseOuverte ||
-        jeu.ui.panneauUIOuvert
+        jeu.ui.panneauUIOuvert ||
+        jeu.ui.menuEchapOuvert
       ) {
         return;
       }
@@ -30921,7 +31021,8 @@ function initialiserZoomCartes() {
     if (
       jeu.ui.zoomVerrouille ||
       jeu.ui.defausseOuverte ||
-      jeu.ui.panneauUIOuvert
+      jeu.ui.panneauUIOuvert ||
+      jeu.ui.menuEchapOuvert
     ) {
       return;
     }
@@ -31547,12 +31648,14 @@ function initialiserBoutonsTour() {
 
   if (btnSauvegarderPartie) {
     btnSauvegarderPartie.onclick = () => {
+      fermerMenuEchap({ silencieux: true });
       sauvegarderPartie();
     };
   }
 
   if (btnChargerPartie) {
     btnChargerPartie.onclick = () => {
+      fermerMenuEchap({ silencieux: true });
       chargerPartieSauvegardee();
     };
   }
@@ -31598,7 +31701,208 @@ function mettreAJourBoutonsPhaseJoueur() {
   }
 }
 
-//---MUSIQUE---//
+/* =========================================================
+   48) MENU ESC + LEXIQUE
+   ========================================================= */
+
+const lexiqueMenuEntrees = [];
+
+function vueAccueilVisible() {
+  const vueAccueil = getElement("vue-accueil");
+  return !!(vueAccueil && !vueAccueil.classList.contains("vue-cachee"));
+}
+
+function menuEchapAutorise() {
+  return !vueAccueilVisible();
+}
+
+function mettreAJourContenuLexiqueMenu() {
+  const conteneur = getElement("menu-lexique-contenu");
+  if (!conteneur) {
+    return;
+  }
+
+  conteneur.innerHTML = "";
+
+  if (!Array.isArray(lexiqueMenuEntrees) || lexiqueMenuEntrees.length === 0) {
+    const message = document.createElement("p");
+    message.className = "menu-lexique-vide";
+    message.textContent = "Les definitions seront ajoutees ici.";
+    conteneur.appendChild(message);
+    return;
+  }
+
+  const liste = document.createElement("dl");
+  liste.className = "menu-lexique-liste";
+
+  lexiqueMenuEntrees.forEach(entree => {
+    const terme = document.createElement("dt");
+    terme.className = "menu-lexique-terme";
+    terme.textContent = entree.terme;
+
+    const definition = document.createElement("dd");
+    definition.className = "menu-lexique-definition";
+    definition.textContent = entree.definition;
+
+    liste.appendChild(terme);
+    liste.appendChild(definition);
+  });
+
+  conteneur.appendChild(liste);
+}
+
+function definirLexiqueMenu(entrees = []) {
+  lexiqueMenuEntrees.length = 0;
+
+  if (Array.isArray(entrees)) {
+    entrees.forEach(entree => {
+      if (!entree || typeof entree !== "object") {
+        return;
+      }
+
+      const terme = String(entree.terme || "").trim();
+      const definition = String(entree.definition || "").trim();
+
+      if (!terme || !definition) {
+        return;
+      }
+
+      lexiqueMenuEntrees.push({ terme, definition });
+    });
+  }
+
+  mettreAJourContenuLexiqueMenu();
+}
+
+function ajouterEntreeLexiqueMenu(terme, definition) {
+  const termeNormalise = String(terme || "").trim();
+  const definitionNormalisee = String(definition || "").trim();
+
+  if (!termeNormalise || !definitionNormalisee) {
+    return;
+  }
+
+  lexiqueMenuEntrees.push({
+    terme: termeNormalise,
+    definition: definitionNormalisee
+  });
+
+  mettreAJourContenuLexiqueMenu();
+}
+
+function ouvrirMenuEchap() {
+  if (!menuEchapAutorise()) {
+    return;
+  }
+
+  const panneau = getElement("panneau-menu-echap");
+  if (!panneau || jeu?.ui?.menuEchapOuvert) {
+    return;
+  }
+
+  fermerZoomTemporaire();
+  mettreAJourDisponibiliteBoutonsSauvegarde();
+  mettreAJourContenuLexiqueMenu();
+  mettreAJourAffichageMenuAudio();
+
+  panneau.classList.remove("panneau-ui-cache");
+  panneau.classList.add("panneau-ui-ouvert");
+  panneau.setAttribute("aria-hidden", "false");
+
+  if (jeu?.ui) {
+    jeu.ui.menuEchapOuvert = true;
+  }
+
+  getElement("btn-fermer-menu-echap")?.focus();
+}
+
+function fermerMenuEchap({ silencieux = false } = {}) {
+  const panneau = getElement("panneau-menu-echap");
+  if (!panneau) {
+    return;
+  }
+
+  panneau.classList.remove("panneau-ui-ouvert");
+  panneau.classList.add("panneau-ui-cache");
+  panneau.setAttribute("aria-hidden", "true");
+
+  if (jeu?.ui) {
+    jeu.ui.menuEchapOuvert = false;
+  }
+
+  if (!silencieux) {
+    mettreAJourLibelleBoutonMusique();
+  }
+}
+
+function basculerMenuEchap() {
+  if (jeu?.ui?.menuEchapOuvert) {
+    fermerMenuEchap();
+    return;
+  }
+
+  ouvrirMenuEchap();
+}
+
+function initialiserMenuEchap() {
+  const panneau = getElement("panneau-menu-echap");
+  const btnFermer = getElement("btn-fermer-menu-echap");
+
+  if (!panneau) {
+    return;
+  }
+
+  if (btnFermer) {
+    btnFermer.addEventListener("click", () => {
+      fermerMenuEchap();
+    });
+  }
+
+  panneau.addEventListener("click", event => {
+    if (event.target === panneau) {
+      fermerMenuEchap();
+    }
+  });
+
+  document.addEventListener("keydown", event => {
+    if (event.key !== "Escape") {
+      return;
+    }
+
+    if (jeu?.ui?.menuEchapOuvert) {
+      event.preventDefault();
+      event.stopPropagation();
+      fermerMenuEchap();
+      return;
+    }
+
+    if (
+      !menuEchapAutorise() ||
+      jeu?.ui?.defausseOuverte ||
+      jeu?.ui?.zoomVerrouille ||
+      jeu?.ui?.regardRenommeeActif ||
+      jeu?.ui?.panneauUIOuvert ||
+      jeu?.ui?.modeInteraction ||
+      jeu?.ui?.selectionCarteActive ||
+      jeu?.ui?.selectionMarcheActive
+    ) {
+      return;
+    }
+
+    event.preventDefault();
+    event.stopPropagation();
+    basculerMenuEchap();
+  }, true);
+
+  window.definirLexiqueMenu = definirLexiqueMenu;
+  window.ajouterEntreeLexiqueMenu = ajouterEntreeLexiqueMenu;
+  window.definirMotsClesEffetEnGras = definirMotsClesEffetEnGras;
+  mettreAJourContenuLexiqueMenu();
+}
+
+/* =========================================================
+   49) MUSIQUE
+   ========================================================= */
 
 const playlistMusique = [
   "assets/audio/theme-Romains.mp3",
@@ -31607,13 +31911,122 @@ const playlistMusique = [
   "assets/audio/theme-Carthaginois.mp3"
 ];
 
+const VOLUME_MUSIQUE_PAR_DEFAUT = 0.4;
+
 let indexMusiqueActuelle = -1;
 let musiqueInitialisee = false;
 let musiqueFinPartieActive = false;
 let audioFinPartie = null;
+let volumeMusique = VOLUME_MUSIQUE_PAR_DEFAUT;
+let musiqueMuette = false;
+
+function normaliserVolumeMusique(valeur) {
+  const nombre = Number(valeur);
+  if (!Number.isFinite(nombre)) {
+    return VOLUME_MUSIQUE_PAR_DEFAUT;
+  }
+
+  if (nombre <= 0) {
+    return 0;
+  }
+
+  if (nombre >= 1) {
+    return 1;
+  }
+
+  return nombre;
+}
+
+function obtenirVolumeEffectifMusique() {
+  if (musiqueMuette) {
+    return 0;
+  }
+
+  return volumeMusique;
+}
+
+function appliquerPreferencesAudioMusique() {
+  const audio = getElement("musique-fond");
+  const volume = obtenirVolumeEffectifMusique();
+
+  if (audio) {
+    audio.volume = volume;
+    audio.muted = musiqueMuette;
+  }
+
+  if (audioFinPartie) {
+    audioFinPartie.volume = volume;
+    audioFinPartie.muted = musiqueMuette;
+  }
+}
+
+function mettreAJourAffichageMenuAudio() {
+  const slider = getElement("menu-volume-musique");
+  const valeur = getElement("menu-volume-musique-valeur");
+  const caseMuet = getElement("menu-musique-muet");
+  const pourcentage = Math.round(volumeMusique * 100);
+
+  if (slider) {
+    slider.value = String(pourcentage);
+  }
+
+  if (valeur) {
+    valeur.textContent = `${pourcentage}%`;
+  }
+
+  if (caseMuet) {
+    caseMuet.checked = musiqueMuette;
+  }
+}
+
+function mettreAJourLibelleBoutonMusique() {
+  const bouton = getElement("btn-musique");
+  const audio = getElement("musique-fond");
+
+  if (!bouton) {
+    return;
+  }
+
+  if (musiqueMuette) {
+    bouton.textContent = "🔇 Muet";
+    return;
+  }
+
+  if (audio?.paused) {
+    bouton.textContent = "▶️ Musique";
+    return;
+  }
+
+  bouton.textContent = "🔊 Musique";
+}
+
+function definirVolumeMusiqueDepuisPourcentage(valeurPourcentage) {
+  const nombre = Number(valeurPourcentage);
+  if (!Number.isFinite(nombre)) {
+    return;
+  }
+
+  const volumeNormalise = Math.min(100, Math.max(0, nombre)) / 100;
+  volumeMusique = normaliserVolumeMusique(volumeNormalise);
+
+  if (volumeMusique > 0 && musiqueMuette) {
+    musiqueMuette = false;
+  }
+
+  appliquerPreferencesAudioMusique();
+  mettreAJourAffichageMenuAudio();
+  mettreAJourLibelleBoutonMusique();
+}
+
+function definirMuetMusique(estMuet) {
+  musiqueMuette = !!estMuet;
+  appliquerPreferencesAudioMusique();
+  mettreAJourAffichageMenuAudio();
+  mettreAJourLibelleBoutonMusique();
+}
 
 function arreterMusiquePrincipale() {
-  const audio = document.getElementById("musique-fond");
+  const audio = getElement("musique-fond");
 
   if (!audio) {
     return;
@@ -31621,6 +32034,7 @@ function arreterMusiquePrincipale() {
 
   audio.pause();
   audio.currentTime = 0;
+  mettreAJourLibelleBoutonMusique();
 }
 
 function obtenirCheminMusiqueFinPartie(resultat) {
@@ -31643,12 +32057,10 @@ function jouerMusiqueFinPartie(resultat) {
   }
 
   musiqueFinPartieActive = true;
-
   arreterMusiquePrincipale();
 
   if (!audioFinPartie) {
     audioFinPartie = new Audio();
-    audioFinPartie.volume = 0.4;
     audioFinPartie.loop = false;
   }
 
@@ -31656,6 +32068,7 @@ function jouerMusiqueFinPartie(resultat) {
     audioFinPartie.src = chemin;
   }
 
+  appliquerPreferencesAudioMusique();
   audioFinPartie.currentTime = 0;
   audioFinPartie.play().catch(() => {});
 }
@@ -31689,8 +32102,7 @@ function choisirIndexAleatoireDifferant(taille, indexExclu = -1) {
 }
 
 function jouerMusiqueParIndex(index) {
-  const audio = document.getElementById("musique-fond");
-  const bouton = document.getElementById("btn-musique");
+  const audio = getElement("musique-fond");
 
   if (musiqueFinPartieActive || jeu?.finPartie?.terminee) {
     return;
@@ -31706,12 +32118,10 @@ function jouerMusiqueParIndex(index) {
 
   indexMusiqueActuelle = index;
   audio.src = playlistMusique[indexMusiqueActuelle];
-  audio.volume = 0.4;
+  appliquerPreferencesAudioMusique();
 
   audio.play().then(() => {
-    if (bouton) {
-      bouton.textContent = "🔊 Musique";
-    }
+    mettreAJourLibelleBoutonMusique();
   }).catch(() => {});
 }
 
@@ -31733,19 +32143,23 @@ function passerMusiqueSuivante() {
 }
 
 function initialiserMusique() {
-  const audio = document.getElementById("musique-fond");
+  const audio = getElement("musique-fond");
 
   if (!audio) {
     return;
   }
 
-  audio.addEventListener("ended", () => {
-  if (musiqueFinPartieActive || jeu?.finPartie?.terminee) {
-    return;
-  }
+  appliquerPreferencesAudioMusique();
+  mettreAJourAffichageMenuAudio();
+  mettreAJourLibelleBoutonMusique();
 
-  jouerMusiqueAleatoire();
-});
+  audio.addEventListener("ended", () => {
+    if (musiqueFinPartieActive || jeu?.finPartie?.terminee) {
+      return;
+    }
+
+    jouerMusiqueAleatoire();
+  });
 
   function lancerMusiqueUneFois() {
     if (musiqueInitialisee) {
@@ -31764,13 +32178,15 @@ function initialiserMusique() {
 }
 
 function initialiserControleMusique() {
-  const audio = document.getElementById("musique-fond");
-  const boutonToggle = document.getElementById("btn-musique");
-  const boutonSuivante = document.getElementById("btn-musique-suivante");
+  const audio = getElement("musique-fond");
+  const boutonToggle = getElement("btn-musique");
+  const boutonSuivante = getElement("btn-musique-suivante");
+  const sliderVolume = getElement("menu-volume-musique");
+  const caseMuet = getElement("menu-musique-muet");
 
   if (musiqueFinPartieActive || jeu?.finPartie?.terminee) {
-  return;
-}
+    return;
+  }
 
   if (!audio) {
     return;
@@ -31785,16 +32201,16 @@ function initialiserControleMusique() {
       }
 
       if (musiqueFinPartieActive || jeu?.finPartie?.terminee) {
-  return;
-}
+        return;
+      }
 
       if (audio.paused) {
         audio.play().then(() => {
-          boutonToggle.textContent = "🔊 Musique";
+          mettreAJourLibelleBoutonMusique();
         }).catch(() => {});
       } else {
         audio.pause();
-        boutonToggle.textContent = "🔇 Muet";
+        mettreAJourLibelleBoutonMusique();
       }
     });
   }
@@ -31808,11 +32224,26 @@ function initialiserControleMusique() {
       passerMusiqueSuivante();
     });
   }
+
+  if (sliderVolume) {
+    sliderVolume.addEventListener("input", event => {
+      definirVolumeMusiqueDepuisPourcentage(event.target.value);
+    });
+  }
+
+  if (caseMuet) {
+    caseMuet.addEventListener("change", event => {
+      definirMuetMusique(event.target.checked);
+    });
+  }
+
+  mettreAJourAffichageMenuAudio();
+  mettreAJourLibelleBoutonMusique();
 }
 
 
 /* =========================================================
-   48) INITIALISATION GLOBALE
+   50) INITIALISATION GLOBALE
    ========================================================= */
 
 function initialiserAffichagesInitiaux() {
@@ -31843,6 +32274,7 @@ function initialiserInterfaces() {
   initialiserPanneauExil();
   initialiserMusique();
   initialiserControleMusique();
+  initialiserMenuEchap();
    initialiserOuverturePileEtoile();
      brancherClicHistoireBot();
      initialiserBoutonSuivantBot();
@@ -32002,7 +32434,6 @@ document.addEventListener("keydown", function(event) {
   }
 
 });
-
 
 
 
