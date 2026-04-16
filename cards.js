@@ -16684,6 +16684,7 @@ async function commencerTourBotDepuisInterface() {
   commencerPhaseSolsticeInteractive();
   mettreAJourBoutonsPhaseJoueur();
   afficherVue("vue-joueur");
+  miniTutorielMarquerBotLance();
 
   avertir("Tour du Bot terminé. Le Solstice peut maintenant commencer.");
   return true;
@@ -20178,6 +20179,16 @@ const jeu = {
   histoireOuverte: false,
 selectionDansHistoireActive: false,
 callbackSelectionDansHistoire: null,
+
+  miniTutorielActif: false,
+  miniTutorielTermine: false,
+  miniTutorielMasque: false,
+  miniTutorielToursTermines: 0,
+  miniTutorielCarteJoueeTour: false,
+  miniTutorielBotLanceTour: false,
+  miniTutorielDerniereManche: 1,
+  miniTutorielIntroTermine: false,
+  miniTutorielEtapeScript: 0,
   
   }
   
@@ -20468,7 +20479,16 @@ function creerSnapshotSauvegardePartie() {
       ui: {
         optionSpecialeDebutTourDisponible: jeu.ui.optionSpecialeDebutTourDisponible,
         optionSpecialeDebutTourChoisie: jeu.ui.optionSpecialeDebutTourChoisie,
-        choixProgresMarcheActif: jeu.ui.choixProgresMarcheActif
+        choixProgresMarcheActif: jeu.ui.choixProgresMarcheActif,
+        miniTutorielActif: !!jeu.ui.miniTutorielActif,
+        miniTutorielTermine: !!jeu.ui.miniTutorielTermine,
+        miniTutorielMasque: !!jeu.ui.miniTutorielMasque,
+        miniTutorielToursTermines: Number(jeu.ui.miniTutorielToursTermines || 0),
+        miniTutorielCarteJoueeTour: !!jeu.ui.miniTutorielCarteJoueeTour,
+        miniTutorielBotLanceTour: !!jeu.ui.miniTutorielBotLanceTour,
+        miniTutorielDerniereManche: Number(jeu.ui.miniTutorielDerniereManche || 1),
+        miniTutorielIntroTermine: !!jeu.ui.miniTutorielIntroTermine,
+        miniTutorielEtapeScript: Number(jeu.ui.miniTutorielEtapeScript || 0)
       }
     })),
     etatBot: JSON.parse(JSON.stringify(etatBot))
@@ -20487,6 +20507,7 @@ function appliquerConfigurationPartieSauvegardee(configurationSauvee = {}) {
 
   const selectNationJoueur = getElement("choix-nation-joueur");
   const selectNationBot = getElement("choix-nation-bot");
+  const optionMiniTutoriel = getElement("option-mini-tutoriel");
 
   if (selectNationJoueur && configurationPartie.nationJoueur) {
     selectNationJoueur.value = configurationPartie.nationJoueur;
@@ -20494,6 +20515,13 @@ function appliquerConfigurationPartieSauvegardee(configurationSauvee = {}) {
 
   if (selectNationBot && configurationPartie.nationBot) {
     selectNationBot.value = configurationPartie.nationBot;
+  }
+
+  if (optionMiniTutoriel) {
+    optionMiniTutoriel.checked = !!configurationPartie.miniTutoriel;
+    if (typeof optionMiniTutoriel.onchange === "function") {
+      optionMiniTutoriel.onchange();
+    }
   }
 
 }
@@ -20554,6 +20582,19 @@ function reinitialiserEtatUIApresChargement(uiSauve = {}) {
   jeu.ui.histoireOuverte = false;
   jeu.ui.selectionDansHistoireActive = false;
   jeu.ui.callbackSelectionDansHistoire = null;
+
+  jeu.ui.miniTutorielActif = !!uiSauve.miniTutorielActif;
+  jeu.ui.miniTutorielTermine = !!uiSauve.miniTutorielTermine;
+  jeu.ui.miniTutorielMasque = !!uiSauve.miniTutorielMasque;
+  jeu.ui.miniTutorielToursTermines = Number(uiSauve.miniTutorielToursTermines || 0);
+  jeu.ui.miniTutorielCarteJoueeTour = !!uiSauve.miniTutorielCarteJoueeTour;
+  jeu.ui.miniTutorielBotLanceTour = !!uiSauve.miniTutorielBotLanceTour;
+  jeu.ui.miniTutorielDerniereManche = Number(
+    uiSauve.miniTutorielDerniereManche || jeu.manche.numero || 1
+  );
+  jeu.ui.miniTutorielIntroTermine = !!uiSauve.miniTutorielIntroTermine;
+  jeu.ui.miniTutorielEtapeScript = Number(uiSauve.miniTutorielEtapeScript || 0);
+  miniTutorielDerniereEtapeScriptRendue = -1;
 }
 
 function appliquerSauvegardePartie(snapshot) {
@@ -20748,6 +20789,7 @@ function chargerPartieSauvegardee({ silencieux = false } = {}) {
     }
 
     mettreAJourDisponibiliteBoutonsSauvegarde();
+    miniTutorielSynchroniser();
 
     if (!silencieux) {
       ouvrirPanneauUI("Partie chargée.", [{ label: "OK" }]);
@@ -27727,6 +27769,7 @@ async function jouerCarteDepuisMain(indexCarte, options = {}) {
   }
 
   verrouillerOptionsSpecialesDebutTour();
+  miniTutorielMarquerCarteJouee();
 
   declencherCotteDeMaillesSiPossible(carte);
 
@@ -28240,6 +28283,7 @@ function terminerTourJoueur() {
 
   // 🔽 Passage au nettoyage
   demarrerChoixProgresMarcheFinTour();
+  miniTutorielSynchroniser();
   journal("terminerTourJoueur ->", jeu.manche.phase);
 }
 
@@ -28283,12 +28327,14 @@ function terminerNettoyage() {
     afficherVue("vue-bot");
     definirEtatBoutonTourBot(true);
     mettreAJourBoutonsPhaseJoueur();
+    miniTutorielSynchroniser();
 
     avertir("Nettoyage terminé. Cliquez sur « Commencer tour Bot ».");
   });
 }
 
 async function finaliserFinDeMancheApresSolstice() {
+  const mancheTerminee = Number(jeu.manche.numero || 0);
   reinitialiserModificateursTour();
 
   if (verifierEffondrement()) {
@@ -28299,6 +28345,7 @@ async function finaliserFinDeMancheApresSolstice() {
   jeu.manche.numero += 1;
   mettreAJourBoutonsPhaseJoueur();
   preparerDebutTourJoueur();
+  miniTutorielNotifierFinDeManche(mancheTerminee);
 
   if (verifierFinParDecompte()) {
     return;
@@ -29191,7 +29238,117 @@ function afficherCompteursJoueur() {
    34) AFFICHAGE JOUEUR / TABLEAU ET MAIN
    ========================================================= */
 
-  function ouvrirPanneauUI(message, options = []) {
+const DUREE_TOAST_PAR_DEFAUT = 2800;
+let toastActifTimeoutId = null;
+
+function obtenirConteneurToastUI() {
+  let conteneur = getElement("zone-toast-ui");
+
+  if (!conteneur) {
+    conteneur = document.createElement("div");
+    conteneur.id = "zone-toast-ui";
+    conteneur.setAttribute("aria-live", "polite");
+    conteneur.setAttribute("aria-atomic", "true");
+    document.body.appendChild(conteneur);
+  }
+
+  return conteneur;
+}
+
+function fermerToastUI() {
+  const conteneur = getElement("zone-toast-ui");
+  if (!conteneur) {
+    return;
+  }
+
+  if (toastActifTimeoutId) {
+    clearTimeout(toastActifTimeoutId);
+    toastActifTimeoutId = null;
+  }
+
+  const toast = conteneur.querySelector(".toast-ui");
+  if (!toast) {
+    return;
+  }
+
+  toast.classList.remove("toast-ui-visible");
+  toast.classList.add("toast-ui-cache");
+
+  setTimeout(() => {
+    toast.remove();
+  }, 220);
+}
+
+function afficherToastUI(message, configuration = {}) {
+  const conteneur = obtenirConteneurToastUI();
+  if (!conteneur) {
+    return;
+  }
+
+  const texte = String(message ?? "").trim();
+  if (!texte) {
+    return;
+  }
+
+  const toastExistant = conteneur.querySelector(".toast-ui");
+  if (toastExistant) {
+    toastExistant.remove();
+  }
+
+  if (toastActifTimeoutId) {
+    clearTimeout(toastActifTimeoutId);
+    toastActifTimeoutId = null;
+  }
+
+  const toast = document.createElement("div");
+  toast.className = "toast-ui toast-ui-cache";
+  toast.setAttribute("role", "status");
+  toast.textContent = texte;
+  conteneur.appendChild(toast);
+
+  requestAnimationFrame(() => {
+    toast.classList.remove("toast-ui-cache");
+    toast.classList.add("toast-ui-visible");
+  });
+
+  const duree = Number(configuration?.duree);
+  const dureeFinale = Number.isFinite(duree) && duree > 0
+    ? duree
+    : DUREE_TOAST_PAR_DEFAUT;
+
+  toastActifTimeoutId = setTimeout(() => {
+    fermerToastUI();
+  }, dureeFinale);
+}
+
+function popupPeutDevenirToast(options = [], configuration = {}) {
+  if (configuration?.forcerModal === true) {
+    return false;
+  }
+
+  if (configuration?.mode === "toast") {
+    return true;
+  }
+
+  if (!Array.isArray(options) || options.length !== 1) {
+    return false;
+  }
+
+  const optionUnique = options[0] || {};
+  const label = String(optionUnique.label || "").trim().toLowerCase();
+  const aCallback = typeof optionUnique.callback === "function";
+
+  return label === "ok" && !aCallback;
+}
+
+  function ouvrirPanneauUI(message, options = [], configuration = {}) {
+  if (popupPeutDevenirToast(options, configuration)) {
+    afficherToastUI(message, configuration?.toast);
+    return;
+  }
+
+  fermerToastUI();
+
   const panneau = getElement("panneau-ui");
   const messageDiv = getElement("panneau-ui-message");
   const boutonsDiv = getElement("panneau-ui-boutons");
@@ -30338,6 +30495,7 @@ function fermerZoomTemporaire() {
 
   zoomCarte.innerHTML = "";
   zoomCarte.style.display = "none";
+  zoomCarte.classList.remove("zoom-force-visible");
 }
 
 function fermerInterfacesAvantChoixMarche() {
@@ -30716,6 +30874,8 @@ function afficherVue(idVueAAfficher) {
       recalculerEchelleAvecSecurite();
     }
   });
+
+  miniTutorielSynchroniser();
 }
 
 const ETAT_ECHELLE_INTERFACE = {
@@ -31157,6 +31317,7 @@ function fermerZoomVoieSacree() {
   zoomCarte.innerHTML = "";
   zoomCarte.style.zIndex = "13000";
   zoomCarte.style.pointerEvents = "none";
+  zoomCarte.classList.remove("zoom-force-visible");
 
   jeu.ui.zoomVerrouille = false;
   jeu.ui.sourceZoomVerrouille = null;
@@ -31195,6 +31356,7 @@ function fermerZoomTemporaireSpecial() {
   zoomCarte.innerHTML = "";
   zoomCarte.style.zIndex = "13000";
   zoomCarte.style.pointerEvents = "none";
+  zoomCarte.classList.remove("zoom-force-visible");
 
   jeu.ui.zoomVerrouille = false;
   jeu.ui.sourceZoomVerrouille = null;
@@ -31258,6 +31420,7 @@ function fermerZoomVerrouille() {
   jeu.ui.sourceZoomVerrouille = null;
   zoomCarte.style.display = "none";
   zoomCarte.innerHTML = "";
+  zoomCarte.classList.remove("zoom-force-visible");
 }
 
 function initialiserSurvolCartesDansZoom() {
@@ -31320,6 +31483,14 @@ function initialiserFermetureZoomVerrouille() {
     const clicSurCarteTableau = event.target.closest("#contenu-tableau-joueur .carte");
     const clicSurCarteMain = event.target.closest("#slot-main .carte");
     const clicSurCarteMarche = event.target.closest(".zone-cartes-marche .carte, .pile-visible .carte");
+    const clicDansPanneauTutoriel = event.target.closest("#panneau-mini-tutoriel");
+
+    const sourceZoom = String(jeu.ui.sourceZoomVerrouille || "");
+    const zoomMiniTutorielActif = sourceZoom.startsWith("mini-tutoriel-");
+
+    if (zoomMiniTutorielActif && clicDansPanneauTutoriel) {
+      return;
+    }
 
     if (clicDansZoom || clicSurCarteTableau || clicSurCarteMain || clicSurCarteMarche) {
       return;
@@ -31505,7 +31676,8 @@ function choisirCarteRegardRenommee(indexChoisi) {
 
    let configurationPartie = {
   nationJoueur: null,
-  nationBot: null
+  nationBot: null,
+  miniTutoriel: false
 };
 
 function obtenirListeNationsDepuisCartes(listeCartes) {
@@ -31533,6 +31705,9 @@ function obtenirListeNationsDepuisCartes(listeCartes) {
 function initialiserChoixNations() {
   const selectJoueur = document.getElementById("choix-nation-joueur");
   const selectBot = document.getElementById("choix-nation-bot");
+  const optionMiniTutoriel = document.getElementById("option-mini-tutoriel");
+  const NATION_TUTORIEL_JOUEUR = "Romains";
+  const NATION_TUTORIEL_BOT = "Celtes";
 
   if (!selectJoueur || !selectBot) {
     console.error("Les menus de choix des nations sont introuvables.");
@@ -31565,6 +31740,43 @@ function initialiserChoixNations() {
     selectJoueur.appendChild(optionJoueur);
     selectBot.appendChild(optionBot);
   }
+
+  if (configurationPartie.nationJoueur && nations.includes(configurationPartie.nationJoueur)) {
+    selectJoueur.value = configurationPartie.nationJoueur;
+  }
+
+  if (configurationPartie.nationBot && nations.includes(configurationPartie.nationBot)) {
+    selectBot.value = configurationPartie.nationBot;
+  }
+
+  const romainsDisponibles = nations.includes(NATION_TUTORIEL_JOUEUR);
+  const celtesDisponibles = nations.includes(NATION_TUTORIEL_BOT);
+
+  const appliquerContraintesTutorielAccueil = () => {
+    const tutorielCoche = !!optionMiniTutoriel?.checked;
+
+    if (tutorielCoche && romainsDisponibles && celtesDisponibles) {
+      selectJoueur.value = NATION_TUTORIEL_JOUEUR;
+      selectBot.value = NATION_TUTORIEL_BOT;
+      configurationPartie.nationJoueur = NATION_TUTORIEL_JOUEUR;
+      configurationPartie.nationBot = NATION_TUTORIEL_BOT;
+      selectJoueur.disabled = true;
+      selectBot.disabled = true;
+      return;
+    }
+
+    selectJoueur.disabled = false;
+    selectBot.disabled = false;
+  };
+
+  if (optionMiniTutoriel) {
+    optionMiniTutoriel.checked = !!configurationPartie.miniTutoriel;
+    optionMiniTutoriel.onchange = () => {
+      configurationPartie.miniTutoriel = !!optionMiniTutoriel.checked;
+      appliquerContraintesTutorielAccueil();
+    };
+    appliquerContraintesTutorielAccueil();
+  }
 }
 
 function obtenirCartesDuneNation(nomNation, listeCartes) {
@@ -31584,9 +31796,26 @@ function obtenirCartesDuneNation(nomNation, listeCartes) {
 function commencerNouvellePartie() {
   const selectNationJoueur = document.getElementById("choix-nation-joueur");
   const selectNationBot = document.getElementById("choix-nation-bot");
+  const optionMiniTutoriel = document.getElementById("option-mini-tutoriel");
+  const modeMiniTutoriel = !!optionMiniTutoriel?.checked;
 
-  configurationPartie.nationJoueur = selectNationJoueur.value;
-  configurationPartie.nationBot = selectNationBot.value;
+  configurationPartie.miniTutoriel = modeMiniTutoriel;
+
+  if (modeMiniTutoriel) {
+    configurationPartie.nationJoueur = "Romains";
+    configurationPartie.nationBot = "Celtes";
+
+    if (selectNationJoueur) {
+      selectNationJoueur.value = "Romains";
+    }
+
+    if (selectNationBot) {
+      selectNationBot.value = "Celtes";
+    }
+  } else {
+    configurationPartie.nationJoueur = selectNationJoueur.value;
+    configurationPartie.nationBot = selectNationBot.value;
+  }
 
   initialiserJeu();
   initialiserBot();
@@ -31595,6 +31824,7 @@ function commencerNouvellePartie() {
   document.getElementById("barre-navigation-vues")?.classList.remove("ui-cachee");
 
   afficherVue("vue-joueur");
+  initialiserMiniTutorielPartie(!!configurationPartie.miniTutoriel);
 }
 
 function demarrerPartie() {
@@ -31606,7 +31836,7 @@ function demarrerPartie() {
    47) BOUTONS / INITIALISATIONS UI
    ========================================================= */
 
-   function afficherUIPartie() {
+function afficherUIPartie() {
   const blocCompteurs = document.getElementById("bloc-compteurs-global");
   const blocControlesTour = document.getElementById("bloc-controles-tour");
 
@@ -31616,6 +31846,19 @@ function demarrerPartie() {
 
   if (blocControlesTour) {
     blocControlesTour.classList.remove("ui-cachee");
+  }
+}
+
+function masquerUIPartie() {
+  const blocCompteurs = document.getElementById("bloc-compteurs-global");
+  const blocControlesTour = document.getElementById("bloc-controles-tour");
+
+  if (blocCompteurs) {
+    blocCompteurs.classList.add("ui-cachee");
+  }
+
+  if (blocControlesTour) {
+    blocControlesTour.classList.add("ui-cachee");
   }
 }
 
@@ -31700,6 +31943,1057 @@ function mettreAJourBoutonsPhaseJoueur() {
     btnFinSolstice.disabled = !finSolsticeActif;
     btnFinSolstice.classList.toggle("bouton-inactif", !finSolsticeActif);
   }
+}
+
+const MINI_TUTORIEL_TOURS = 3;
+let miniTutorielElementsSurlignes = [];
+let miniTutorielDerniereEtapeScriptRendue = -1;
+
+function miniTutorielEstActif() {
+  return !!jeu?.ui?.miniTutorielActif && !jeu?.ui?.miniTutorielTermine;
+}
+
+function miniTutorielEstEnIntroduction() {
+  return miniTutorielEstActif() && !jeu?.ui?.miniTutorielIntroTermine;
+}
+
+function miniTutorielIconeStatut(src, alt) {
+  return `<img class="icone-ressource" src="${src}" alt="${alt}">`;
+}
+
+function miniTutorielMasquerPanneau() {
+  const panneau = getElement("panneau-mini-tutoriel");
+  if (!panneau) {
+    return;
+  }
+
+  panneau.classList.add("ui-cachee");
+}
+
+function miniTutorielAfficherPanneau() {
+  const panneau = getElement("panneau-mini-tutoriel");
+  if (!panneau) {
+    return;
+  }
+
+  panneau.classList.remove("ui-cachee");
+}
+
+function miniTutorielForcerVueJoueur() {
+  afficherVue("vue-joueur");
+  afficherZoneJoueur();
+}
+
+function miniTutorielForcerVueMarche() {
+  afficherVue("vue-marche");
+  afficherHautMarche();
+  afficherBarreIndicateurs();
+  afficherPileExil();
+  afficherBasMarche();
+}
+
+function miniTutorielForcerVueBot() {
+  afficherVue("vue-bot");
+}
+
+function miniTutorielPasserJoueurEnBarbare() {
+  jeu.joueurZones.carteStatutVisible = { ...carteStatutJoueur.faceA };
+  afficherZoneJoueur();
+}
+
+function miniTutorielCarteEstDalmatie(carte) {
+  return !!(
+    carte &&
+    carte.nom === "Dalmatie" &&
+    (carte.nation === "Romains" || !carte.nation || carte.nation === "Aucun")
+  );
+}
+
+function miniTutorielTrouverTemplateDalmatie() {
+  return (cartesNations || []).find(carte =>
+    carte &&
+    carte.nom === "Dalmatie" &&
+    carte.nation === "Romains"
+  ) || null;
+}
+
+function miniTutorielExtraireDalmatieDepuisListe(liste) {
+  if (!Array.isArray(liste) || liste.length === 0) {
+    return null;
+  }
+
+  const index = liste.findIndex(carte => miniTutorielCarteEstDalmatie(carte));
+  if (index < 0) {
+    return null;
+  }
+
+  return liste.splice(index, 1)[0] || null;
+}
+
+function miniTutorielAssurerCarteDalmatieEnMain() {
+  const zones = jeu?.joueurZones || {};
+  const main = zones.mainJoueur || [];
+
+  const dejaEnMain = main.find(carte =>
+    carte?.miniTutorielDalmatie === true || miniTutorielCarteEstDalmatie(carte)
+  );
+
+  if (dejaEnMain) {
+    dejaEnMain.miniTutorielDalmatie = true;
+    return dejaEnMain;
+  }
+
+  const ordreZones = [
+    zones.deckJoueur,
+    zones.defausseJoueur,
+    zones.pileCroissantJoueur,
+    zones.pileEtoileJoueur,
+    zones.tableauJoueur,
+    zones.histoireJoueur
+  ];
+
+  let carte = null;
+  for (const zone of ordreZones) {
+    carte = miniTutorielExtraireDalmatieDepuisListe(zone);
+    if (carte) {
+      break;
+    }
+  }
+
+  if (!carte) {
+    const template = miniTutorielTrouverTemplateDalmatie();
+    if (!template) {
+      return null;
+    }
+    carte = clonerCartePourJeu(template);
+  }
+
+  carte.miniTutorielDalmatie = true;
+  main.unshift(carte);
+  afficherZoneJoueur();
+  return carte;
+}
+
+function miniTutorielJouerDalmatieDansTableau() {
+  const zones = jeu?.joueurZones || {};
+  const main = zones.mainJoueur || [];
+  const tableau = zones.tableauJoueur || [];
+
+  const indexMain = main.findIndex(carte =>
+    carte?.miniTutorielDalmatie === true || miniTutorielCarteEstDalmatie(carte)
+  );
+
+  if (indexMain >= 0) {
+    const carte = main.splice(indexMain, 1)[0];
+    if (carte) {
+      carte.miniTutorielDalmatie = true;
+      tableau.push(carte);
+    }
+    afficherZoneJoueur();
+    return;
+  }
+
+  const dejaDansTableau = tableau.some(carte =>
+    carte?.miniTutorielDalmatie === true || miniTutorielCarteEstDalmatie(carte)
+  );
+
+  if (dejaDansTableau) {
+    return;
+  }
+
+  const carte =
+    miniTutorielExtraireDalmatieDepuisListe(zones.deckJoueur) ||
+    miniTutorielExtraireDalmatieDepuisListe(zones.defausseJoueur) ||
+    miniTutorielExtraireDalmatieDepuisListe(zones.pileCroissantJoueur) ||
+    miniTutorielExtraireDalmatieDepuisListe(zones.pileEtoileJoueur) ||
+    miniTutorielExtraireDalmatieDepuisListe(zones.histoireJoueur);
+
+  if (!carte) {
+    return;
+  }
+
+  carte.miniTutorielDalmatie = true;
+  tableau.push(carte);
+  afficherZoneJoueur();
+}
+
+function miniTutorielOuvrirZoomCarteCommeSurvol(carte, sourceZoom = "mini-tutoriel-zoom") {
+  const zoomCarte = getElement("zoom-carte");
+
+  if (!zoomCarte || !carte) {
+    return;
+  }
+
+  jeu.ui.zoomVerrouille = true;
+  jeu.ui.sourceZoomVerrouille = sourceZoom;
+  jeu.ui.timestampOuvertureZoom = Date.now();
+
+  zoomCarte.innerHTML = "";
+  zoomCarte.style.display = "block";
+  zoomCarte.style.zIndex = "130000";
+  zoomCarte.style.pointerEvents = "none";
+  zoomCarte.classList.add("zoom-force-visible");
+
+  const divCarte = document.createElement("div");
+  divCarte.className = "carte zoom-carte-principale";
+  divCarte.innerHTML = creerCarteHTML(carte);
+
+  zoomCarte.appendChild(divCarte);
+}
+
+function miniTutorielCarteEstLegions(carte) {
+  return !!(
+    carte &&
+    (carte.nom === "Légions" || carte.nom === "Légion") &&
+    (carte.nation === "Romains" || !carte.nation || carte.nation === "Aucun")
+  );
+}
+
+function miniTutorielTrouverTemplateLegions() {
+  return (cartesNations || []).find(carte =>
+    carte &&
+    (carte.nom === "Légions" || carte.nom === "Légion") &&
+    carte.nation === "Romains"
+  ) || null;
+}
+
+function miniTutorielObtenirCarteLegionsPourZoom() {
+  const zones = jeu?.joueurZones || {};
+
+  const zonesRecherche = [
+    zones.mainJoueur,
+    zones.tableauJoueur,
+    zones.deckJoueur,
+    zones.defausseJoueur,
+    zones.pileEtoileJoueur,
+    zones.pileCroissantJoueur,
+    zones.histoireJoueur
+  ];
+
+  for (const zone of zonesRecherche) {
+    if (!Array.isArray(zone) || zone.length === 0) {
+      continue;
+    }
+
+    const carteTrouvee = zone.find(carte => miniTutorielCarteEstLegions(carte));
+    if (carteTrouvee) {
+      return carteTrouvee;
+    }
+  }
+
+  const template = miniTutorielTrouverTemplateLegions();
+  if (template) {
+    return clonerCartePourJeu(template);
+  }
+
+  return null;
+}
+
+function miniTutorielCartePourZoomSelonCle(cleZoom = "") {
+  if (cleZoom === "dalmatie") {
+    return miniTutorielAssurerCarteDalmatieEnMain();
+  }
+
+  if (cleZoom === "legions") {
+    return miniTutorielObtenirCarteLegionsPourZoom();
+  }
+
+  return null;
+}
+
+function miniTutorielSourceZoomSelonCle(cleZoom = "") {
+  if (cleZoom === "dalmatie") {
+    return "mini-tutoriel-dalmatie";
+  }
+
+  if (cleZoom === "legions") {
+    return "mini-tutoriel-legions";
+  }
+
+  return "mini-tutoriel-zoom";
+}
+
+function miniTutorielAssurerZoomScriptVisible() {
+  if (!miniTutorielEstEnIntroduction()) {
+    return;
+  }
+
+  const index = Number(jeu?.ui?.miniTutorielEtapeScript || 0);
+  const etape = MINI_TUTORIEL_ETAPES_SCRIPT[index];
+  const cleZoom = String(etape?.zoomMaintenir || "").trim().toLowerCase();
+
+  if (!cleZoom) {
+    return;
+  }
+
+  const sourceAttendue = miniTutorielSourceZoomSelonCle(cleZoom);
+  const zoomCarte = getElement("zoom-carte");
+  const carteDejaVisible = !!zoomCarte?.querySelector(".zoom-carte-principale");
+  const sourceActuelle = String(jeu.ui.sourceZoomVerrouille || "");
+
+  if (carteDejaVisible && sourceActuelle === sourceAttendue) {
+    return;
+  }
+
+  const carte = miniTutorielCartePourZoomSelonCle(cleZoom);
+  if (!carte) {
+    return;
+  }
+
+  miniTutorielOuvrirZoomCarteCommeSurvol(
+    carte,
+    sourceAttendue
+  );
+}
+
+const MINI_TUTORIEL_ETAPES_SCRIPT = [
+  {
+    message: "Voici la zone joueur.",
+    cibles: [],
+    onEnter: () => {
+      miniTutorielForcerVueJoueur();
+    }
+  },
+  {
+    message: "Voici ta carte Puissance. Tu peux y lire les effets passifs ou actifs propres à ta nation. Tu peux aussi cliquer sur la carte Puissance pour ouvrir ton Histoire.",
+    cibles: ["#slot-puissance .carte-slot-puissance-cliquable", "#slot-puissance .carte"]
+  },
+  {
+    message: `Voici ta carte Statut. Elle indique si tu te trouves présentement en état Barbare (${miniTutorielIconeStatut("icons/imperium-barbare.png", "Barbare")}).`,
+    cibles: ["#slot-statut .carte-statut", "#slot-statut .carte"],
+    onEnter: () => {
+      miniTutorielPasserJoueurEnBarbare();
+    }
+  },
+  {
+    message: `Ou en état Empire (${miniTutorielIconeStatut("icons/imperium-empire.png", "Empire")}).`,
+    cibles: ["#slot-statut .carte-statut", "#slot-statut .carte"],
+    onEnter: () => {
+      passerJoueurEnEmpire();
+    }
+  },
+  {
+    message: `Certaines cartes ne peuvent être jouées que lorsque ta nation est dans l’un ou l’autre de ces états. Ces cartes sont identifiables par leur icône Barbare ou Empire.`,
+    cibles: [],
+    onEnter: () => {
+      miniTutorielPasserJoueurEnBarbare();
+    }
+  },
+  {
+    message: `Ce deck contient les cartes Nation que tu obtiendras au fil des rafraîchissements de ton deck principal. Les cartes obtenues par ce deck vont directement dans ta défausse. Une fois que tu auras obtenu toutes les cartes de ce deck, tu pourras obtenir la carte Avènement. En tant que Romains, ta carte Avènement est Jules César. Une fois cette carte dans ta défausse, ta nation passe au statut d’Empire.`,
+    cibles: ["#slot-croissant .dos-carte-horizontale", "#slot-croissant .compteur-pile-joueur"]
+  },
+  {
+    message: `Ce deck contient les cartes à développer de ta nation. Ces cartes sont obtenues de la même manière que les cartes Nation. Cependant, elles ont un coût de développement en Matériaux et en Population. Une fois une carte développée, elle va directement dans ta défausse. Contrairement à la pile de cartes Nation, tu peux choisir dans quel ordre obtenir tes cartes à développer.`,
+    cibles: ["#slot-etoile .carte"]
+  },
+  {
+    message: `Ce deck contient les cartes à piger qui iront directement dans ta main. Une fois le deck vide, il est rafraîchi depuis la défausse.`,
+    cibles: ["#slot-base .dos-carte-verticale", "#slot-base .compteur-pile-joueur"]
+  },
+  {
+    message: `Voici ta main. Tu peux jouer la plupart des cartes en cliquant dessus. Certaines cartes ne peuvent être jouées que si certains critères sont respectés. À chaque fin de tour, tu auras l’opportunité de défausser autant de cartes que tu veux, puis tu pourras reconstituer ta main de 5 cartes. Au courant d’un tour, il est possible d’avoir plus de 5 cartes, et il n’est pas nécessaire de défausser jusqu’au maximum de la main. Certaines cartes permettent d’augmenter ton maximum de cartes, permettant de reconstituer ta main de plus de 5 cartes.`,
+    cibles: ["#slot-main .carte"],
+    onEnter: () => {
+      miniTutorielAssurerCarteDalmatieEnMain();
+      miniTutorielForcerVueJoueur();
+    }
+  },
+  {
+    message: "Zoom sur la carte Dalmatie.",
+    cibles: ["#zoom-carte .zoom-carte-principale"],
+    zoomMaintenir: "dalmatie",
+    onEnter: () => {
+      const dalmatie = miniTutorielAssurerCarteDalmatieEnMain();
+      miniTutorielForcerVueJoueur();
+      if (dalmatie) {
+        miniTutorielOuvrirZoomCarteCommeSurvol(dalmatie, "mini-tutoriel-dalmatie");
+      }
+    }
+  },
+  {
+    message: "Cet icône indique que la carte jouée ira dans ton tableau. Les cartes dans ton tableau peuvent avoir des effets activables durant ton tour, ou à la fin du tour du bot, durant le Solstice.",
+    cibles: ["#zoom-carte .zoom-carte-principale .bandeau .pin img[src*='imperium-persistante']"],
+    zoomMaintenir: "dalmatie"
+  },
+  {
+    message: "Certaines cartes ont des icônes associés auxquels d’autres cartes peuvent se référer. Exemple: une carte pourrait te permettre de recevoir X ressource par icône Sac dans ton tableau.",
+    cibles: ["#zoom-carte .zoom-carte-principale .zone-centre img[src*='imperium-sac']"],
+    zoomMaintenir: "dalmatie"
+  },
+  {
+    message: "C’est ici que tu peux lire les actions de la carte. Certaines actions de cartes sont obligatoires, d’autres optionnelles. Il n’est pas toujours nécessaire de répondre à toutes les conditions pour jouer une carte. Ex: Une carte qui permet de voler des matériaux au bot sera jouable même si le bot n’a pas de matériaux.",
+    cibles: ["#zoom-carte .zoom-carte-principale .effet"],
+    zoomMaintenir: "dalmatie"
+  },
+  {
+    message: "La catégorie de la carte est indiquée au bas de celle-ci.",
+    cibles: ["#zoom-carte .zoom-carte-principale .categorie"],
+    zoomMaintenir: "dalmatie"
+  },
+  {
+    message: "Dézoom de la carte Dalmatie. La carte Dalmatie est jouée dans le tableau.",
+    cibles: ["#contenu-tableau-joueur"],
+    positionPanneau: "gauche-haut",
+    onEnter: () => {
+      fermerZoomVerrouille();
+      miniTutorielJouerDalmatieDansTableau();
+      miniTutorielForcerVueJoueur();
+    }
+  },
+  {
+    message: "Zoom sur la carte Légions.",
+    cibles: ["#zoom-carte .zoom-carte-principale"],
+    zoomMaintenir: "legions",
+    onEnter: () => {
+      const legions = miniTutorielObtenirCarteLegionsPourZoom();
+      miniTutorielForcerVueJoueur();
+      if (legions) {
+        miniTutorielOuvrirZoomCarteCommeSurvol(legions, "mini-tutoriel-legions");
+      }
+    }
+  },
+  {
+    message: "Le chiffre en bas à droite de la carte indique combien de points de victoire elle vaut. Les cartes de départ ne confèrent aucun point. Il est donc important d’obtenir des cartes du marché, ou de développer le plus de cartes possible pour maximiser ses points en fin de partie.",
+    cibles: ["#zoom-carte .zoom-carte-principale .points-victoire, #zoom-carte .zoom-carte-principale .zone-victoire"],
+    zoomMaintenir: "legions"
+  },
+  {
+    message: "Dézoom de la carte Légions.",
+    cibles: [],
+    onEnter: () => {
+      fermerZoomVerrouille();
+      miniTutorielForcerVueJoueur();
+    }
+  },
+  {
+    message: "De haut en bas: Jetons d’actions, Jetons d’épuisement, Population, Matériaux, Progrès.",
+    cibles: ["#bloc-compteurs-global"]
+  },
+  {
+    message: "Les jetons d’actions indiquent combien d’actions il te reste à jouer. Les actions sont seulement utilisées pour jouer une carte de la main. À chaque nettoyage, à la fin du tour, les jetons sont réinitialisés à 3.",
+    cibles: ["#bloc-compteurs-global"]
+  },
+  {
+    message: "Les jetons d’épuisement permettent d’activer les effets d’épuisement des cartes. La carte Puissance et certaines cartes du tableau peuvent avoir ces effets d’épuisement, activés passivement ou parfois activement. Les jetons d’épuisement vont aussi se placer automatiquement sur les piles Nation et Développement lorsqu’une carte y est retirée lors du rafraîchissement du deck. Il est alors impossible pour le reste du tour d’obtenir une nouvelle carte d’une de ces piles par rafraîchissement de deck. À chaque nettoyage, à la fin du tour, les jetons sont réinitialisés à 5.",
+    cibles: ["#bloc-compteurs-global"]
+  },
+  {
+    message: "Les jetons de Population et Matériaux sont des ressources utilisables pour effectuer certaines actions de cartes.",
+    cibles: ["#bloc-compteurs-global"]
+  },
+  {
+    message: "Les jetons Progrès donnent 1 point de victoire par jeton. Ils peuvent aussi être utilisés pour remplacer 2 Matériaux ou 1 Population.",
+    cibles: ["#bloc-compteurs-global"]
+  },
+  {
+    message: "Voici le Marché. C’est ici que tu pourras obtenir de nouvelles cartes à ajouter à ton deck.",
+    cibles: ["#zone-marche"],
+    onEnter: () => {
+      miniTutorielForcerVueMarche();
+    }
+  },
+  {
+    message: "Chaque catégorie de carte se retrouve dans l’une des piles suivantes. Lorsqu’une pile est vide, le bas du Marché est rafraîchi depuis la pile principale.",
+    cibles: ["#haut-marche .bloc-pioche .dos-pioche"]
+  },
+  {
+    message: "Seule l’action d’innover permet de piocher depuis l’une de ces piles.",
+    cibles: ["#haut-marche .bloc-pioche .dos-pioche"]
+  },
+  {
+    message: "Voici la pile de cartes Renommée. Ces cartes confèrent de puissants bonus. Pour la majorité des nations, seule la carte Gloire permet d’obtenir des cartes Renommée.",
+    cibles: ["#haut-marche .bloc-renommee-dessus .bloc-pioche .dos-pioche"],
+    positionPanneau: "gauche-haut"
+  },
+  {
+    message: "Les cartes Instabilité représentent le chaos généré par les changements en cours dans ta nation. Ce sont des cartes parasites dont il ferait bien de se débarrasser, sans quoi tu seras pénalisé en fin de partie.",
+    cibles: ["#bas-marche .colonne-bas-marche:last-child .pile-visible .carte", "#bas-marche .colonne-bas-marche:last-child .pile-visible .compteur-pile-mini"],
+    positionPanneau: "gauche-haut"
+  },
+  {
+    message: "Il est primordial de vérifier le compteur de cartes de la pile Instabilité. S’il ne reste plus de carte dans cette pile, le joueur perd automatiquement.",
+    cibles: ["#bas-marche .colonne-bas-marche:last-child .pile-visible .carte", "#bas-marche .colonne-bas-marche:last-child .pile-visible .compteur-pile-mini"],
+    positionPanneau: "gauche-haut"
+  },
+  {
+    message: "C’est ici que tu pourras sélectionner des nouvelles cartes. Certaines cartes de ta main te permettront d’acquérir ou d’innover une carte, en respectant une ou plusieurs catégories.",
+    cibles: ["#bas-marche .zone-cartes-marche .carte", "#bas-marche .pile-visible .carte"]
+  },
+  {
+    message: "Il est important de te rappeler qu’acquérir une carte te force à prendre la carte Instabilité qui y est associée. Seules les cartes de catégorie Région n’ont pas d’Instabilité. Innover te permet également de choisir une carte dans le bas du Marché sans prendre de carte Instabilité.",
+    cibles: ["#bas-marche .zone-cartes-marche .carte", "#bas-marche .colonne-bas-marche:last-child .pile-visible .carte"]
+  },
+  {
+    message: "Tu auras parfois à exiler une carte du Marché. Tu auras à choisir une carte sur laquelle aucun jeton n’est posé pour la placer dans l’Exil. Ces cartes ne seront plus accessibles durant la partie.",
+    cibles: ["#pile-exil .pile-visible .carte", "#pile-exil .pile-visible .dos-carte-verticale"],
+    positionPanneau: "gauche-haut"
+  },
+  {
+    message: "Le contrôle du marché par l’exil de cartes et le placement de jetons est un outil essentiel pour vaincre le bot.",
+    cibles: ["#pile-exil .pile-visible .carte", "#pile-exil .pile-visible .dos-carte-verticale", "#bas-marche .zone-cartes-marche .carte", "#bas-marche .pile-visible .carte"],
+    positionPanneau: "gauche-haut"
+  },
+  {
+    message: "Si la pile principale du Marché ou la pile de cartes Renommée arrive à 0, le Décompte sera déclenché. Le décompte entame la fin de la partie après deux derniers Solstice.",
+    cibles: ["#haut-marche .bloc-pioche.principale .dos-pioche", "#haut-marche .bloc-renommee-dessus .bloc-pioche .dos-pioche"],
+    positionPanneau: "centre-bas"
+  },
+  {
+    message: "Voici l’interface de l’automate.",
+    cibles: [],
+    positionPanneau: "centre-bas",
+    onEnter: () => {
+      miniTutorielForcerVueBot();
+    }
+  },
+  {
+    message: "Le bot ne joue pas comme le joueur. Il n’effectue aucun des effets indiqués sur les cartes. Il suit plutôt une logique fixe propre à chaque nation.",
+    cibles: [],
+    positionPanneau: "centre-bas"
+  },
+  {
+    message: "Le bot peut nuire au joueur et interagir avec le marché.",
+    cibles: [],
+    positionPanneau: "centre-bas"
+  },
+  {
+    message: "Le plus important à se rappeler face au bot est que les cartes avec des conditions de points de victoire X valent toujours 5 points, et les cartes avec des conditions de points de victoire ? valent toujours la valeur maximale. Un contrôle adéquat du marché est donc nécessaire pour ne pas permettre au bot d’obtenir trop de ces précieuses cartes.",
+    cibles: [],
+    positionPanneau: "centre-bas"
+  },
+  {
+    message: "Pour plus d’informations sur le fonctionnement du bot et la logique propre à chaque nation, il est recommandé de se référer au manuel de jeu disponible en ligne. Simplement chercher Imperium Antique règles Solo.",
+    cibles: [],
+    positionPanneau: "centre-bas"
+  },
+  {
+    message: "Passage à la zone joueur.",
+    cibles: [],
+    positionPanneau: "centre-ecran",
+    onEnter: () => {
+      miniTutorielForcerVueJoueur();
+    }
+  },
+  {
+    message: "Déroulement d’un tour complet:",
+    cibles: [],
+    positionPanneau: "centre-ecran"
+  },
+  {
+    message: "Premièrement, le joueur choisit s’il veut jouer des cartes de sa main, ou effectuer une des deux actions spéciales de début de tour.",
+    cibles: [],
+    positionPanneau: "centre-ecran"
+  },
+  {
+    message: "Pacifier permet de te débarrasser de toutes les cartes Instabilité de ta main. Cela met automatiquement fin au tour et enclenche le Nettoyage.",
+    cibles: ["#btn-pacifier"],
+    positionPanneau: "centre-ecran"
+  },
+  {
+    message: "Innover force le joueur à défausser toutes ses cartes. Ensuite, le joueur peut aller chercher n’importe quelle carte disponible du marché, sauf les cartes Renommée. Le tour prend ensuite fin et le Nettoyage est enclenché.",
+    cibles: ["#btn-innover-tour"],
+    positionPanneau: "centre-ecran"
+  },
+  {
+    message: "Si le joueur décide de jouer normalement les cartes de sa main, il pourra aussi activer les effets d’épuisement sur sa carte Puissance si disponible et sur ses cartes du tableau.",
+    cibles: [],
+    positionPanneau: "centre-ecran"
+  },
+  {
+    message: "Une fois que le joueur a utilisé toutes ses actions, ou ne veut pas utiliser ses actions restantes, il peut cliquer sur Fin du tour.",
+    cibles: ["#btn-fin-tour"],
+    positionPanneau: "centre-ecran"
+  },
+  {
+    message: "La fin du tour enclenche le Nettoyage. Premièrement, le joueur va placer un jeton Progrès sur une des cartes du Marché. Ce jeton ne provient pas de sa pile personnelle.",
+    cibles: [],
+    positionPanneau: "centre-ecran"
+  },
+  {
+    message: "Ensuite, le joueur peut défausser autant de cartes qu’il le désire, et pige jusqu’à son maximum de main.",
+    cibles: [],
+    positionPanneau: "centre-ecran"
+  },
+  {
+    message: "Ensuite, le bot joue son tour complet.",
+    cibles: ["#btn-commencer-tour-bot"],
+    positionPanneau: "centre-ecran"
+  },
+  {
+    message: "Finalement, avant le début du prochain tour, le joueur a l’opportunité d’enclencher les effets Solstice de toutes ses cartes en jeu dans le tableau. Certains effets Solstice sont obligatoires.",
+    cibles: [],
+    positionPanneau: "centre-ecran"
+  },
+  {
+    message: "Lorsque le joueur a au moins joué ses Solstice obligatoires, il peut cliquer sur Fin Solstice pour mettre fin au Solstice et débuter son prochain tour.",
+    cibles: ["#btn-fin-solstice"],
+    positionPanneau: "centre-ecran"
+  },
+  {
+    message: "Les mots-clés les plus importants sont décrits dans la section Lexique du menu (Esc).",
+    cibles: [],
+    positionPanneau: "centre-ecran"
+  },
+  {
+    message: "Pour plus de précisions sur les règles de jeu, il est recommandé de se référer au manuel disponible en ligne. Simplement chercher Imperium Antique livret règle.",
+    cibles: [],
+    positionPanneau: "centre-ecran"
+  }
+];
+
+function miniTutorielResoudreElements(cibles = []) {
+  const elements = [];
+
+  (cibles || []).forEach(cible => {
+    if (!cible) {
+      return;
+    }
+
+    if (typeof cible === "string") {
+      const selecteur = (
+        cible.startsWith("#") ||
+        cible.startsWith(".") ||
+        cible.includes("[") ||
+        cible.includes(" ")
+      ) ? cible : `#${cible}`;
+
+      document.querySelectorAll(selecteur).forEach(element => {
+        if (element) {
+          elements.push(element);
+        }
+      });
+      return;
+    }
+
+    if (Array.isArray(cible)) {
+      cible.forEach(element => {
+        if (element) {
+          elements.push(element);
+        }
+      });
+      return;
+    }
+
+    if (cible instanceof Element) {
+      elements.push(cible);
+    }
+  });
+
+  return [...new Set(elements)];
+}
+
+function miniTutorielNettoyerSurbrillance() {
+  miniTutorielElementsSurlignes.forEach(element => {
+    element.classList.remove("tutoriel-cible");
+  });
+
+  miniTutorielElementsSurlignes = [];
+}
+
+function miniTutorielAppliquerSurbrillance(cibles = []) {
+  miniTutorielNettoyerSurbrillance();
+
+  const elements = miniTutorielResoudreElements(cibles);
+  elements.forEach(element => {
+    element.classList.add("tutoriel-cible");
+  });
+
+  miniTutorielElementsSurlignes = elements;
+}
+
+function miniTutorielEtapeTourCourante() {
+  const manche = Number(jeu?.manche?.numero || 1);
+  return Math.max(1, Math.min(MINI_TUTORIEL_TOURS, manche));
+}
+
+function miniTutorielConstruireContexteTours() {
+  const etape = miniTutorielEtapeTourCourante();
+  const phase = jeu?.manche?.phase;
+  const carteJouee = !!jeu?.ui?.miniTutorielCarteJoueeTour;
+  const botLance = !!jeu?.ui?.miniTutorielBotLanceTour;
+  const toursTermines = Number(jeu?.ui?.miniTutorielToursTermines || 0);
+  const cocher = valeur => (valeur ? "✓" : "□");
+
+  if (etape === 1) {
+    return {
+      etapeLabel: `Tour ${etape} / ${MINI_TUTORIEL_TOURS}`,
+      objectifHtml: "Objectif court terme: jouez 1 carte depuis votre main, puis terminez votre tour.",
+      progressionLignes: [
+        `${cocher(carteJouee)} Jouer 1 carte depuis la main`,
+        `${cocher(phase !== PHASES.TOUR)} Cliquer sur Fin du tour`
+      ],
+      ressourcesHtml: "Rappel ressources: Actions pour jouer des cartes. Population/Materiaux pour payer des coûts. Progres pour scorer et payer certains remplacements.",
+      positionPanneau: "droite-haut",
+      cibles:
+        phase === PHASES.TOUR
+          ? ["#btn-vue-joueur", "#btn-vue-marche", "#btn-fin-tour"]
+          : phase === "attente-tour-bot"
+            ? ["#btn-vue-bot", "#btn-commencer-tour-bot"]
+            : phase === PHASES.SOLSTICE
+              ? ["#btn-vue-joueur", "#btn-fin-solstice"]
+              : ["#btn-fin-tour"],
+      afficherSuivant: false
+    };
+  }
+
+  if (etape === 2) {
+    return {
+      etapeLabel: `Tour ${etape} / ${MINI_TUTORIEL_TOURS}`,
+      objectifHtml: "Objectif court terme: enchainez votre tour puis lancez le tour du Bot.",
+      progressionLignes: [
+        `${cocher(phase !== PHASES.TOUR)} Terminer votre tour`,
+        `${cocher(botLance)} Lancer le tour du Bot`
+      ],
+      ressourcesHtml: "Rappel ressources: Progres = points de victoire. Epuisement = activations limitees pendant le tour.",
+      positionPanneau: "droite-haut",
+      cibles:
+        phase === PHASES.TOUR
+          ? ["#btn-fin-tour", "#btn-vue-marche"]
+          : phase === "attente-tour-bot"
+            ? ["#btn-vue-bot", "#btn-commencer-tour-bot"]
+            : phase === PHASES.SOLSTICE
+              ? ["#btn-vue-joueur", "#btn-fin-solstice"]
+              : ["#btn-fin-tour"],
+      afficherSuivant: false
+    };
+  }
+
+  return {
+    etapeLabel: `Tour ${etape} / ${MINI_TUTORIEL_TOURS}`,
+    objectifHtml: "Objectif court terme: terminez le Solstice de cette manche pour conclure le mini tutoriel.",
+    progressionLignes: [
+      `${cocher(botLance || phase === PHASES.SOLSTICE)} Atteindre la phase Solstice`,
+      `${cocher(toursTermines >= MINI_TUTORIEL_TOURS)} Finaliser la 3e manche guidee`
+    ],
+    ressourcesHtml: "Rappel ressources: les jetons Progres comptent directement au score final.",
+    positionPanneau: "droite-haut",
+    cibles:
+      phase === PHASES.SOLSTICE
+        ? ["#btn-vue-joueur", "#btn-fin-solstice"]
+        : phase === "attente-tour-bot"
+          ? ["#btn-vue-bot", "#btn-commencer-tour-bot"]
+          : ["#btn-fin-tour", "#btn-vue-joueur"],
+    afficherSuivant: false
+  };
+}
+
+function miniTutorielConstruireContexteScript() {
+  const index = Number(jeu?.ui?.miniTutorielEtapeScript || 0);
+  const total = MINI_TUTORIEL_ETAPES_SCRIPT.length;
+  const etape = MINI_TUTORIEL_ETAPES_SCRIPT[index] || MINI_TUTORIEL_ETAPES_SCRIPT[0];
+
+  return {
+    etapeLabel: `Introduction ${Math.min(index + 1, total)} / ${total}`,
+    objectifHtml: etape?.message || "",
+    progressionLignes: ["Cliquez sur Suivant pour passer à l’explication suivante."],
+    ressourcesHtml: "",
+    positionPanneau: etape?.positionPanneau || "droite-haut",
+    cibles: etape?.cibles || [],
+    afficherSuivant: true
+  };
+}
+
+function miniTutorielExecuterEtapeScriptSiNecessaire() {
+  if (!miniTutorielEstEnIntroduction()) {
+    miniTutorielDerniereEtapeScriptRendue = -1;
+    return;
+  }
+
+  const index = Number(jeu?.ui?.miniTutorielEtapeScript || 0);
+  const etape = MINI_TUTORIEL_ETAPES_SCRIPT[index];
+
+  if (!etape) {
+    return;
+  }
+
+  if (miniTutorielDerniereEtapeScriptRendue === index) {
+    return;
+  }
+
+  miniTutorielDerniereEtapeScriptRendue = index;
+
+  if (typeof etape.onEnter === "function") {
+    etape.onEnter();
+  }
+}
+
+function miniTutorielPasserEtapeScriptSuivante() {
+  if (!miniTutorielEstEnIntroduction()) {
+    return;
+  }
+
+  const indexActuel = Number(jeu?.ui?.miniTutorielEtapeScript || 0);
+  const prochainIndex = indexActuel + 1;
+
+  if (prochainIndex >= MINI_TUTORIEL_ETAPES_SCRIPT.length) {
+    miniTutorielTerminerEtRetourAccueil("Tutoriel termine. Retour au menu d’accueil.");
+    return;
+  }
+
+  jeu.ui.miniTutorielEtapeScript = prochainIndex;
+  miniTutorielSynchroniser();
+}
+
+function miniTutorielMettreAJourBoutonControle() {
+  const bouton = getElement("btn-tutoriel");
+  if (!bouton) {
+    return;
+  }
+
+  const actif = miniTutorielEstActif();
+  bouton.classList.toggle("ui-cachee", !actif);
+
+  if (!actif) {
+    bouton.textContent = "Tutoriel";
+    return;
+  }
+
+  bouton.textContent = jeu.ui.miniTutorielMasque ? "Tutoriel (afficher)" : "Tutoriel";
+}
+
+function miniTutorielMettreAJourActionsPanneau(afficherSuivant = false) {
+  const boutonSuivant = getElement("btn-mini-tutoriel-suivant");
+  if (!boutonSuivant) {
+    return;
+  }
+
+  boutonSuivant.style.display = afficherSuivant ? "inline-block" : "none";
+}
+
+function miniTutorielMettreAJourPanneau(contexte) {
+  const etape = getElement("mini-tutoriel-etape");
+  const objectif = getElement("mini-tutoriel-objectif");
+  const progression = getElement("mini-tutoriel-progression");
+  const ressources = getElement("mini-tutoriel-ressources");
+
+  if (!etape || !objectif || !progression || !ressources) {
+    return;
+  }
+
+  etape.textContent = contexte.etapeLabel || "";
+  objectif.innerHTML = contexte.objectifHtml || "";
+  progression.innerHTML = (contexte.progressionLignes || [])
+    .map(ligne => `<div>${ligne}</div>`)
+    .join("");
+  ressources.innerHTML = contexte.ressourcesHtml || "";
+  ressources.style.display = (contexte.ressourcesHtml || "").trim() ? "block" : "none";
+
+  miniTutorielMettreAJourActionsPanneau(!!contexte.afficherSuivant);
+}
+
+function miniTutorielAppliquerPositionPanneau(position = "droite-haut") {
+  const panneau = getElement("panneau-mini-tutoriel");
+  if (!panneau) {
+    return;
+  }
+
+  panneau.classList.remove(
+    "mini-tutoriel-position-gauche-haut",
+    "mini-tutoriel-position-centre-bas",
+    "mini-tutoriel-position-centre-ecran"
+  );
+
+  if (position === "gauche-haut") {
+    panneau.classList.add("mini-tutoriel-position-gauche-haut");
+    return;
+  }
+
+  if (position === "centre-bas") {
+    panneau.classList.add("mini-tutoriel-position-centre-bas");
+    return;
+  }
+
+  if (position === "centre-ecran") {
+    panneau.classList.add("mini-tutoriel-position-centre-ecran");
+  }
+}
+
+function miniTutorielReinitialiserSuiviTour() {
+  jeu.ui.miniTutorielCarteJoueeTour = false;
+  jeu.ui.miniTutorielBotLanceTour = false;
+}
+
+function miniTutorielSynchroniser() {
+  miniTutorielMettreAJourBoutonControle();
+
+  if (!miniTutorielEstActif()) {
+    miniTutorielAppliquerPositionPanneau("droite-haut");
+    miniTutorielNettoyerSurbrillance();
+    miniTutorielMasquerPanneau();
+    miniTutorielMettreAJourActionsPanneau(false);
+    return;
+  }
+
+  if (vueAccueilVisible() || jeu?.finPartie?.terminee) {
+    miniTutorielAppliquerPositionPanneau("droite-haut");
+    miniTutorielNettoyerSurbrillance();
+    miniTutorielMasquerPanneau();
+    miniTutorielMettreAJourActionsPanneau(false);
+    return;
+  }
+
+  let contexte;
+
+  if (miniTutorielEstEnIntroduction()) {
+    if (Number(jeu?.ui?.miniTutorielEtapeScript || 0) >= MINI_TUTORIEL_ETAPES_SCRIPT.length) {
+      jeu.ui.miniTutorielIntroTermine = true;
+      miniTutorielDerniereEtapeScriptRendue = -1;
+    }
+  }
+
+  if (miniTutorielEstEnIntroduction()) {
+    miniTutorielExecuterEtapeScriptSiNecessaire();
+    miniTutorielAssurerZoomScriptVisible();
+    contexte = miniTutorielConstruireContexteScript();
+  } else {
+    const mancheCourante = Number(jeu?.manche?.numero || 1);
+    if (mancheCourante !== Number(jeu?.ui?.miniTutorielDerniereManche || 1)) {
+      jeu.ui.miniTutorielDerniereManche = mancheCourante;
+      miniTutorielReinitialiserSuiviTour();
+    }
+    contexte = miniTutorielConstruireContexteTours();
+  }
+
+  miniTutorielAppliquerSurbrillance(contexte.cibles);
+
+  if (jeu.ui.miniTutorielMasque) {
+    miniTutorielAppliquerPositionPanneau("droite-haut");
+    miniTutorielMasquerPanneau();
+    return;
+  }
+
+  miniTutorielAfficherPanneau();
+  miniTutorielMettreAJourPanneau(contexte);
+  miniTutorielAppliquerPositionPanneau(contexte.positionPanneau);
+}
+
+function miniTutorielTerminer(messageFin = "Mini tutoriel termine.") {
+  jeu.ui.miniTutorielActif = false;
+  jeu.ui.miniTutorielTermine = true;
+  jeu.ui.miniTutorielMasque = false;
+  jeu.ui.miniTutorielIntroTermine = true;
+  miniTutorielDerniereEtapeScriptRendue = -1;
+  fermerZoomVerrouille();
+  miniTutorielSynchroniser();
+  afficherToastUI(messageFin);
+}
+
+function miniTutorielTerminerEtRetourAccueil(messageFin = "Tutoriel termine. Retour au menu d’accueil.") {
+  miniTutorielTerminer(messageFin);
+  masquerUIPartie();
+  fermerMenuEchap({ silencieux: true });
+  afficherVue("vue-accueil");
+}
+
+function miniTutorielNotifierFinDeManche(mancheTerminee = 0) {
+  if (!miniTutorielEstActif() || !jeu?.ui?.miniTutorielIntroTermine) {
+    return;
+  }
+
+  const numero = Number(mancheTerminee || 0);
+  if (numero > 0) {
+    jeu.ui.miniTutorielToursTermines = Math.max(
+      Number(jeu.ui.miniTutorielToursTermines || 0),
+      numero
+    );
+  }
+
+  if (numero >= MINI_TUTORIEL_TOURS) {
+    miniTutorielTerminer("Mini tutoriel termine. Vous etes pret pour une partie complete.");
+    return;
+  }
+
+  miniTutorielReinitialiserSuiviTour();
+  miniTutorielSynchroniser();
+}
+
+function miniTutorielMarquerCarteJouee() {
+  if (!miniTutorielEstActif() || !jeu?.ui?.miniTutorielIntroTermine) {
+    return;
+  }
+
+  jeu.ui.miniTutorielCarteJoueeTour = true;
+  miniTutorielSynchroniser();
+}
+
+function miniTutorielMarquerBotLance() {
+  if (!miniTutorielEstActif() || !jeu?.ui?.miniTutorielIntroTermine) {
+    return;
+  }
+
+  jeu.ui.miniTutorielBotLanceTour = true;
+  miniTutorielSynchroniser();
+}
+
+function initialiserMiniTutorielPartie(actif = false) {
+  jeu.ui.miniTutorielActif = !!actif;
+  jeu.ui.miniTutorielTermine = false;
+  jeu.ui.miniTutorielMasque = false;
+  jeu.ui.miniTutorielToursTermines = 0;
+  jeu.ui.miniTutorielCarteJoueeTour = false;
+  jeu.ui.miniTutorielBotLanceTour = false;
+  jeu.ui.miniTutorielDerniereManche = Number(jeu?.manche?.numero || 1);
+  jeu.ui.miniTutorielIntroTermine = false;
+  jeu.ui.miniTutorielEtapeScript = 0;
+  miniTutorielDerniereEtapeScriptRendue = -1;
+
+  miniTutorielSynchroniser();
+
+  if (actif) {
+    ouvrirPanneauUI(
+      "Mini tutoriel active : parcours guide complet de l’interface et des bases de jeu.",
+      [{ label: "OK" }],
+      { forcerModal: true }
+    );
+  }
+}
+
+function initialiserMiniTutorielInterface() {
+  const boutonControle = getElement("btn-tutoriel");
+  const boutonSuivant = getElement("btn-mini-tutoriel-suivant");
+  const boutonMasquer = getElement("btn-mini-tutoriel-masquer");
+  const boutonArreter = getElement("btn-mini-tutoriel-arreter");
+
+  if (boutonControle) {
+    boutonControle.onclick = () => {
+      if (!miniTutorielEstActif()) {
+        return;
+      }
+
+      jeu.ui.miniTutorielMasque = !jeu.ui.miniTutorielMasque;
+      miniTutorielSynchroniser();
+    };
+  }
+
+  if (boutonSuivant) {
+    boutonSuivant.onclick = () => {
+      miniTutorielPasserEtapeScriptSuivante();
+    };
+  }
+
+  if (boutonMasquer) {
+    boutonMasquer.onclick = () => {
+      if (!miniTutorielEstActif()) {
+        return;
+      }
+
+      jeu.ui.miniTutorielMasque = true;
+      miniTutorielSynchroniser();
+    };
+  }
+
+  if (boutonArreter) {
+    boutonArreter.onclick = () => {
+      if (!miniTutorielEstActif()) {
+        return;
+      }
+
+      miniTutorielTerminer("Mini tutoriel arrete. Vous pouvez continuer librement.");
+    };
+  }
+
+  miniTutorielSynchroniser();
 }
 
 /* =========================================================
@@ -32276,6 +33570,7 @@ function initialiserInterfaces() {
   initialiserMusique();
   initialiserControleMusique();
   initialiserMenuEchap();
+  initialiserMiniTutorielInterface();
    initialiserOuverturePileEtoile();
      brancherClicHistoireBot();
      initialiserBoutonSuivantBot();

@@ -2353,11 +2353,16 @@ body {
 
 #btn-vue-marche,
 #btn-vue-joueur,
-#btn-vue-bot {
+#btn-vue-bot,
+#btn-tutoriel {
   order: 1;
 }
 
 #btn-vue-bot {
+  margin-right: 0;
+}
+
+#btn-tutoriel {
   margin-right: auto;
 }
 
@@ -2468,6 +2473,39 @@ body {
   font-size: 16px;
   font-weight: bold;
   color: #4a3214;
+}
+
+.bloc-choix-tutoriel {
+  margin-top: 2px;
+  margin-bottom: 8px;
+  padding: 10px 12px;
+  border: 1px solid rgba(122, 88, 42, 0.35);
+  border-radius: 10px;
+  background: rgba(255, 247, 231, 0.62);
+}
+
+.option-tutoriel-accueil {
+  margin: 0;
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  color: #3f2a11;
+  font-size: 15px;
+  line-height: 1.35;
+  cursor: pointer;
+}
+
+.option-tutoriel-accueil input[type="checkbox"] {
+  margin-top: 2px;
+  transform: scale(1.05);
+  accent-color: #4e6c88;
+}
+
+.aide-tutoriel-accueil {
+  margin: 7px 0 0 0;
+  color: #6d4f27;
+  font-size: 13px;
+  line-height: 1.35;
 }
 
 #vue-accueil select {
@@ -2610,6 +2648,10 @@ body {
 
 .ui-bloque-hover-cartes #zoom-carte {
   display: none !important;
+}
+
+.ui-bloque-hover-cartes #zoom-carte.zoom-force-visible {
+  display: block !important;
 }
 
 .ui-bloque-hover-cartes .zoom-carte-au-devant {
@@ -3853,7 +3895,8 @@ body {
 
 #btn-vue-marche,
 #btn-vue-joueur,
-#btn-vue-bot {
+#btn-vue-bot,
+#btn-tutoriel {
   --btn-ton-haut: #7f9bb4;
   --btn-ton-milieu: #597896;
   --btn-ton-bas: #3f5f7a;
@@ -4191,6 +4234,250 @@ body {
     rgba(18, 13, 8, 0.18) 40%,
     rgba(18, 13, 8, 0) 72%
   );
+}
+
+#zone-toast-ui {
+  position: fixed;
+  left: 50%;
+  bottom: 18px;
+  transform: translateX(-50%);
+  z-index: 26000;
+  width: min(760px, calc(100vw - 24px));
+  display: flex;
+  justify-content: center;
+  pointer-events: none;
+}
+
+.toast-ui {
+  max-width: 100%;
+  padding: 12px 16px;
+  border-radius: 12px;
+  border: 1px solid rgba(106, 76, 39, 0.86);
+  color: #f8efe0;
+  font-size: 15px;
+  font-weight: 600;
+  text-align: center;
+  text-shadow: 0 1px 0 rgba(0, 0, 0, 0.65);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.16),
+    0 8px 18px rgba(0, 0, 0, 0.40);
+  background:
+    linear-gradient(to bottom, rgba(108, 78, 43, 0.95), rgba(72, 50, 28, 0.96)),
+    rgba(30, 22, 13, 0.95);
+  transition: opacity 0.2s ease, transform 0.2s ease;
+}
+
+.toast-ui-cache {
+  opacity: 0;
+  transform: translateY(8px);
+}
+
+.toast-ui-visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+#panneau-mini-tutoriel {
+  position: fixed;
+  top: 86px;
+  right: 12px;
+  z-index: 24000;
+  width: min(360px, calc(100vw - 24px));
+  border-radius: 14px;
+  border: 1px solid rgba(106, 76, 39, 0.88);
+  background:
+    radial-gradient(circle at 16% 10%, rgba(255, 254, 246, 0.64) 0%, rgba(255, 254, 246, 0) 40%),
+    linear-gradient(165deg, rgba(248, 237, 213, 0.97) 0%, rgba(239, 222, 190, 0.96) 56%, rgba(224, 196, 155, 0.95) 100%);
+  color: #2f2114;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.66),
+    inset 0 -1px 0 rgba(84, 59, 27, 0.24),
+    0 14px 26px rgba(0, 0, 0, 0.35);
+  padding: 12px 12px 10px 12px;
+}
+
+#panneau-mini-tutoriel.mini-tutoriel-position-gauche-haut {
+  right: auto;
+  left: 112px;
+}
+
+#panneau-mini-tutoriel.mini-tutoriel-position-centre-bas {
+  top: auto;
+  right: auto;
+  left: 50%;
+  bottom: 14px;
+  transform: translateX(-50%);
+}
+
+#panneau-mini-tutoriel.mini-tutoriel-position-centre-ecran {
+  top: 50%;
+  right: auto;
+  left: 50%;
+  bottom: auto;
+  transform: translate(-50%, -50%);
+}
+
+.mini-tutoriel-entete {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+
+.mini-tutoriel-titre {
+  font-family: "Palatino Linotype", "Book Antiqua", Georgia, serif;
+  font-size: 19px;
+  font-weight: 700;
+  color: #3f2a11;
+}
+
+.mini-tutoriel-etape {
+  font-size: 13px;
+  font-weight: 700;
+  color: #5f4728;
+}
+
+.mini-tutoriel-objectif {
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 1.35;
+  margin-bottom: 8px;
+}
+
+.mini-tutoriel-progression {
+  font-size: 13px;
+  line-height: 1.35;
+  color: #4a351d;
+  margin-bottom: 8px;
+}
+
+.mini-tutoriel-ressources {
+  font-size: 12px;
+  line-height: 1.35;
+  color: #5f4524;
+  border-top: 1px solid rgba(112, 80, 40, 0.28);
+  padding-top: 8px;
+}
+
+.mini-tutoriel-actions {
+  margin-top: 10px;
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
+#panneau-mini-tutoriel button {
+  border: 1px solid rgba(66, 48, 26, 0.68);
+  border-radius: 8px;
+  background: linear-gradient(to bottom, #5a7998, #385673);
+  color: #f4ecdf;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  padding: 6px 10px;
+}
+
+#panneau-mini-tutoriel button:hover {
+  filter: brightness(1.08);
+}
+
+.tutoriel-cible {
+  animation: tutorielPulse 1.15s ease-in-out infinite;
+  box-shadow:
+    0 0 0 2px rgba(236, 198, 123, 0.92),
+    0 0 14px rgba(255, 225, 169, 0.65);
+}
+
+.tutoriel-cible.dos-pioche,
+.tutoriel-cible.dos-carte-verticale,
+.tutoriel-cible.dos-carte-horizontale {
+  position: relative;
+  z-index: 25;
+  animation: tutorielPulseDos 0.9s ease-in-out infinite;
+  box-shadow:
+    0 0 0 4px rgba(255, 215, 120, 0.98),
+    0 0 0 10px rgba(255, 177, 66, 0.55),
+    0 0 36px rgba(255, 222, 143, 0.88),
+    inset 0 0 0 2px rgba(255, 248, 212, 0.82);
+  filter: saturate(1.28) brightness(1.16);
+}
+
+#bloc-controles-tour button.tutoriel-cible,
+#bloc-musique button.tutoriel-cible,
+#bloc-controles-bot button.tutoriel-cible {
+  position: relative;
+  z-index: 40;
+  animation: tutorielPulseBouton 0.72s ease-in-out infinite;
+  transform: translateY(-1px) scale(1.09);
+  box-shadow:
+    0 0 0 3px rgba(255, 214, 120, 0.98),
+    0 0 0 7px rgba(255, 163, 52, 0.58),
+    0 0 24px rgba(255, 220, 141, 0.92),
+    inset 0 1px 0 rgba(255, 255, 255, 0.78);
+  filter: saturate(1.35) brightness(1.18);
+}
+
+@keyframes tutorielPulse {
+  0%, 100% {
+    filter: brightness(1);
+  }
+
+  50% {
+    filter: brightness(1.12);
+  }
+}
+
+@keyframes tutorielPulseDos {
+  0%, 100% {
+    filter: saturate(1.18) brightness(1.06);
+  }
+
+  50% {
+    filter: saturate(1.38) brightness(1.24);
+  }
+}
+
+@keyframes tutorielPulseBouton {
+  0%, 100% {
+    transform: translateY(-1px) scale(1.06);
+    filter: saturate(1.24) brightness(1.10);
+  }
+
+  50% {
+    transform: translateY(-2px) scale(1.11);
+    filter: saturate(1.46) brightness(1.24);
+  }
+}
+
+@media (max-width: 900px) {
+  #panneau-mini-tutoriel {
+    top: 72px;
+    right: 8px;
+    width: min(96vw, 360px);
+    padding: 10px 10px 8px 10px;
+  }
+
+  #panneau-mini-tutoriel.mini-tutoriel-position-gauche-haut {
+    right: auto;
+    left: 8px;
+  }
+
+  #panneau-mini-tutoriel.mini-tutoriel-position-centre-bas {
+    top: auto;
+    right: auto;
+    left: 50%;
+    bottom: 8px;
+    transform: translateX(-50%);
+  }
+
+  #panneau-mini-tutoriel.mini-tutoriel-position-centre-ecran {
+    top: 50%;
+    right: auto;
+    left: 50%;
+    bottom: auto;
+    transform: translate(-50%, -50%);
+  }
 }
 
 .panneau-ui-contenu,
