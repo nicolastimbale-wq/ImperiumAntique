@@ -31948,6 +31948,7 @@ function mettreAJourBoutonsPhaseJoueur() {
 const MINI_TUTORIEL_TOURS = 3;
 let miniTutorielElementsSurlignes = [];
 let miniTutorielDerniereEtapeScriptRendue = -1;
+let miniTutorielResizeListenerAttache = false;
 
 function miniTutorielEstActif() {
   return !!jeu?.ui?.miniTutorielActif && !jeu?.ui?.miniTutorielTermine;
@@ -31977,6 +31978,113 @@ function miniTutorielAfficherPanneau() {
   }
 
   panneau.classList.remove("ui-cachee");
+}
+
+function miniTutorielMettreFiltreObscurActif(actif = false, elementsSurlignes = []) {
+  document.body?.classList.remove("mini-tutoriel-focus-actif");
+
+  const voile = getElement("mini-tutoriel-voile");
+  const svg = getElement("mini-tutoriel-voile-svg");
+  const path = getElement("mini-tutoriel-voile-path");
+
+  if (!voile || !svg || !path) {
+    return;
+  }
+
+  if (!actif) {
+    path.setAttribute("d", "");
+    voile.classList.add("ui-cachee");
+    return;
+  }
+
+  const largeur = Math.max(0, Number(window.innerWidth || 0));
+  const hauteur = Math.max(0, Number(window.innerHeight || 0));
+  if (largeur <= 0 || hauteur <= 0) {
+    path.setAttribute("d", "");
+    voile.classList.add("ui-cachee");
+    return;
+  }
+
+  svg.setAttribute("viewBox", `0 0 ${largeur} ${hauteur}`);
+  path.setAttribute("fill-rule", "evenodd");
+
+  const marge = 10;
+  let chemin = `M0 0H${largeur}V${hauteur}H0Z`;
+  let trous = 0;
+  const rectanglesTrous = [];
+
+  (elementsSurlignes || []).forEach(element => {
+    if (!(element instanceof Element)) {
+      return;
+    }
+
+    const rect = element.getBoundingClientRect();
+    if (rect.width <= 0 || rect.height <= 0) {
+      return;
+    }
+
+    const gauche = Math.max(0, rect.left - marge);
+    const haut = Math.max(0, rect.top - marge);
+    const droite = Math.min(largeur, rect.right + marge);
+    const bas = Math.min(hauteur, rect.bottom + marge);
+
+    if (droite <= gauche || bas <= haut) {
+      return;
+    }
+
+    rectanglesTrous.push({ gauche, haut, droite, bas });
+  });
+
+  const fusionTolerance = 6;
+  const fusionnes = [];
+  const seChevauchent = (a, b, tolerance = 0) => !(
+    a.droite + tolerance < b.gauche ||
+    b.droite + tolerance < a.gauche ||
+    a.bas + tolerance < b.haut ||
+    b.bas + tolerance < a.haut
+  );
+
+  rectanglesTrous.forEach(rectangleInitial => {
+    let rectangleCourant = { ...rectangleInitial };
+    let fusionEffectuee = true;
+
+    while (fusionEffectuee) {
+      fusionEffectuee = false;
+
+      for (let i = 0; i < fusionnes.length; i += 1) {
+        const candidate = fusionnes[i];
+        if (!seChevauchent(rectangleCourant, candidate, fusionTolerance)) {
+          continue;
+        }
+
+        rectangleCourant = {
+          gauche: Math.min(rectangleCourant.gauche, candidate.gauche),
+          haut: Math.min(rectangleCourant.haut, candidate.haut),
+          droite: Math.max(rectangleCourant.droite, candidate.droite),
+          bas: Math.max(rectangleCourant.bas, candidate.bas)
+        };
+        fusionnes.splice(i, 1);
+        fusionEffectuee = true;
+        break;
+      }
+    }
+
+    fusionnes.push(rectangleCourant);
+  });
+
+  fusionnes.forEach(rectangle => {
+    chemin += `M${rectangle.gauche} ${rectangle.haut}H${rectangle.droite}V${rectangle.bas}H${rectangle.gauche}Z`;
+    trous += 1;
+  });
+
+  if (trous <= 0) {
+    path.setAttribute("d", "");
+    voile.classList.add("ui-cachee");
+    return;
+  }
+
+  path.setAttribute("d", chemin);
+  voile.classList.remove("ui-cachee");
 }
 
 function miniTutorielForcerVueJoueur() {
@@ -32189,6 +32297,40 @@ function miniTutorielObtenirCarteLegionsPourZoom() {
   return null;
 }
 
+function miniTutorielTrouverTemplateEmpereurTrajan() {
+  return (cartesNations || []).find(carte =>
+    carte &&
+    carte.nom === "Empereur Trajan" &&
+    carte.nation === "Romains"
+  ) || null;
+}
+
+function miniTutorielObtenirCarteEmpereurTrajanPourZoom() {
+  const template = miniTutorielTrouverTemplateEmpereurTrajan();
+  if (!template) {
+    return null;
+  }
+
+  return clonerCartePourJeu(template);
+}
+
+function miniTutorielTrouverTemplateVilleConditionnelle() {
+  return (cartesCommunes || []).find(carte =>
+    carte &&
+    carte.nom === "Ville" &&
+    carte.pointsVictoire === "Conditionnel"
+  ) || null;
+}
+
+function miniTutorielObtenirCarteVillePourZoom() {
+  const template = miniTutorielTrouverTemplateVilleConditionnelle();
+  if (!template) {
+    return null;
+  }
+
+  return clonerCartePourJeu(template);
+}
+
 function miniTutorielCartePourZoomSelonCle(cleZoom = "") {
   if (cleZoom === "dalmatie") {
     return miniTutorielAssurerCarteDalmatieEnMain();
@@ -32196,6 +32338,14 @@ function miniTutorielCartePourZoomSelonCle(cleZoom = "") {
 
   if (cleZoom === "legions") {
     return miniTutorielObtenirCarteLegionsPourZoom();
+  }
+
+  if (cleZoom === "trajan") {
+    return miniTutorielObtenirCarteEmpereurTrajanPourZoom();
+  }
+
+  if (cleZoom === "ville") {
+    return miniTutorielObtenirCarteVillePourZoom();
   }
 
   return null;
@@ -32208,6 +32358,14 @@ function miniTutorielSourceZoomSelonCle(cleZoom = "") {
 
   if (cleZoom === "legions") {
     return "mini-tutoriel-legions";
+  }
+
+  if (cleZoom === "trajan") {
+    return "mini-tutoriel-trajan";
+  }
+
+  if (cleZoom === "ville") {
+    return "mini-tutoriel-ville";
   }
 
   return "mini-tutoriel-zoom";
@@ -32300,7 +32458,7 @@ const MINI_TUTORIEL_ETAPES_SCRIPT = [
     }
   },
   {
-    message: "Zoom sur la carte Dalmatie.",
+    message: "Voici la carte Dalmatie.",
     cibles: ["#zoom-carte .zoom-carte-principale"],
     zoomMaintenir: "dalmatie",
     onEnter: () => {
@@ -32332,7 +32490,7 @@ const MINI_TUTORIEL_ETAPES_SCRIPT = [
     zoomMaintenir: "dalmatie"
   },
   {
-    message: "Dézoom de la carte Dalmatie. La carte Dalmatie est jouée dans le tableau.",
+    message: "Si tu jouais la carte Dalmatie, elle serait placée ici dans le tableau.",
     cibles: ["#contenu-tableau-joueur"],
     positionPanneau: "gauche-haut",
     onEnter: () => {
@@ -32342,7 +32500,7 @@ const MINI_TUTORIEL_ETAPES_SCRIPT = [
     }
   },
   {
-    message: "Zoom sur la carte Légions.",
+    message: "Voici la carte Légions.",
     cibles: ["#zoom-carte .zoom-carte-principale"],
     zoomMaintenir: "legions",
     onEnter: () => {
@@ -32359,16 +32517,46 @@ const MINI_TUTORIEL_ETAPES_SCRIPT = [
     zoomMaintenir: "legions"
   },
   {
-    message: "Dézoom de la carte Légions.",
-    cibles: [],
+    message: "Voici la carte Empereur Trajan.",
+    cibles: ["#zoom-carte .zoom-carte-principale"],
+    zoomMaintenir: "trajan",
+    onEnter: () => {
+      const trajan = miniTutorielObtenirCarteEmpereurTrajanPourZoom();
+      miniTutorielForcerVueJoueur();
+      if (trajan) {
+        miniTutorielOuvrirZoomCarteCommeSurvol(trajan, "mini-tutoriel-trajan");
+      }
+    }
+  },
+  {
+    message: "Les cartes identifiées par un X offrent une quantité variable de points selon le critère indiqué.",
+    cibles: ["#zoom-carte .zoom-carte-principale .points-victoire, #zoom-carte .zoom-carte-principale .zone-victoire"],
+    zoomMaintenir: "trajan"
+  },
+  {
+    message: "Voici la carte Ville.",
+    cibles: ["#zoom-carte .zoom-carte-principale"],
+    zoomMaintenir: "ville",
+    onEnter: () => {
+      const ville = miniTutorielObtenirCarteVillePourZoom();
+      miniTutorielForcerVueJoueur();
+      if (ville) {
+        miniTutorielOuvrirZoomCarteCommeSurvol(ville, "mini-tutoriel-ville");
+      }
+    }
+  },
+  {
+    message: "Les cartes identifiées par un ? offrent une quantité de points conditionnelle au critère indiqué.",
+    cibles: ["#zoom-carte .zoom-carte-principale .points-victoire, #zoom-carte .zoom-carte-principale .zone-victoire"],
+    zoomMaintenir: "ville"
+  },
+  {
+    message: "De haut en bas: Jetons d’actions, Jetons d’épuisement, Population, Matériaux, Progrès.",
+    cibles: ["#bloc-compteurs-global"],
     onEnter: () => {
       fermerZoomVerrouille();
       miniTutorielForcerVueJoueur();
     }
-  },
-  {
-    message: "De haut en bas: Jetons d’actions, Jetons d’épuisement, Population, Matériaux, Progrès.",
-    cibles: ["#bloc-compteurs-global"]
   },
   {
     message: "Les jetons d’actions indiquent combien d’actions il te reste à jouer. Les actions sont seulement utilisées pour jouer une carte de la main. À chaque nettoyage, à la fin du tour, les jetons sont réinitialisés à 3.",
@@ -32585,7 +32773,7 @@ function miniTutorielResoudreElements(cibles = []) {
 
 function miniTutorielNettoyerSurbrillance() {
   miniTutorielElementsSurlignes.forEach(element => {
-    element.classList.remove("tutoriel-cible");
+    element.classList.remove("tutoriel-cible", "tutoriel-cible-statique");
   });
 
   miniTutorielElementsSurlignes = [];
@@ -32597,9 +32785,13 @@ function miniTutorielAppliquerSurbrillance(cibles = []) {
   const elements = miniTutorielResoudreElements(cibles);
   elements.forEach(element => {
     element.classList.add("tutoriel-cible");
+    if (window.getComputedStyle(element).position === "static") {
+      element.classList.add("tutoriel-cible-statique");
+    }
   });
 
   miniTutorielElementsSurlignes = elements;
+  return elements;
 }
 
 function miniTutorielEtapeTourCourante() {
@@ -32690,7 +32882,9 @@ function miniTutorielConstruireContexteScript() {
     ressourcesHtml: "",
     positionPanneau: etape?.positionPanneau || "droite-haut",
     cibles: etape?.cibles || [],
-    afficherSuivant: true
+    afficherSuivant: true,
+    afficherPrecedent: true,
+    precedentActif: index > 0
   };
 }
 
@@ -32735,43 +32929,50 @@ function miniTutorielPasserEtapeScriptSuivante() {
   miniTutorielSynchroniser();
 }
 
-function miniTutorielMettreAJourBoutonControle() {
-  const bouton = getElement("btn-tutoriel");
-  if (!bouton) {
+function miniTutorielRevenirEtapeScriptPrecedente() {
+  if (!miniTutorielEstEnIntroduction()) {
     return;
   }
 
-  const actif = miniTutorielEstActif();
-  bouton.classList.toggle("ui-cachee", !actif);
+  const indexActuel = Number(jeu?.ui?.miniTutorielEtapeScript || 0);
+  const precedentIndex = indexActuel - 1;
 
-  if (!actif) {
-    bouton.textContent = "Tutoriel";
+  if (precedentIndex < 0) {
     return;
   }
 
-  bouton.textContent = jeu.ui.miniTutorielMasque ? "Tutoriel (afficher)" : "Tutoriel";
+  jeu.ui.miniTutorielEtapeScript = precedentIndex;
+  miniTutorielDerniereEtapeScriptRendue = -1;
+  miniTutorielSynchroniser();
 }
 
-function miniTutorielMettreAJourActionsPanneau(afficherSuivant = false) {
+function miniTutorielMettreAJourActionsPanneau(
+  afficherSuivant = false,
+  afficherPrecedent = false,
+  precedentActif = true
+) {
+  const boutonPrecedent = getElement("btn-mini-tutoriel-precedent");
   const boutonSuivant = getElement("btn-mini-tutoriel-suivant");
-  if (!boutonSuivant) {
-    return;
+
+  if (boutonPrecedent) {
+    boutonPrecedent.style.display = afficherPrecedent ? "inline-block" : "none";
+    boutonPrecedent.disabled = !precedentActif;
   }
 
-  boutonSuivant.style.display = afficherSuivant ? "inline-block" : "none";
+  if (boutonSuivant) {
+    boutonSuivant.style.display = afficherSuivant ? "inline-block" : "none";
+  }
 }
 
 function miniTutorielMettreAJourPanneau(contexte) {
-  const etape = getElement("mini-tutoriel-etape");
   const objectif = getElement("mini-tutoriel-objectif");
   const progression = getElement("mini-tutoriel-progression");
   const ressources = getElement("mini-tutoriel-ressources");
 
-  if (!etape || !objectif || !progression || !ressources) {
+  if (!objectif || !progression || !ressources) {
     return;
   }
 
-  etape.textContent = contexte.etapeLabel || "";
   objectif.innerHTML = contexte.objectifHtml || "";
   progression.innerHTML = (contexte.progressionLignes || [])
     .map(ligne => `<div>${ligne}</div>`)
@@ -32779,7 +32980,11 @@ function miniTutorielMettreAJourPanneau(contexte) {
   ressources.innerHTML = contexte.ressourcesHtml || "";
   ressources.style.display = (contexte.ressourcesHtml || "").trim() ? "block" : "none";
 
-  miniTutorielMettreAJourActionsPanneau(!!contexte.afficherSuivant);
+  miniTutorielMettreAJourActionsPanneau(
+    !!contexte.afficherSuivant,
+    !!contexte.afficherPrecedent,
+    contexte.precedentActif !== false
+  );
 }
 
 function miniTutorielAppliquerPositionPanneau(position = "droite-haut") {
@@ -32815,21 +33020,21 @@ function miniTutorielReinitialiserSuiviTour() {
 }
 
 function miniTutorielSynchroniser() {
-  miniTutorielMettreAJourBoutonControle();
-
   if (!miniTutorielEstActif()) {
+    miniTutorielMettreFiltreObscurActif(false);
     miniTutorielAppliquerPositionPanneau("droite-haut");
     miniTutorielNettoyerSurbrillance();
     miniTutorielMasquerPanneau();
-    miniTutorielMettreAJourActionsPanneau(false);
+    miniTutorielMettreAJourActionsPanneau(false, false, false);
     return;
   }
 
   if (vueAccueilVisible() || jeu?.finPartie?.terminee) {
+    miniTutorielMettreFiltreObscurActif(false);
     miniTutorielAppliquerPositionPanneau("droite-haut");
     miniTutorielNettoyerSurbrillance();
     miniTutorielMasquerPanneau();
-    miniTutorielMettreAJourActionsPanneau(false);
+    miniTutorielMettreAJourActionsPanneau(false, false, false);
     return;
   }
 
@@ -32855,13 +33060,8 @@ function miniTutorielSynchroniser() {
     contexte = miniTutorielConstruireContexteTours();
   }
 
-  miniTutorielAppliquerSurbrillance(contexte.cibles);
-
-  if (jeu.ui.miniTutorielMasque) {
-    miniTutorielAppliquerPositionPanneau("droite-haut");
-    miniTutorielMasquerPanneau();
-    return;
-  }
+  const elementsSurlignes = miniTutorielAppliquerSurbrillance(contexte.cibles);
+  miniTutorielMettreFiltreObscurActif(elementsSurlignes.length > 0, elementsSurlignes);
 
   miniTutorielAfficherPanneau();
   miniTutorielMettreAJourPanneau(contexte);
@@ -32950,19 +33150,12 @@ function initialiserMiniTutorielPartie(actif = false) {
 }
 
 function initialiserMiniTutorielInterface() {
-  const boutonControle = getElement("btn-tutoriel");
+  const boutonPrecedent = getElement("btn-mini-tutoriel-precedent");
   const boutonSuivant = getElement("btn-mini-tutoriel-suivant");
-  const boutonMasquer = getElement("btn-mini-tutoriel-masquer");
-  const boutonArreter = getElement("btn-mini-tutoriel-arreter");
 
-  if (boutonControle) {
-    boutonControle.onclick = () => {
-      if (!miniTutorielEstActif()) {
-        return;
-      }
-
-      jeu.ui.miniTutorielMasque = !jeu.ui.miniTutorielMasque;
-      miniTutorielSynchroniser();
+  if (boutonPrecedent) {
+    boutonPrecedent.onclick = () => {
+      miniTutorielRevenirEtapeScriptPrecedente();
     };
   }
 
@@ -32972,25 +33165,17 @@ function initialiserMiniTutorielInterface() {
     };
   }
 
-  if (boutonMasquer) {
-    boutonMasquer.onclick = () => {
+  if (!miniTutorielResizeListenerAttache) {
+    window.addEventListener("resize", () => {
       if (!miniTutorielEstActif()) {
         return;
       }
-
-      jeu.ui.miniTutorielMasque = true;
-      miniTutorielSynchroniser();
-    };
-  }
-
-  if (boutonArreter) {
-    boutonArreter.onclick = () => {
-      if (!miniTutorielEstActif()) {
-        return;
-      }
-
-      miniTutorielTerminer("Mini tutoriel arrete. Vous pouvez continuer librement.");
-    };
+      miniTutorielMettreFiltreObscurActif(
+        miniTutorielElementsSurlignes.length > 0,
+        miniTutorielElementsSurlignes
+      );
+    });
+    miniTutorielResizeListenerAttache = true;
   }
 
   miniTutorielSynchroniser();

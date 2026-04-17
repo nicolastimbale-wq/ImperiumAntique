@@ -2353,16 +2353,11 @@ body {
 
 #btn-vue-marche,
 #btn-vue-joueur,
-#btn-vue-bot,
-#btn-tutoriel {
+#btn-vue-bot {
   order: 1;
 }
 
 #btn-vue-bot {
-  margin-right: 0;
-}
-
-#btn-tutoriel {
   margin-right: auto;
 }
 
@@ -3895,8 +3890,7 @@ body {
 
 #btn-vue-marche,
 #btn-vue-joueur,
-#btn-vue-bot,
-#btn-tutoriel {
+#btn-vue-bot {
   --btn-ton-haut: #7f9bb4;
   --btn-ton-milieu: #597896;
   --btn-ton-bas: #3f5f7a;
@@ -4317,27 +4311,6 @@ body {
   transform: translate(-50%, -50%);
 }
 
-.mini-tutoriel-entete {
-  display: flex;
-  justify-content: space-between;
-  align-items: baseline;
-  gap: 12px;
-  margin-bottom: 8px;
-}
-
-.mini-tutoriel-titre {
-  font-family: "Palatino Linotype", "Book Antiqua", Georgia, serif;
-  font-size: 19px;
-  font-weight: 700;
-  color: #3f2a11;
-}
-
-.mini-tutoriel-etape {
-  font-size: 13px;
-  font-weight: 700;
-  color: #5f4728;
-}
-
 .mini-tutoriel-objectif {
   font-size: 14px;
   font-weight: 700;
@@ -4382,18 +4355,39 @@ body {
   filter: brightness(1.08);
 }
 
+#mini-tutoriel-voile {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 12000;
+}
+
+#mini-tutoriel-voile-svg {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+#mini-tutoriel-voile-path {
+  fill: rgba(16, 12, 8, 0.78);
+}
+
 .tutoriel-cible {
+  z-index: 12120 !important;
   animation: tutorielPulse 1.15s ease-in-out infinite;
   box-shadow:
     0 0 0 2px rgba(236, 198, 123, 0.92),
     0 0 14px rgba(255, 225, 169, 0.65);
 }
 
+.tutoriel-cible.tutoriel-cible-statique {
+  position: relative !important;
+}
+
 .tutoriel-cible.dos-pioche,
 .tutoriel-cible.dos-carte-verticale,
 .tutoriel-cible.dos-carte-horizontale {
-  position: relative;
-  z-index: 25;
+  z-index: 12130 !important;
   animation: tutorielPulseDos 0.9s ease-in-out infinite;
   box-shadow:
     0 0 0 4px rgba(255, 215, 120, 0.98),
@@ -4406,8 +4400,7 @@ body {
 #bloc-controles-tour button.tutoriel-cible,
 #bloc-musique button.tutoriel-cible,
 #bloc-controles-bot button.tutoriel-cible {
-  position: relative;
-  z-index: 40;
+  z-index: 12140 !important;
   animation: tutorielPulseBouton 0.72s ease-in-out infinite;
   transform: translateY(-1px) scale(1.09);
   box-shadow:

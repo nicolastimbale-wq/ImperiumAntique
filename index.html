@@ -44,7 +44,6 @@
   <button id="btn-vue-marche">Marché</button>
   <button id="btn-vue-joueur">Joueur</button>
   <button id="btn-vue-bot">Bot</button>
-  <button id="btn-tutoriel" class="ui-cachee">Tutoriel</button>
 
   <button id="btn-pacifier">Pacifier</button>
   <button id="btn-innover-tour">Innover</button>
@@ -258,19 +257,20 @@
 </div>
 
 <aside id="panneau-mini-tutoriel" class="ui-cachee" aria-live="polite">
-  <div class="mini-tutoriel-entete">
-    <div class="mini-tutoriel-titre">Mini tutoriel</div>
-    <div id="mini-tutoriel-etape" class="mini-tutoriel-etape">Tour 1 / 3</div>
-  </div>
   <div id="mini-tutoriel-objectif" class="mini-tutoriel-objectif"></div>
   <div id="mini-tutoriel-progression" class="mini-tutoriel-progression"></div>
   <div id="mini-tutoriel-ressources" class="mini-tutoriel-ressources"></div>
   <div class="mini-tutoriel-actions">
+    <button id="btn-mini-tutoriel-precedent" type="button">Précédent</button>
     <button id="btn-mini-tutoriel-suivant" type="button">Suivant</button>
-    <button id="btn-mini-tutoriel-masquer" type="button">Masquer</button>
-    <button id="btn-mini-tutoriel-arreter" type="button">Arreter</button>
   </div>
 </aside>
+
+<div id="mini-tutoriel-voile" class="ui-cachee" aria-hidden="true">
+  <svg id="mini-tutoriel-voile-svg" viewBox="0 0 1 1" preserveAspectRatio="none">
+    <path id="mini-tutoriel-voile-path" fill-rule="evenodd"></path>
+  </svg>
+</div>
 
   <div id="zoom-carte"></div>
 
