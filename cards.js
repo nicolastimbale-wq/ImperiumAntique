@@ -22514,7 +22514,7 @@ function ouvrirPanneauChoixMarcheSelection(message, obligatoire = false, configu
   messageDiv.textContent = message || "Choisissez une carte du marché.";
 
   const boutonVisible = configuration.afficherBouton === true || !obligatoire;
-  const libelleBouton = configuration.libelleBouton || "OK";
+  const libelleBouton = configuration.libelleBouton || "OK [Entrée]";
   const actionBouton = configuration.actionBouton || null;
   const boutonGrand = configuration.boutonGrand === true;
 
@@ -22528,7 +22528,7 @@ function ouvrirPanneauChoixMarcheSelection(message, obligatoire = false, configu
     btn.onclick = null;
   } else {
     btn.style.display = "inline-block";
-    btn.textContent = libelleBouton;
+    btn.textContent = libelleBoutonAvecRaccourciEntree(libelleBouton);
     btn.onclick = () => {
       if (typeof actionBouton === "function") {
         actionBouton();
@@ -29321,6 +29321,27 @@ function afficherToastUI(message, configuration = {}) {
   }, dureeFinale);
 }
 
+function normaliserLibelleBoutonPourRaccourci(label = "") {
+  return String(label || "")
+    .replace(/\[[^\]]*\]/g, "")
+    .trim()
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "");
+}
+
+function libelleBoutonEstOk(label = "") {
+  return normaliserLibelleBoutonPourRaccourci(label) === "ok";
+}
+
+function libelleBoutonAvecRaccourciEntree(label = "") {
+  if (libelleBoutonEstOk(label)) {
+    return "OK [Entrée]";
+  }
+
+  return String(label || "");
+}
+
 function popupPeutDevenirToast(options = [], configuration = {}) {
   if (configuration?.forcerModal === true) {
     return false;
@@ -29335,10 +29356,10 @@ function popupPeutDevenirToast(options = [], configuration = {}) {
   }
 
   const optionUnique = options[0] || {};
-  const label = String(optionUnique.label || "").trim().toLowerCase();
+  const label = String(optionUnique.label || "").trim();
   const aCallback = typeof optionUnique.callback === "function";
 
-  return label === "ok" && !aCallback;
+  return libelleBoutonEstOk(label) && !aCallback;
 }
 
   function ouvrirPanneauUI(message, options = [], configuration = {}) {
@@ -29367,7 +29388,7 @@ function popupPeutDevenirToast(options = [], configuration = {}) {
 
   options.forEach(option => {
     const bouton = document.createElement("button");
-    bouton.textContent = option.label;
+    bouton.textContent = libelleBoutonAvecRaccourciEntree(option.label);
 
     bouton.onclick = () => {
       fermerPanneauUI();
@@ -30945,26 +30966,104 @@ function recalculerEchelleAvecSecurite() {
   planifierAjustementEchelleInterface({ avecRelance: true });
 }
 
+function elementEstVisiblePourRaccourciClavier(element) {
+  if (!element) {
+    return false;
+  }
+
+  if (
+    element.classList?.contains("ui-cachee") ||
+    element.classList?.contains("panneau-ui-cache")
+  ) {
+    return false;
+  }
+
+  const style = window.getComputedStyle(element);
+  return style.display !== "none" && style.visibility !== "hidden";
+}
+
+function tenterValidationParEntree() {
+  const panneauUI = getElement("panneau-ui");
+  if (elementEstVisiblePourRaccourciClavier(panneauUI)) {
+    const boutons = Array.from(
+      panneauUI.querySelectorAll("#panneau-ui-boutons button")
+    ).filter(bouton =>
+      bouton &&
+      !bouton.disabled &&
+      elementEstVisiblePourRaccourciClavier(bouton)
+    );
+
+    const boutonOk = boutons.find(bouton => libelleBoutonEstOk(bouton.textContent));
+    if (boutonOk) {
+      boutonOk.click();
+      return true;
+    }
+  }
+
+  const panneauChoixMarcheSelection = getElement("panneau-choix-marche-selection");
+  const boutonChoixMarcheSelection = getElement("btn-fermer-choix-marche-selection");
+  if (
+    elementEstVisiblePourRaccourciClavier(panneauChoixMarcheSelection) &&
+    boutonChoixMarcheSelection &&
+    !boutonChoixMarcheSelection.disabled &&
+    elementEstVisiblePourRaccourciClavier(boutonChoixMarcheSelection) &&
+    libelleBoutonEstOk(boutonChoixMarcheSelection.textContent)
+  ) {
+    boutonChoixMarcheSelection.click();
+    return true;
+  }
+
+  return false;
+}
+
 function initialiserRaccourcisClavier() {
   document.addEventListener("keydown", event => {
+    if (event.altKey || event.ctrlKey || event.metaKey) {
+      return;
+    }
+
+    const elementActif = document.activeElement;
+    const tagActif = String(elementActif?.tagName || "").toLowerCase();
+    if (tagActif === "input" || tagActif === "textarea" || tagActif === "select") {
+      return;
+    }
+
     if (jeu?.ui?.menuEchapOuvert) {
       return;
     }
 
     if (event.key === "1") {
+      event.preventDefault();
       afficherVue("vue-marche");
+      return;
     }
 
     if (event.key === "2") {
+      event.preventDefault();
       afficherVue("vue-joueur");
+      return;
     }
 
     if (event.key === "3") {
+      event.preventDefault();
       afficherVue("vue-bot");
+      return;
     }
+
     if (event.key === "Enter") {
-  passerEtapeBotSuivante();
-}
+      if (tagActif === "button") {
+        return;
+      }
+
+      if (tenterValidationParEntree()) {
+        event.preventDefault();
+        event.stopPropagation();
+        return;
+      }
+
+      event.preventDefault();
+      passerEtapeBotSuivante();
+    }
   });
 }
 
@@ -31793,6 +31892,13 @@ function obtenirCartesDuneNation(nomNation, listeCartes) {
   return resultat;
 }
 
+const MESSAGE_TOAST_RACCOURCIS_PARTIE =
+  "Raccourcis: 1 Marché · 2 Joueur · 3 Bot · Esc Menu · Entrée OK";
+
+function afficherRappelRaccourcisPartie() {
+  afficherToastUI(MESSAGE_TOAST_RACCOURCIS_PARTIE, { duree: 6400 });
+}
+
 function commencerNouvellePartie() {
   const selectNationJoueur = document.getElementById("choix-nation-joueur");
   const selectNationBot = document.getElementById("choix-nation-bot");
@@ -31825,6 +31931,10 @@ function commencerNouvellePartie() {
 
   afficherVue("vue-joueur");
   initialiserMiniTutorielPartie(!!configurationPartie.miniTutoriel);
+
+  setTimeout(() => {
+    afficherRappelRaccourcisPartie();
+  }, 420);
 }
 
 function demarrerPartie() {
@@ -32724,6 +32834,46 @@ const MINI_TUTORIEL_ETAPES_SCRIPT = [
     positionPanneau: "centre-ecran"
   },
   {
+    message: "Conditions de fin de partie:",
+    cibles: [],
+    positionPanneau: "centre-ecran"
+  },
+  {
+    message: "Quand le joueur ou le bot ont développé leur dernière carte, ou quand la pioche Renommée ou la pile principale du marché sont vides, un Décompte est déclenché.",
+    cibles: [],
+    positionPanneau: "centre-ecran"
+  },
+  {
+    message: "Le décompte permet deux Solstices additionnels avant de terminer la partie.",
+    cibles: [],
+    positionPanneau: "centre-ecran"
+  },
+  {
+    message: "Dès que la pile Instabilité est vide, le joueur perd par Effondrement de sa nation.",
+    cibles: [],
+    positionPanneau: "centre-ecran"
+  },
+  {
+    message: "Décompte des points:",
+    cibles: [],
+    positionPanneau: "centre-ecran"
+  },
+  {
+    message: "Chez le joueur, chaque jeton Progrès vaut 1 PV. Ensuite, chaque carte qui appartient au joueur, excluant ses cartes non développées, est comptabilisée.",
+    cibles: [],
+    positionPanneau: "centre-ecran"
+  },
+  {
+    message: "Chez le bot, les jetons Progrès valent aussi 1 PV. De plus, chaque 10 ressources équivaut à 1 PV. Chaque carte, excluant ses cartes encore dans la pile Dynastie, est comptabilisée. Les cartes X valent toujours 5 points, et les cartes ? valent toujours leur valeur maximum.",
+    cibles: [],
+    positionPanneau: "centre-ecran"
+  },
+  {
+    message: "Celui qui a le plus de points remporte la partie.",
+    cibles: [],
+    positionPanneau: "centre-ecran"
+  },
+  {
     message: "Pour plus de précisions sur les règles de jeu, il est recommandé de se référer au manuel disponible en ligne. Simplement chercher Imperium Antique livret règle.",
     cibles: [],
     positionPanneau: "centre-ecran"
@@ -33186,6 +33336,81 @@ function initialiserMiniTutorielInterface() {
    ========================================================= */
 
 const lexiqueMenuEntrees = [];
+const LEXIQUE_MENU_ENTREES_PAR_DEFAUT = [
+  {
+    terme: "Action gratuite",
+    definition: "Effet que vous résolvez sans dépenser de jeton d’action."
+  },
+  {
+    terme: "Passif",
+    definition: "Effet permanent actif tant que la carte reste en jeu."
+  },
+  {
+    terme: "Épuiser",
+    definition: "Activer un effet d’épuisement. Chaque activation consomme un jeton d’épuisement."
+  },
+  {
+    terme: "Acquérir",
+    definition: "Prendre une carte du marché selon les catégories autorisées et la placer dans votre main. L’Instabilité associée est aussi prise ."
+  },
+  {
+    terme: "Innover",
+    definition: "Prendre une carte du marché selon les catégories autorisées et la placer dans votre main sans prendre l’Instabilité associée."
+  },
+  {
+    terme: "Développer",
+    definition: "Prendre une carte de votre pile Développement en payant son coût en Population/Matériaux."
+  },
+  {
+    terme: "Archiver",
+    definition: "Retirer une carte de vos zones jouables pour la placer dans votre Histoire."
+  },
+  {
+    terme: "Histoire",
+    definition: "Zone de cartes archivées. Ces cartes ne sont plus accessibles."
+  },
+  {
+    terme: "Rappeler",
+    definition: "Retirer une carte de votre tableau pour la remettre dans votre main."
+  },
+  {
+    terme: "Réserver",
+    definition: "Glisser une carte de votre main sous la carte cible. Une carte réservée n’est pas considérée comme étant dans votre zone de jeu, bien qu’elle vous rapporte des points à la fin de la partie. Vous ne pouvez pas activer ses effets. Si une carte réservée est située sous une carte qui est abandonnée, rappelée, exilée ou archivée, cet effet s’applique aussi à la carte réservée."
+  },
+  {
+    terme: "Exiler",
+    definition: "Retirer une carte du marché et la placer dans la pile Exil."
+  },
+  {
+    terme: "Abandonner",
+    definition: "Retirer une carte persistante de votre tableau et la placer dans votre défausse."
+  },
+  {
+    terme: "Piocher X cartes",
+    definition: "Prendre X cartes du dessus de votre deck pour les ajouter à votre main. Si le deck ne contient pas assez de carte, procéder à son rafraîchissement puis piocher les cartes restantes."
+  },
+  {
+    terme: "Piocher X carte, si possible",
+    definition: "Prendre X cartes du dessus de votre deck pour les ajouter à votre main. Si le deck ne contient pas assez de carte, ne procédez PAS au rafraîchissement du deck."
+  },
+  
+  {
+    terme: "Récupérer",
+    definition: "Choisissez une carte dans la pile correspondante et ajoutez-la à votre main ou dans la zone de jeu indiquée. Si vous devez récupérer une carte de votre défausse ou de votre Histoire, choisissez la carte."
+  },
+  {
+    terme: "Renvoyer",
+    definition: "Remettre une carte dans sa pile d’origine (souvent Instabilité)."
+  },
+  {
+    terme: "Instabilité",
+    definition: "Carte parasite qui encombre votre deck et peut provoquer une défaite immédiate si la pile est vide."
+  },
+  {
+    terme: "Pacifier",
+    definition: "Action spéciale de début de tour qui renvoie les Instabilités de votre main puis lance le Nettoyage."
+  },
+];
 
 function vueAccueilVisible() {
   const vueAccueil = getElement("vue-accueil");
@@ -33231,6 +33456,16 @@ function mettreAJourContenuLexiqueMenu() {
   conteneur.appendChild(liste);
 }
 
+function trierLexiqueMenuAlphabetique() {
+  lexiqueMenuEntrees.sort((a, b) =>
+    String(a?.terme || "").localeCompare(
+      String(b?.terme || ""),
+      "fr",
+      { sensitivity: "base" }
+    )
+  );
+}
+
 function definirLexiqueMenu(entrees = []) {
   lexiqueMenuEntrees.length = 0;
 
@@ -33251,6 +33486,7 @@ function definirLexiqueMenu(entrees = []) {
     });
   }
 
+  trierLexiqueMenuAlphabetique();
   mettreAJourContenuLexiqueMenu();
 }
 
@@ -33267,7 +33503,16 @@ function ajouterEntreeLexiqueMenu(terme, definition) {
     definition: definitionNormalisee
   });
 
+  trierLexiqueMenuAlphabetique();
   mettreAJourContenuLexiqueMenu();
+}
+
+function initialiserLexiqueMenuParDefaut() {
+  if (Array.isArray(lexiqueMenuEntrees) && lexiqueMenuEntrees.length > 0) {
+    return;
+  }
+
+  definirLexiqueMenu(LEXIQUE_MENU_ENTREES_PAR_DEFAUT);
 }
 
 function ouvrirMenuEchap() {
@@ -33374,6 +33619,7 @@ function initialiserMenuEchap() {
     basculerMenuEchap();
   }, true);
 
+  initialiserLexiqueMenuParDefaut();
   window.definirLexiqueMenu = definirLexiqueMenu;
   window.ajouterEntreeLexiqueMenu = ajouterEntreeLexiqueMenu;
   window.definirMotsClesEffetEnGras = definirMotsClesEffetEnGras;
@@ -33904,20 +34150,5 @@ function afficherEcranFinDePartie() {
 // =========================================================
 //  FIN DU FICHIER
 // =========================================================
-
-document.addEventListener("keydown", function(event) {
-
-  const tag = document.activeElement.tagName.toLowerCase();
-  if (tag === "input" || tag === "textarea") return;
-
-  if (event.key === "3") {
-    afficherVue("vue-bot");
-  }
-
-});
-
-
-
-
 
 
