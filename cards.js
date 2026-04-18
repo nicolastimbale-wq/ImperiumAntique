@@ -3736,10 +3736,10 @@ const cartesNations = [
   effet: "Épuiser: dépensez 1 action, placez 2 cartes de votre main au-dessus de votre deck et payez 1 Population pour innover en Vassal.",
   conditionEpuiser: () =>
     (jeu.joueurZones.mainJoueur || []).length >= 2 &&
-    (jeu.joueur.population || 0) >= 1 &&
+    peutPayerRessource("population", 1) &&
     (jeu.joueur.actions || 0) >= 1,
   messageConditionEpuiser:
-    "Vous devez avoir au moins 2 cartes en main, 1 Population et 1 action pour utiliser l'effet des Perses.",
+    "Vous devez avoir au moins 2 cartes en main, 1 Population (ou 1 Progrès) et 1 action pour utiliser l'effet des Perses.",
   epuiserCode: [
   {
     type: "payerAction",
@@ -20459,8 +20459,8 @@ function mettreAJourDisponibiliteBoutonsSauvegarde() {
 
   const boutonReprendre = getElement("btn-reprendre-sauvegarde");
   if (boutonReprendre) {
-    boutonReprendre.style.display = disponible ? "inline-block" : "none";
     boutonReprendre.disabled = !disponible;
+    boutonReprendre.classList.toggle("bouton-inactif", !disponible);
   }
 }
 
@@ -23775,6 +23775,11 @@ function innoverDepuisPiocheCategorie(categorie) {
 
     jeu.joueur.progres += 2;
     afficherZoneJoueur();
+    ouvrirPanneauUI(
+      "Aucune carte Vassal n'est disponible. Vous gagnez 2 Progrès à la place.",
+      [{ label: "OK" }],
+      { mode: "toast" }
+    );
     return "progres";
   }
 
@@ -30650,6 +30655,9 @@ function afficherHautMarche() {
   const zone = getElement("haut-marche");
 
   if (!zone) {
+    if (jeu?.finPartie?.terminee) {
+      return;
+    }
     console.error('Élément "haut-marche" introuvable dans le HTML.');
     return;
   }
@@ -30699,6 +30707,9 @@ function afficherBarreIndicateurs() {
   const zone = getElement("barre-indicateurs");
 
   if (!zone) {
+    if (jeu?.finPartie?.terminee) {
+      return;
+    }
     console.error('Élément "barre-indicateurs" introuvable dans le HTML.');
     return;
   }
@@ -30730,6 +30741,10 @@ function afficherBasMarche() {
   const zone = getElement("bas-marche");
 
   if (!zone) {
+    // L'écran de fin remplace #app et retire le marché du DOM.
+    if (jeu?.finPartie?.terminee) {
+      return;
+    }
     console.error('Élément "bas-marche" introuvable dans le HTML.');
     return;
   }
@@ -34075,13 +34090,30 @@ function slugNationPourFond(nomNation) {
 
 function obtenirFondFinDePartie(resultat) {
   const nation = slugNationPourFond(configurationPartie?.nationJoueur);
+  const nationsAvecFondDefaite = new Set([
+    "carthaginois",
+    "celtes",
+    "grecs",
+    "macedoniens",
+    "perses",
+    "romains",
+    "scythes",
+    "vikings"
+  ]);
+  const nationsAvecFondVictoire = new Set(["celtes", "romains"]);
 
   if (resultat === "defaite") {
-    return `/assets/backgrounds/fond-defaite-${nation}.png`;
+    if (nationsAvecFondDefaite.has(nation)) {
+      return `assets/backgrounds/fond-defaite-${nation}.png`;
+    }
+    return "assets/backgrounds/fond-accueil.jpg";
   }
 
   if (resultat === "victoire") {
-    return `/assets/backgrounds/fond-victoire-${nation}.png`;
+    if (nationsAvecFondVictoire.has(nation)) {
+      return `assets/backgrounds/fond-victoire-${nation}.png`;
+    }
+    return "assets/backgrounds/fond-accueil.jpg";
   }
 
   return "";
@@ -34089,6 +34121,20 @@ function obtenirFondFinDePartie(resultat) {
 
 function afficherEcranFinDePartie() {
   const fond = obtenirFondFinDePartie(jeu.finPartie.resultat);
+  const estDefaite = jeu.finPartie.resultat === "defaite";
+  const titreHtml = estDefaite
+    ? ""
+    : `
+        <h1 style="
+          font-size: 72px;
+          margin: 0 0 20px 0;
+          text-transform: uppercase;
+          letter-spacing: 2px;
+        ">
+          Victoire
+        </h1>
+      `;
+  const margeHautRaison = estDefaite ? "120px" : "0";
 
   const app = document.getElementById("app");
   if (!app) return;
@@ -34119,18 +34165,12 @@ function afficherEcranFinDePartie() {
         padding: 40px;
         max-width: 900px;
       ">
-        <h1 style="
-          font-size: 72px;
-          margin: 0 0 20px 0;
-          text-transform: uppercase;
-          letter-spacing: 2px;
-        ">
-          ${jeu.finPartie.resultat === "defaite" ? "Défaite" : "Victoire"}
-        </h1>
+        ${titreHtml}
 
         <p style="
           font-size: 24px;
-          margin: 0 0 30px 0;
+          margin: ${margeHautRaison} 0 30px 0;
+          text-shadow: 0 2px 6px rgba(0, 0, 0, 0.7);
         ">
           ${jeu.finPartie.raison || ""}
         </p>
