@@ -3106,6 +3106,10 @@ body {
   transform-origin: top center;
 }
 
+#bot-scale.bot-scale-suzerain {
+  width: 2280px;
+}
+
 #zone-bot {
   position: relative;
   width: 100%;
@@ -3174,6 +3178,11 @@ body {
   box-shadow: 0 6px 18px rgba(0, 0, 0, 0.14);
 }
 
+#bloc-emplacements-bot.bloc-emplacements-bot-suzerain {
+  width: fit-content;
+  min-width: 1700px;
+}
+
 .bloc-bot h2,
 .bloc-bot h3 {
   margin: 0 0 12px 0;
@@ -3226,6 +3235,10 @@ body {
   align-items: start;
   justify-items: center;
   width: 100%;
+}
+
+#grille-emplacements-bot.bot-grille-6 {
+  grid-template-columns: repeat(6, 1fr);
 }
 
 .colonne-emplacement-bot {
@@ -3285,6 +3298,23 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
+}
+
+.slot-carte-bot.slot-bot-jeton-epuisement {
+  border-style: solid;
+  border-color: rgba(85, 55, 21, 0.55);
+  background:
+    radial-gradient(circle at 50% 52%, rgba(210, 169, 84, 0.28), rgba(80, 58, 33, 0.28) 58%, rgba(33, 23, 11, 0.36) 100%),
+    linear-gradient(160deg, rgba(255, 240, 205, 0.42), rgba(128, 92, 48, 0.32));
+}
+
+.slot-carte-bot.slot-bot-jeton-epuisement.vide::before {
+  content: "";
+  background-image: url("icons/jeton-epuisement.png");
+  background-repeat: no-repeat;
+  background-position: center;
+  background-size: 34px 34px;
+  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.30));
 }
 
 .pile-bot-visuelle {
@@ -4315,6 +4345,18 @@ body {
   pointer-events: none;
 }
 
+#zone-banniere-ui {
+  position: fixed;
+  left: 50%;
+  top: 14px;
+  transform: translateX(-50%);
+  z-index: 26100;
+  width: min(980px, calc(100vw - 24px));
+  display: flex;
+  justify-content: center;
+  pointer-events: none;
+}
+
 .toast-ui {
   max-width: 100%;
   padding: 12px 16px;
@@ -4340,6 +4382,35 @@ body {
 }
 
 .toast-ui-visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.banniere-systeme-ui {
+  max-width: 100%;
+  padding: 10px 16px;
+  border-radius: 10px;
+  border: 1px solid rgba(121, 83, 33, 0.88);
+  color: #f8efe0;
+  font-size: 15px;
+  font-weight: 700;
+  text-align: center;
+  text-shadow: 0 1px 0 rgba(0, 0, 0, 0.62);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.16),
+    0 8px 18px rgba(0, 0, 0, 0.40);
+  background:
+    linear-gradient(to bottom, rgba(126, 84, 30, 0.96), rgba(86, 56, 18, 0.97)),
+    rgba(30, 22, 13, 0.95);
+  transition: opacity 0.2s ease, transform 0.2s ease;
+}
+
+.banniere-systeme-ui-cache {
+  opacity: 0;
+  transform: translateY(-8px);
+}
+
+.banniere-systeme-ui-visible {
   opacity: 1;
   transform: translateY(0);
 }

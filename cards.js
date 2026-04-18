@@ -8788,6 +8788,99 @@ const PHASES = Object.freeze({
   SOLSTICE: "solstice"
 });
 
+const DIFFICULTES_BOT = Object.freeze({
+  CHEF_DE_CLAN: "chef_de_clan",
+  SEIGNEUR_DE_GUERRE: "seigneur_de_guerre",
+  IMPERATOR: "imperator",
+  SOUVERAIN: "souverain",
+  SUZERAIN: "suzerain"
+});
+
+const DIFFICULTE_BOT_PAR_DEFAUT = DIFFICULTES_BOT.IMPERATOR;
+const DIFFICULTES_BOT_VALIDES = new Set(Object.values(DIFFICULTES_BOT));
+
+function normaliserDifficulteBot(valeur) {
+  const slug = String(valeur || "").trim().toLowerCase();
+  return DIFFICULTES_BOT_VALIDES.has(slug) ? slug : DIFFICULTE_BOT_PAR_DEFAUT;
+}
+
+function difficulteBotActive() {
+  return normaliserDifficulteBot(configurationPartie?.difficulteBot);
+}
+
+function botDoitAfficherJetonEpuisementEmplacement5() {
+  const difficulte = difficulteBotActive();
+  return (
+    difficulte === DIFFICULTES_BOT.CHEF_DE_CLAN ||
+    difficulte === DIFFICULTES_BOT.SEIGNEUR_DE_GUERRE
+  );
+}
+
+function botDoitPlacerCarteSupplementaireEnDefausse() {
+  return difficulteBotActive() === DIFFICULTES_BOT.SEIGNEUR_DE_GUERRE;
+}
+
+function botUtiliseScoreRessourcesCombinees() {
+  const difficulte = difficulteBotActive();
+  return (
+    difficulte === DIFFICULTES_BOT.SOUVERAIN ||
+    difficulte === DIFFICULTES_BOT.SUZERAIN
+  );
+}
+
+function botNombreEmplacementsActifs() {
+  const difficulte = difficulteBotActive();
+
+  if (difficulte === DIFFICULTES_BOT.SUZERAIN) {
+    return 6;
+  }
+
+  if (
+    difficulte === DIFFICULTES_BOT.CHEF_DE_CLAN ||
+    difficulte === DIFFICULTES_BOT.SEIGNEUR_DE_GUERRE
+  ) {
+    return 4;
+  }
+
+  return 5;
+}
+
+function botNombreEmplacementsSelonDe() {
+  return difficulteBotActive() === DIFFICULTES_BOT.SUZERAIN ? 6 : 5;
+}
+
+function botIndicesEmplacementsExistants() {
+  return [1, 2, 3, 4, 5, 6];
+}
+
+function botIndicesEmplacementsActifs() {
+  return botIndicesEmplacementsExistants().slice(0, botNombreEmplacementsActifs());
+}
+
+function botIndicesEmplacementsSelonDe() {
+  return botIndicesEmplacementsExistants().slice(0, botNombreEmplacementsSelonDe());
+}
+
+function botEmplacementsActifsComplets() {
+  return botIndicesEmplacementsActifs().every(i => !!etatBot.emplacements?.[String(i)]);
+}
+
+function botBonusRessourcesDepartSelonDifficulte() {
+  if (!botUtiliseScoreRessourcesCombinees()) {
+    return {
+      materiaux: 0,
+      population: 0,
+      progres: 0
+    };
+  }
+
+  return {
+    materiaux: 3,
+    population: 2,
+    progres: 1
+  };
+}
+
 const UI = Object.freeze({
   LARGEUR_CARTE_MAIN: 260,
   LARGEUR_ZONE_MAIN: 1420,
@@ -8934,7 +9027,8 @@ const etatBot = {
     2: null,
     3: null,
     4: null,
-    5: null
+    5: null,
+    6: null
   }
 };
 
@@ -8949,6 +9043,7 @@ const botUI = {
     3: false,
     4: false,
     5: false,
+    6: false
   }
 };
 
@@ -14247,7 +14342,7 @@ function lancerDeBot() {
 }
 
 function obtenirCleEmplacementBotDepuisDe(resultatDe) {
-  if (resultatDe >= 1 && resultatDe <= 5) {
+  if (resultatDe >= 1 && resultatDe <= botNombreEmplacementsSelonDe()) {
     return String(resultatDe);
   }
 
@@ -14268,8 +14363,21 @@ function retirerCarteEmplacementBot(cle) {
 
 function placerCarteDansEmplacementBot(cle, carte) {
   const cleTexte = String(cle);
+  const cleNumerique = Number(cleTexte);
 
   if (!carte) {
+    return false;
+  }
+
+  if (!Number.isInteger(cleNumerique)) {
+    return false;
+  }
+
+  if (cleNumerique < 1 || cleNumerique > botNombreEmplacementsSelonDe()) {
+    return false;
+  }
+
+  if (cleNumerique === 5 && botDoitAfficherJetonEpuisementEmplacement5()) {
     return false;
   }
 
@@ -14286,7 +14394,7 @@ function placerCarteDansEmplacementBot(cle, carte) {
 }
 
 function obtenirPremierEmplacementVideBot() {
-  for (let i = 1; i <= 5; i += 1) {
+  for (const i of botIndicesEmplacementsActifs()) {
     if (!etatBot.emplacements[String(i)]) {
       return String(i);
     }
@@ -14296,7 +14404,7 @@ function obtenirPremierEmplacementVideBot() {
 }
 
 function botToutesLesCartesEmplacements() {
-  return [1, 2, 3, 4, 5].map(i => etatBot.emplacements[String(i)]).filter(Boolean);
+  return botIndicesEmplacementsActifs().map(i => etatBot.emplacements[String(i)]).filter(Boolean);
 }
 
 function carteBotEstInstabilite(carte) {
@@ -14383,6 +14491,59 @@ function botPiocherDepuisDeckCiv() {
   return carte;
 }
 
+function botAppliquerContraintesEmplacementsSelonDifficulte() {
+  const deplacementVersDefausse = cle => {
+    const cleTexte = String(cle);
+    const carte = etatBot.emplacements?.[cleTexte] || null;
+
+    if (!carte) {
+      return false;
+    }
+
+    etatBot.emplacements[cleTexte] = null;
+    etatBot.defausse.push(carte);
+    return true;
+  };
+
+  let aDeplace = false;
+
+  if (botDoitAfficherJetonEpuisementEmplacement5()) {
+    aDeplace = deplacementVersDefausse(5) || aDeplace;
+  }
+
+  if (botNombreEmplacementsSelonDe() < 6) {
+    aDeplace = deplacementVersDefausse(6) || aDeplace;
+  }
+
+  if (!botUI.emplacementsReveles) {
+    botUI.emplacementsReveles = {};
+  }
+
+  botUI.emplacementsReveles[5] = false;
+  botUI.emplacementsReveles[6] = false;
+
+  return aDeplace;
+}
+
+function botAjouterCarteSupplementaireEnDefausseSiNecessaire() {
+  if (!botDoitPlacerCarteSupplementaireEnDefausse()) {
+    return null;
+  }
+
+  if (!botEmplacementsActifsComplets()) {
+    return null;
+  }
+
+  const carte = botPiocherDepuisDeckCiv();
+
+  if (!carte) {
+    return null;
+  }
+
+  etatBot.defausse.push(carte);
+  return carte;
+}
+
 function botRemplirEmplacementsVides() {
   const cartesPiochees = [];
 
@@ -14390,7 +14551,9 @@ function botRemplirEmplacementsVides() {
     botUI.emplacementsReveles = {};
   }
 
-  for (let i = 1; i <= 5; i += 1) {
+  botAppliquerContraintesEmplacementsSelonDifficulte();
+
+  for (const i of botIndicesEmplacementsActifs()) {
     const cle = String(i);
 
     if (etatBot.emplacements[cle]) {
@@ -14409,6 +14572,15 @@ function botRemplirEmplacementsVides() {
     cartesPiochees.push({ cle, carte });
   }
 
+  const carteDefaussee = botAjouterCarteSupplementaireEnDefausseSiNecessaire();
+  if (carteDefaussee) {
+    cartesPiochees.push({
+      cle: "defausse",
+      carte: carteDefaussee
+    });
+  }
+
+  botAppliquerContraintesEmplacementsSelonDifficulte();
   afficherZoneBot?.();
   return cartesPiochees;
 }
@@ -14482,7 +14654,7 @@ async function resoudreEmplacementBot(cle) {
 }
 
 async function resoudreEmplacementsBot(cleIgnoree = null) {
-  for (let i = 1; i <= 5; i += 1) {
+  for (const i of botIndicesEmplacementsActifs()) {
     const cle = String(i);
 
     if (cle === String(cleIgnoree)) {
@@ -14558,7 +14730,7 @@ async function nettoyerBot(resultatDe, carteMiseDeCote = null) {
         botUI.emplacementsReveles = {};
       }
 
-      for (let i = 1; i <= 5; i += 1) {
+      for (const i of botIndicesEmplacementsSelonDe()) {
         if (etatBot.emplacements[String(i)]) {
           botUI.emplacementsReveles[i] = false;
         }
@@ -14629,7 +14801,9 @@ async function jouerTourBot() {
    ========================================================= */
 
 function remplirTousLesEmplacementsBotAuDepart() {
-  for (let i = 1; i <= 5; i += 1) {
+  botAppliquerContraintesEmplacementsSelonDifficulte();
+
+  for (const i of botIndicesEmplacementsActifs()) {
     if (!etatBot.emplacements[String(i)]) {
       const carte = botPiocherDepuisDeckCiv();
       if (!carte) {
@@ -14638,6 +14812,9 @@ function remplirTousLesEmplacementsBotAuDepart() {
       etatBot.emplacements[String(i)] = carte;
     }
   }
+
+  botAjouterCarteSupplementaireEnDefausseSiNecessaire();
+  botAppliquerContraintesEmplacementsSelonDifficulte();
   recacherEmplacementsBot();
   afficherZoneBot?.();
 }
@@ -16440,6 +16617,10 @@ function afficherZoneBot() {
   const progres = getElement("bot-progres");
   const statut = getElement("bot-statut");
   const zonePuissance = getElement("bot-carte-puissance");
+  const botScale = getElement("bot-scale");
+  const blocEmplacements = getElement("bloc-emplacements-bot");
+  const grilleEmplacements = getElement("grille-emplacements-bot");
+  const colonneEmplacement6 = getElement("bot-colonne-emplacement-6");
 
 if (zonePuissance) {
   zonePuissance.style.cursor = "pointer";
@@ -16465,14 +16646,52 @@ if (zonePuissance) {
   afficherSlotStatutBot();
   remplirSlotCarteBot("bot-carte-puissance", etatBot.cartePuissance);
 
-  for (let i = 1; i <= 5; i += 1) {
-  const carte = etatBot.emplacements?.[String(i)] || null;
-  const revelee = botUI.emplacementsReveles?.[i] === true;
+  const afficherEmplacement6 = botNombreEmplacementsSelonDe() >= 6;
 
-  remplirSlotCarteBot(`bot-emplacement-${i}`, carte, {
-    faceCachee: carte ? !revelee : false
-  });
-}
+  if (grilleEmplacements) {
+    grilleEmplacements.classList.toggle("bot-grille-6", afficherEmplacement6);
+  }
+
+  if (colonneEmplacement6) {
+    colonneEmplacement6.classList.toggle("ui-cachee", !afficherEmplacement6);
+  }
+
+  if (botScale) {
+    botScale.classList.toggle("bot-scale-suzerain", afficherEmplacement6);
+  }
+
+  if (blocEmplacements) {
+    blocEmplacements.classList.toggle("bloc-emplacements-bot-suzerain", afficherEmplacement6);
+  }
+
+  const mettreAJourAffichageSpecialEmplacement = (index, carte) => {
+    const zone = getElement(`bot-emplacement-${index}`);
+    if (!zone) {
+      return;
+    }
+
+    const afficherJetonEpuisement =
+      index === 5 &&
+      botDoitAfficherJetonEpuisementEmplacement5() &&
+      !carte;
+
+    zone.classList.toggle("slot-bot-jeton-epuisement", afficherJetonEpuisement);
+  };
+
+  for (const i of botIndicesEmplacementsSelonDe()) {
+    const carte = etatBot.emplacements?.[String(i)] || null;
+    const revelee = botUI.emplacementsReveles?.[i] === true;
+
+    remplirSlotCarteBot(`bot-emplacement-${i}`, carte, {
+      faceCachee: carte ? !revelee : false
+    });
+    mettreAJourAffichageSpecialEmplacement(i, carte);
+  }
+
+  if (!afficherEmplacement6) {
+    remplirSlotCarteBot("bot-emplacement-6", null);
+    mettreAJourAffichageSpecialEmplacement(6, null);
+  }
 
   remplirPileBot("bot-deck-civ", "bot-deck-civ-compteur", etatBot.deckCiv);
   remplirPileBot("bot-defausse", "bot-defausse-compteur", etatBot.defausse);
@@ -16494,7 +16713,7 @@ function recacherEmplacementsBot() {
     botUI.emplacementsReveles = {};
   }
 
-  for (let i = 1; i <= 5; i += 1) {
+  for (const i of botIndicesEmplacementsExistants()) {
     botUI.emplacementsReveles[i] = false;
   }
 }
@@ -16524,7 +16743,8 @@ function reinitialiserEtatBot() {
     2: null,
     3: null,
     4: null,
-    5: null
+    5: null,
+    6: null
   };
 }
 
@@ -16631,6 +16851,11 @@ function initialiserBot() {
   const nationBot = configurationPartie.nationBot || "Celtes";
   etatBot.nation = nationBot;
 
+  const bonusDepart = botBonusRessourcesDepartSelonDifficulte();
+  etatBot.materiaux = Number(bonusDepart.materiaux || 0);
+  etatBot.population = Number(bonusDepart.population || 0);
+  etatBot.progres = Number(bonusDepart.progres || 0);
+
   const deckNation = creerDeckBotDepuisNation(nationBot);
   const separation = separerCartesBotInitiales(deckNation);
 
@@ -16639,6 +16864,7 @@ function initialiserBot() {
   etatBot.cartePuissance = separation.cartePuissance || null;
 
   melangerTableauBot(etatBot.deckCiv);
+  botAppliquerContraintesEmplacementsSelonDifficulte();
 
   remplirTousLesEmplacementsBotAuDepart();
   afficherZoneBot();
@@ -16748,7 +16974,9 @@ function debugRemplirBotAvecExemples() {
   etatBot.emplacements["3"] = clonerCartePourBot(cartesSource.find(c => inclutCategorie(c, CATEGORIES.TRADITION)) || cartesSource[2]);
   etatBot.emplacements["4"] = clonerCartePourBot(cartesSource.find(c => inclutCategorie(c, CATEGORIES.REGION)) || cartesSource[3]);
   etatBot.emplacements["5"] = clonerCartePourBot(cartesSource.find(c => c.pin === PINS.EPEE) || cartesSource[4]);
+  etatBot.emplacements["6"] = clonerCartePourBot(cartesSource[5] || cartesSource[0]);
 
+  botAppliquerContraintesEmplacementsSelonDifficulte();
   afficherZoneBot();
 }
 
@@ -20504,9 +20732,11 @@ function appliquerConfigurationPartieSauvegardee(configurationSauvee = {}) {
     ...configurationPartie,
     ...configurationSauvee
   };
+  configurationPartie.difficulteBot = normaliserDifficulteBot(configurationPartie.difficulteBot);
 
   const selectNationJoueur = getElement("choix-nation-joueur");
   const selectNationBot = getElement("choix-nation-bot");
+  const selectDifficulteBot = getElement("choix-difficulte-bot");
   const optionMiniTutoriel = getElement("option-mini-tutoriel");
 
   if (selectNationJoueur && configurationPartie.nationJoueur) {
@@ -20515,6 +20745,13 @@ function appliquerConfigurationPartieSauvegardee(configurationSauvee = {}) {
 
   if (selectNationBot && configurationPartie.nationBot) {
     selectNationBot.value = configurationPartie.nationBot;
+  }
+
+  if (selectDifficulteBot) {
+    selectDifficulteBot.value = configurationPartie.difficulteBot;
+    if (typeof selectDifficulteBot.onchange === "function") {
+      selectDifficulteBot.onchange();
+    }
   }
 
   if (optionMiniTutoriel) {
@@ -20682,7 +20919,8 @@ function appliquerSauvegardePartie(snapshot) {
     2: rehydraterCarteSauvegardee(botSauve.emplacements?.["2"] ?? botSauve.emplacements?.[2]),
     3: rehydraterCarteSauvegardee(botSauve.emplacements?.["3"] ?? botSauve.emplacements?.[3]),
     4: rehydraterCarteSauvegardee(botSauve.emplacements?.["4"] ?? botSauve.emplacements?.[4]),
-    5: rehydraterCarteSauvegardee(botSauve.emplacements?.["5"] ?? botSauve.emplacements?.[5])
+    5: rehydraterCarteSauvegardee(botSauve.emplacements?.["5"] ?? botSauve.emplacements?.[5]),
+    6: rehydraterCarteSauvegardee(botSauve.emplacements?.["6"] ?? botSauve.emplacements?.[6])
   };
 
   reinitialiserEtatUIApresChargement(jeuSauve.ui || {});
@@ -20696,8 +20934,11 @@ function appliquerSauvegardePartie(snapshot) {
     2: false,
     3: false,
     4: false,
-    5: false
+    5: false,
+    6: false
   };
+
+  botAppliquerContraintesEmplacementsSelonDifficulte();
 
   tourBotEnCours = false;
 }
@@ -21628,8 +21869,20 @@ function toutesLesCartesBotPourScoreSansDynastieNiPuissance() {
 
 function botScoreRessourcesFinPartie() {
   const progres = Number(etatBot.progres || 0);
-  const dizainesMateriaux = Math.floor((Number(etatBot.materiaux || 0)) / 10);
-  const dizainesPopulation = Math.floor((Number(etatBot.population || 0)) / 10);
+  const materiaux = Number(etatBot.materiaux || 0);
+  const population = Number(etatBot.population || 0);
+
+  if (botUtiliseScoreRessourcesCombinees()) {
+    const pvRessources = Math.floor((materiaux + population) / 5);
+    return {
+      progres,
+      ressources: pvRessources,
+      total: progres + pvRessources
+    };
+  }
+
+  const dizainesMateriaux = Math.floor(materiaux / 10);
+  const dizainesPopulation = Math.floor(population / 10);
 
   return {
     progres,
@@ -21672,8 +21925,12 @@ function calculerScoreBotDetailleFinal() {
   const cartes = toutesLesCartesBotPourScoreSansDynastieNiPuissance();
 
   const progres = Number(etatBot.progres || 0);
-  const pvMateriaux = Math.floor((Number(etatBot.materiaux || 0)) / 10);
-  const pvPopulation = Math.floor((Number(etatBot.population || 0)) / 10);
+  const materiaux = Number(etatBot.materiaux || 0);
+  const population = Number(etatBot.population || 0);
+  const scoreRessourcesCombine = botUtiliseScoreRessourcesCombinees();
+  const pvMateriaux = Math.floor(materiaux / 10);
+  const pvPopulation = Math.floor(population / 10);
+  const pvCombine = Math.floor((materiaux + population) / 5);
 
   const detailsCartes = cartes.map(carte => ({
     nom: carte.nom,
@@ -21683,6 +21940,34 @@ function calculerScoreBotDetailleFinal() {
   }));
 
   const totalCartes = detailsCartes.reduce((somme, detail) => somme + Number(detail.pv || 0), 0);
+
+  const detailsRessources = scoreRessourcesCombine
+    ? [
+        {
+          nom: "Matériaux + Population",
+          pv: pvCombine,
+          pointsVictoire: "1 PV par combinaison de 5",
+          conditionVictoire: `${materiaux} Matériaux + ${population} Population`
+        }
+      ]
+    : [
+        {
+          nom: "Matériaux",
+          pv: pvMateriaux,
+          pointsVictoire: "1 PV par dizaine",
+          conditionVictoire: `${materiaux} Matériaux`
+        },
+        {
+          nom: "Population",
+          pv: pvPopulation,
+          pointsVictoire: "1 PV par dizaine",
+          conditionVictoire: `${population} Population`
+        }
+      ];
+
+  const totalRessources = scoreRessourcesCombine
+    ? pvCombine
+    : pvMateriaux + pvPopulation;
 
   return {
     progres: {
@@ -21697,27 +21982,14 @@ function calculerScoreBotDetailleFinal() {
       ]
     },
     ressources: {
-      total: pvMateriaux + pvPopulation,
-      cartes: [
-        {
-          nom: "Matériaux",
-          pv: pvMateriaux,
-          pointsVictoire: "1 PV par dizaine",
-          conditionVictoire: `${etatBot.materiaux || 0} Matériaux`
-        },
-        {
-          nom: "Population",
-          pv: pvPopulation,
-          pointsVictoire: "1 PV par dizaine",
-          conditionVictoire: `${etatBot.population || 0} Population`
-        }
-      ]
+      total: totalRessources,
+      cartes: detailsRessources
     },
     cartes: {
       total: totalCartes,
       cartes: detailsCartes
     },
-    total: progres + pvMateriaux + pvPopulation + totalCartes
+    total: progres + totalRessources + totalCartes
   };
 }
 
@@ -22109,18 +22381,34 @@ function panneauDecompteEstVisible() {
   return messageNormalise.includes("decompte declenche");
 }
 
+function annonceDecompteDoitAttendreInteraction() {
+  if (!jeu?.ui) {
+    return false;
+  }
+
+  if (jeu.ui.selectionMarcheActive || jeu.ui.selectionCarteActive) {
+    return true;
+  }
+
+  if (jeu.ui.modeInteraction) {
+    return true;
+  }
+
+  if (jeu.ui.panneauUIOuvert && !panneauDecompteEstVisible()) {
+    return true;
+  }
+
+  return false;
+}
+
 function ouvrirPanneauDecompteDeclenche() {
-  ouvrirPanneauUI(
-    MESSAGE_DECOMPTE_DECLENCHE,
-    [
-      {
-        label: "OK",
-        callback: () => {
-          jeu.finPartie.annonceDecompteAccusee = true;
-        }
-      }
-    ]
-  );
+  jeu.finPartie.annonceDecompteAccusee = true;
+  ouvrirPanneauUI(MESSAGE_DECOMPTE_DECLENCHE, [], {
+    mode: "banniereSysteme",
+    banniere: {
+      duree: 7600
+    }
+  });
 }
 
 function verifierAnnonceDecompteSiMasquee() {
@@ -22129,6 +22417,11 @@ function verifierAnnonceDecompteSiMasquee() {
     jeu.finPartie.terminee ||
     jeu.finPartie.annonceDecompteAccusee
   ) {
+    return;
+  }
+
+  if (annonceDecompteDoitAttendreInteraction()) {
+    setTimeout(verifierAnnonceDecompteSiMasquee, 120);
     return;
   }
 
@@ -22159,9 +22452,8 @@ function declencherDecompte() {
   jeu.finPartie.mancheDeclenchementDecompte = jeu.manche.numero;
   jeu.finPartie.annonceDecompteAccusee = false;
 
-  ouvrirPanneauDecompteDeclenche();
-
-  // Securise les cas ou un autre flux UI ecrase le panneau juste apres le trigger.
+  // Ouvre l'annonce dès que l'interface n'est plus occupée par une autre interaction.
+  verifierAnnonceDecompteSiMasquee();
   setTimeout(verifierAnnonceDecompteSiMasquee, 0);
   setTimeout(verifierAnnonceDecompteSiMasquee, 100);
 }
@@ -24585,6 +24877,142 @@ function payerRessource(typeRessource, quantite) {
   return false;
 }
 
+function decrireCoutReelRessource(typeRessource, quantite) {
+  const q = Number(quantite || 0);
+
+  if (!typeRessource || q <= 0) {
+    return "";
+  }
+
+  if (!peutPayerRessource(typeRessource, q)) {
+    return "impossible actuellement";
+  }
+
+  if (typeRessource === "population") {
+    const depensePopulation = Math.min(jeu.joueur.population, q);
+    const depenseProgres = q - depensePopulation;
+    const morceaux = [];
+
+    if (depensePopulation > 0) {
+      morceaux.push(`${depensePopulation} Population`);
+    }
+
+    if (depenseProgres > 0) {
+      morceaux.push(`${depenseProgres} Progrès`);
+    }
+
+    return morceaux.join(" + ");
+  }
+
+  if (typeRessource === "materiaux") {
+    const paiement = calculerPaiementMateriauxOptimise(
+      q,
+      jeu.joueur.materiaux,
+      jeu.joueur.progres
+    );
+
+    if (!paiement) {
+      return "impossible actuellement";
+    }
+
+    const morceaux = [];
+
+    if (paiement.materiaux > 0) {
+      morceaux.push(`${paiement.materiaux} Matériaux`);
+    }
+
+    if (paiement.progres > 0) {
+      morceaux.push(`${paiement.progres} Progrès`);
+    }
+
+    return morceaux.join(" + ");
+  }
+
+  if (typeRessource === "progres") {
+    return `${q} Progrès`;
+  }
+
+  if (typeRessource === "actions") {
+    return `${q} action(s)`;
+  }
+
+  return "";
+}
+
+function extrairePaiementsPourLibelleDepuisEffets(effets = [], paiements = []) {
+  if (!Array.isArray(effets)) {
+    return paiements;
+  }
+
+  const typesPaiementCompose = new Set([
+    "lancerPaiementPuisAcquerirParmiCategories",
+    "lancerPaiementPuisInnoverParmiCategories",
+    "payerPuisAcquerirParmiCategories",
+    "payerPuisInnoverParmiCategories"
+  ]);
+
+  for (const effet of effets) {
+    if (!effet || typeof effet !== "object") {
+      continue;
+    }
+
+    if (effet.type === "payer") {
+      paiements.push({
+        ressource: effet.ressource,
+        quantite: Number(effet.quantite || 0)
+      });
+    } else if (effet.type === "payerAction") {
+      paiements.push({
+        ressource: "actions",
+        quantite: Number(effet.quantite || 0)
+      });
+    } else if (typesPaiementCompose.has(effet.type)) {
+      paiements.push({
+        ressource: effet.ressource,
+        quantite: Number(effet.quantite || 0)
+      });
+    }
+
+    if (Array.isArray(effet.effets)) {
+      extrairePaiementsPourLibelleDepuisEffets(effet.effets, paiements);
+    }
+
+    if (Array.isArray(effet.effetSiOui)) {
+      extrairePaiementsPourLibelleDepuisEffets(effet.effetSiOui, paiements);
+    }
+  }
+
+  return paiements;
+}
+
+function enrichirLibelleOptionAvecCoutReel(label, effets = []) {
+  const texte = String(label || "").trim();
+
+  if (!texte || /\[\s*Coût réel\s*:/i.test(texte)) {
+    return texte;
+  }
+
+  const paiements = extrairePaiementsPourLibelleDepuisEffets(effets);
+  if (!Array.isArray(paiements) || paiements.length === 0) {
+    return texte;
+  }
+
+  const morceaux = paiements
+    .filter(item =>
+      item &&
+      typeof item.ressource === "string" &&
+      Number(item.quantite || 0) > 0
+    )
+    .map(item => decrireCoutReelRessource(item.ressource, item.quantite))
+    .filter(Boolean);
+
+  if (morceaux.length === 0) {
+    return texte;
+  }
+
+  return `${texte} [Coût réel: ${morceaux.join(" + ")}]`;
+}
+
 /* =========================================================
    23) CHOIX DE CATÉGORIES / ACTIONS LIÉES AU MARCHÉ
    ========================================================= */
@@ -24816,7 +25244,7 @@ async function lancerPaiementPuisInnovation(ressource, quantite, categories) {
     return false;
   }
 
-  if ((jeu.joueur[ressource] || 0) < quantite) {
+  if (!peutPayerRessource(ressource, quantite)) {
     ouvrirPanneauUI(`Impossible de payer ${quantite} ${ressource}.`, [
       { label: "OK" }
     ]);
@@ -27612,9 +28040,13 @@ async optionnel(effet, contexte) {
   fermerZoomTemporaire?.();
   fermerZoomVerrouille?.();
 
+  const optionsPourChoix = (effet.options || []).map(option => ({
+    label: enrichirLibelleOptionAvecCoutReel(option.label, option.effets || [])
+  }));
+
   const indexChoisi = await demanderChoixTexte(
     "Choisissez une option :",
-    effet.options.map(option => ({ label: option.label }))
+    optionsPourChoix
   );
 
   jeu.ui.modeInteraction = null;
@@ -29244,7 +29676,10 @@ function afficherCompteursJoueur() {
    ========================================================= */
 
 const DUREE_TOAST_PAR_DEFAUT = 2800;
+const DUREE_BANNIERE_SYSTEME_PAR_DEFAUT = 6200;
 let toastActifTimeoutId = null;
+let banniereSystemeTimeoutId = null;
+const filePanneauUIModales = [];
 
 function obtenirConteneurToastUI() {
   let conteneur = getElement("zone-toast-ui");
@@ -29326,6 +29761,86 @@ function afficherToastUI(message, configuration = {}) {
   }, dureeFinale);
 }
 
+function obtenirConteneurBanniereSystemeUI() {
+  let conteneur = getElement("zone-banniere-ui");
+
+  if (!conteneur) {
+    conteneur = document.createElement("div");
+    conteneur.id = "zone-banniere-ui";
+    conteneur.setAttribute("aria-live", "polite");
+    conteneur.setAttribute("aria-atomic", "true");
+    document.body.appendChild(conteneur);
+  }
+
+  return conteneur;
+}
+
+function fermerBanniereSystemeUI() {
+  const conteneur = getElement("zone-banniere-ui");
+  if (!conteneur) {
+    return;
+  }
+
+  if (banniereSystemeTimeoutId) {
+    clearTimeout(banniereSystemeTimeoutId);
+    banniereSystemeTimeoutId = null;
+  }
+
+  const banniere = conteneur.querySelector(".banniere-systeme-ui");
+  if (!banniere) {
+    return;
+  }
+
+  banniere.classList.remove("banniere-systeme-ui-visible");
+  banniere.classList.add("banniere-systeme-ui-cache");
+
+  setTimeout(() => {
+    banniere.remove();
+  }, 220);
+}
+
+function afficherBanniereSystemeUI(message, configuration = {}) {
+  const conteneur = obtenirConteneurBanniereSystemeUI();
+  if (!conteneur) {
+    return;
+  }
+
+  const texte = String(message ?? "").trim();
+  if (!texte) {
+    return;
+  }
+
+  const banniereExistante = conteneur.querySelector(".banniere-systeme-ui");
+  if (banniereExistante) {
+    banniereExistante.remove();
+  }
+
+  if (banniereSystemeTimeoutId) {
+    clearTimeout(banniereSystemeTimeoutId);
+    banniereSystemeTimeoutId = null;
+  }
+
+  const banniere = document.createElement("div");
+  banniere.className = "banniere-systeme-ui banniere-systeme-ui-cache";
+  banniere.setAttribute("role", "status");
+  banniere.textContent = texte;
+  conteneur.appendChild(banniere);
+
+  requestAnimationFrame(() => {
+    banniere.classList.remove("banniere-systeme-ui-cache");
+    banniere.classList.add("banniere-systeme-ui-visible");
+  });
+
+  const duree = Number(configuration?.duree);
+  const dureeFinale = Number.isFinite(duree) && duree > 0
+    ? duree
+    : DUREE_BANNIERE_SYSTEME_PAR_DEFAUT;
+
+  banniereSystemeTimeoutId = setTimeout(() => {
+    fermerBanniereSystemeUI();
+  }, dureeFinale);
+}
+
 function normaliserLibelleBoutonPourRaccourci(label = "") {
   return String(label || "")
     .replace(/\[[^\]]*\]/g, "")
@@ -29367,12 +29882,7 @@ function popupPeutDevenirToast(options = [], configuration = {}) {
   return libelleBoutonEstOk(label) && !aCallback;
 }
 
-  function ouvrirPanneauUI(message, options = [], configuration = {}) {
-  if (popupPeutDevenirToast(options, configuration)) {
-    afficherToastUI(message, configuration?.toast);
-    return;
-  }
-
+function ouvrirPanneauUIModalInterne(message, options = [], configuration = {}) {
   fermerToastUI();
 
   const panneau = getElement("panneau-ui");
@@ -29384,7 +29894,9 @@ function popupPeutDevenirToast(options = [], configuration = {}) {
     return;
   }
 
-  fermerZoomTemporaire();
+  if (configuration?.conserverZoom !== true) {
+    fermerZoomTemporaire();
+  }
   jeu.ui.panneauUIOuvert = true;
   definirBlocageHoverCartes(true);
 
@@ -29396,10 +29908,14 @@ function popupPeutDevenirToast(options = [], configuration = {}) {
     bouton.textContent = libelleBoutonAvecRaccourciEntree(option.label);
 
     bouton.onclick = () => {
-      fermerPanneauUI();
+      fermerPanneauUI({ afficherSuivant: false });
 
-      if (option.callback) {
-        option.callback();
+      try {
+        if (option.callback) {
+          option.callback();
+        }
+      } finally {
+        ouvrirProchainPanneauUIEnFile();
       }
     };
 
@@ -29410,8 +29926,46 @@ function popupPeutDevenirToast(options = [], configuration = {}) {
   panneau.classList.add("panneau-ui-ouvert");
 }
 
-function fermerPanneauUI() {
+function ouvrirProchainPanneauUIEnFile() {
+  if (jeu?.ui?.panneauUIOuvert) {
+    return;
+  }
+
+  if (filePanneauUIModales.length === 0) {
+    return;
+  }
+
+  const prochaineModale = filePanneauUIModales.shift();
+  ouvrirPanneauUIModalInterne(
+    prochaineModale.message,
+    prochaineModale.options,
+    prochaineModale.configuration
+  );
+}
+
+  function ouvrirPanneauUI(message, options = [], configuration = {}) {
+  if (configuration?.mode === "banniereSysteme") {
+    afficherBanniereSystemeUI(message, configuration?.banniere);
+    return;
+  }
+
+  if (popupPeutDevenirToast(options, configuration)) {
+    afficherToastUI(message, configuration?.toast);
+    return;
+  }
+
+  filePanneauUIModales.push({
+    message,
+    options: Array.isArray(options) ? options : [],
+    configuration: configuration || {}
+  });
+
+  ouvrirProchainPanneauUIEnFile();
+}
+
+function fermerPanneauUI(configuration = {}) {
   const panneau = getElement("panneau-ui");
+  const afficherSuivant = configuration?.afficherSuivant !== false;
 
   if (!panneau) {
     return;
@@ -29423,6 +29977,14 @@ function fermerPanneauUI() {
   jeu.ui.panneauUIOuvert = false;
   definirBlocageHoverCartes(false);
   fermerZoomTemporaire();
+
+  if (configuration?.viderFile === true) {
+    filePanneauUIModales.length = 0;
+  }
+
+  if (afficherSuivant) {
+    ouvrirProchainPanneauUIEnFile();
+  }
 }
 
 function afficherTableauJoueur() {
@@ -31791,7 +32353,8 @@ function choisirCarteRegardRenommee(indexChoisi) {
    let configurationPartie = {
   nationJoueur: null,
   nationBot: null,
-  miniTutoriel: false
+  miniTutoriel: false,
+  difficulteBot: DIFFICULTE_BOT_PAR_DEFAUT
 };
 
 function obtenirListeNationsDepuisCartes(listeCartes) {
@@ -31819,6 +32382,7 @@ function obtenirListeNationsDepuisCartes(listeCartes) {
 function initialiserChoixNations() {
   const selectJoueur = document.getElementById("choix-nation-joueur");
   const selectBot = document.getElementById("choix-nation-bot");
+  const selectDifficulteBot = document.getElementById("choix-difficulte-bot");
   const optionMiniTutoriel = document.getElementById("option-mini-tutoriel");
   const NATION_TUTORIEL_JOUEUR = "Romains";
   const NATION_TUTORIEL_BOT = "Celtes";
@@ -31863,6 +32427,15 @@ function initialiserChoixNations() {
     selectBot.value = configurationPartie.nationBot;
   }
 
+  configurationPartie.difficulteBot = normaliserDifficulteBot(configurationPartie.difficulteBot);
+  if (selectDifficulteBot) {
+    selectDifficulteBot.value = configurationPartie.difficulteBot;
+    selectDifficulteBot.onchange = () => {
+      configurationPartie.difficulteBot = normaliserDifficulteBot(selectDifficulteBot.value);
+      selectDifficulteBot.value = configurationPartie.difficulteBot;
+    };
+  }
+
   const romainsDisponibles = nations.includes(NATION_TUTORIEL_JOUEUR);
   const celtesDisponibles = nations.includes(NATION_TUTORIEL_BOT);
 
@@ -31874,13 +32447,24 @@ function initialiserChoixNations() {
       selectBot.value = NATION_TUTORIEL_BOT;
       configurationPartie.nationJoueur = NATION_TUTORIEL_JOUEUR;
       configurationPartie.nationBot = NATION_TUTORIEL_BOT;
+      configurationPartie.difficulteBot = DIFFICULTES_BOT.IMPERATOR;
       selectJoueur.disabled = true;
       selectBot.disabled = true;
+
+      if (selectDifficulteBot) {
+        selectDifficulteBot.value = DIFFICULTES_BOT.IMPERATOR;
+        selectDifficulteBot.disabled = true;
+      }
+
       return;
     }
 
     selectJoueur.disabled = false;
     selectBot.disabled = false;
+    if (selectDifficulteBot) {
+      selectDifficulteBot.disabled = false;
+      selectDifficulteBot.value = normaliserDifficulteBot(configurationPartie.difficulteBot);
+    }
   };
 
   if (optionMiniTutoriel) {
@@ -31917,6 +32501,7 @@ function afficherRappelRaccourcisPartie() {
 function commencerNouvellePartie() {
   const selectNationJoueur = document.getElementById("choix-nation-joueur");
   const selectNationBot = document.getElementById("choix-nation-bot");
+  const selectDifficulteBot = document.getElementById("choix-difficulte-bot");
   const optionMiniTutoriel = document.getElementById("option-mini-tutoriel");
   const modeMiniTutoriel = !!optionMiniTutoriel?.checked;
 
@@ -31925,6 +32510,7 @@ function commencerNouvellePartie() {
   if (modeMiniTutoriel) {
     configurationPartie.nationJoueur = "Romains";
     configurationPartie.nationBot = "Celtes";
+    configurationPartie.difficulteBot = DIFFICULTES_BOT.IMPERATOR;
 
     if (selectNationJoueur) {
       selectNationJoueur.value = "Romains";
@@ -31933,9 +32519,16 @@ function commencerNouvellePartie() {
     if (selectNationBot) {
       selectNationBot.value = "Celtes";
     }
+
+    if (selectDifficulteBot) {
+      selectDifficulteBot.value = DIFFICULTES_BOT.IMPERATOR;
+    }
   } else {
     configurationPartie.nationJoueur = selectNationJoueur.value;
     configurationPartie.nationBot = selectNationBot.value;
+    configurationPartie.difficulteBot = normaliserDifficulteBot(
+      selectDifficulteBot?.value || configurationPartie.difficulteBot
+    );
   }
 
   initialiserJeu();
@@ -33649,7 +34242,9 @@ const playlistMusique = [
   "assets/audio/theme-Romains.mp3",
   "assets/audio/theme-Vikings.mp3",
   "assets/audio/theme-Perses.mp3",
-  "assets/audio/theme-Carthaginois.mp3"
+  "assets/audio/theme-Carthaginois.mp3",
+  "assets/audio/theme-Macedoniens.mp3",
+  "assets/audio/theme-Scythes.mp3"
 ];
 
 const VOLUME_MUSIQUE_PAR_DEFAUT = 0.4;
@@ -33660,6 +34255,7 @@ let musiqueFinPartieActive = false;
 let audioFinPartie = null;
 let volumeMusique = VOLUME_MUSIQUE_PAR_DEFAUT;
 let musiqueMuette = false;
+let fileIndicesMusiqueSuivante = [];
 
 function normaliserVolumeMusique(valeur) {
   const nombre = Number(valeur);
@@ -33842,7 +34438,47 @@ function choisirIndexAleatoireDifferant(taille, indexExclu = -1) {
   return index;
 }
 
-function jouerMusiqueParIndex(index) {
+function melangerTableau(array) {
+  for (let i = array.length - 1; i > 0; i -= 1) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [array[i], array[j]] = [array[j], array[i]];
+  }
+}
+
+function reinitialiserFileMusiqueSuivante(indexExclu = -1) {
+  if (!Array.isArray(playlistMusique) || playlistMusique.length === 0) {
+    fileIndicesMusiqueSuivante = [];
+    return;
+  }
+
+  const indices = [];
+
+  for (let i = 0; i < playlistMusique.length; i += 1) {
+    if (i !== indexExclu) {
+      indices.push(i);
+    }
+  }
+
+  melangerTableau(indices);
+  fileIndicesMusiqueSuivante = indices;
+}
+
+function extraireProchainIndexMusiqueSuivante() {
+  if (fileIndicesMusiqueSuivante.length === 0) {
+    reinitialiserFileMusiqueSuivante(indexMusiqueActuelle);
+  }
+
+  while (fileIndicesMusiqueSuivante.length > 0) {
+    const index = fileIndicesMusiqueSuivante.shift();
+    if (index !== indexMusiqueActuelle) {
+      return index;
+    }
+  }
+
+  return -1;
+}
+
+function jouerMusiqueParIndex(index, options = {}) {
   const audio = getElement("musique-fond");
 
   if (musiqueFinPartieActive || jeu?.finPartie?.terminee) {
@@ -33861,6 +34497,10 @@ function jouerMusiqueParIndex(index) {
   audio.src = playlistMusique[indexMusiqueActuelle];
   appliquerPreferencesAudioMusique();
 
+  if (options.reinitialiserCycleSuivante !== false) {
+    reinitialiserFileMusiqueSuivante(indexMusiqueActuelle);
+  }
+
   audio.play().then(() => {
     mettreAJourLibelleBoutonMusique();
   }).catch(() => {});
@@ -33876,11 +34516,35 @@ function jouerMusiqueAleatoire() {
     return;
   }
 
-  jouerMusiqueParIndex(nouvelIndex);
+  jouerMusiqueParIndex(nouvelIndex, { reinitialiserCycleSuivante: true });
+}
+
+function jouerMusiqueSuivanteSansRepetition() {
+  if (!Array.isArray(playlistMusique) || playlistMusique.length === 0) {
+    return;
+  }
+
+  if (playlistMusique.length === 1) {
+    jouerMusiqueParIndex(0, { reinitialiserCycleSuivante: false });
+    return;
+  }
+
+  let nouvelIndex = extraireProchainIndexMusiqueSuivante();
+
+  if (nouvelIndex === -1) {
+    reinitialiserFileMusiqueSuivante(indexMusiqueActuelle);
+    nouvelIndex = extraireProchainIndexMusiqueSuivante();
+  }
+
+  if (nouvelIndex === -1) {
+    return;
+  }
+
+  jouerMusiqueParIndex(nouvelIndex, { reinitialiserCycleSuivante: false });
 }
 
 function passerMusiqueSuivante() {
-  jouerMusiqueAleatoire();
+  jouerMusiqueSuivanteSansRepetition();
 }
 
 function initialiserMusique() {
@@ -33899,7 +34563,7 @@ function initialiserMusique() {
       return;
     }
 
-    jouerMusiqueAleatoire();
+    jouerMusiqueSuivanteSansRepetition();
   });
 
   function lancerMusiqueUneFois() {

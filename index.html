@@ -67,6 +67,17 @@
       <select id="choix-nation-bot"></select>
     </div>
 
+    <div class="bloc-choix">
+      <label for="choix-difficulte-bot">Difficulté du bot</label>
+      <select id="choix-difficulte-bot">
+        <option value="chef_de_clan">Chef de clan</option>
+        <option value="seigneur_de_guerre">Seigneur de guerre</option>
+        <option value="imperator" selected>Imperator</option>
+        <option value="souverain">Souverain</option>
+        <option value="suzerain">Suzerain</option>
+      </select>
+    </div>
+
     <div class="bloc-choix bloc-choix-tutoriel">
       <label class="option-tutoriel-accueil">
         <input id="option-mini-tutoriel" type="checkbox">
@@ -191,6 +202,11 @@
                 <div class="colonne-emplacement-bot">
                   <div class="titre-mini-zone marqueur-bot">5</div>
                   <div id="bot-emplacement-5" class="slot-carte-bot"></div>
+                </div>
+
+                <div id="bot-colonne-emplacement-6" class="colonne-emplacement-bot ui-cachee">
+                  <div class="titre-mini-zone marqueur-bot">6</div>
+                  <div id="bot-emplacement-6" class="slot-carte-bot"></div>
                 </div>
               </div>
             </div>
