@@ -21139,6 +21139,7 @@ function chargerPartieSauvegardee({ silencieux = false } = {}) {
 
   try {
     appliquerSauvegardePartie(snapshot);
+    reinitialiserFeedbackCompteursJoueur();
 
     afficherUIPartie();
     document.getElementById("barre-navigation-vues")?.classList.remove("ui-cachee");
@@ -29838,6 +29839,97 @@ function creerZoneMarcheHTML(zone) {
    33) AFFICHAGE JOUEUR / COMPTEURS
    ========================================================= */
 
+const RESSOURCES_FEEDBACK_COMPTEURS_JOUEUR = [
+  "population",
+  "materiaux",
+  "progres"
+];
+
+const etatFeedbackCompteursJoueur = {
+  initialise: false,
+  population: 0,
+  materiaux: 0,
+  progres: 0
+};
+
+function reinitialiserFeedbackCompteursJoueur() {
+  etatFeedbackCompteursJoueur.initialise = false;
+}
+
+function obtenirIdValeurCompteurJoueurPourRessource(typeRessource) {
+  if (typeRessource === "population") {
+    return "valeur-population";
+  }
+
+  if (typeRessource === "materiaux") {
+    return "valeur-materiaux";
+  }
+
+  if (typeRessource === "progres") {
+    return "valeur-progres";
+  }
+
+  return null;
+}
+
+function afficherFeedbackVariationRessourceJoueur(typeRessource, variation) {
+  if (!Number.isFinite(variation) || variation === 0) {
+    return;
+  }
+
+  const idValeurCompteur = obtenirIdValeurCompteurJoueurPourRessource(typeRessource);
+  if (!idValeurCompteur) {
+    return;
+  }
+
+  const elementValeurCompteur = getElement(idValeurCompteur);
+  const conteneurCompteur = elementValeurCompteur?.closest?.(".compteur-joueur");
+  if (!conteneurCompteur) {
+    return;
+  }
+
+  const feedback = document.createElement("div");
+  feedback.className = "feedback-ressource-joueur";
+  feedback.classList.add(variation > 0 ? "feedback-gain" : "feedback-perte");
+  feedback.textContent = `${variation > 0 ? "+" : ""}${variation}`;
+
+  const nbFeedbacksActifs = conteneurCompteur.querySelectorAll(".feedback-ressource-joueur").length;
+  feedback.style.setProperty("--feedback-offset-y", `${nbFeedbacksActifs * 16}px`);
+
+  conteneurCompteur.appendChild(feedback);
+  feedback.addEventListener("animationend", () => {
+    feedback.remove();
+  }, { once: true });
+}
+
+function mettreAJourFeedbackCompteursJoueur() {
+  const valeursActuelles = {
+    population: Number(jeu.joueur.population || 0),
+    materiaux: Number(jeu.joueur.materiaux || 0),
+    progres: Number(jeu.joueur.progres || 0)
+  };
+
+  if (!etatFeedbackCompteursJoueur.initialise) {
+    etatFeedbackCompteursJoueur.population = valeursActuelles.population;
+    etatFeedbackCompteursJoueur.materiaux = valeursActuelles.materiaux;
+    etatFeedbackCompteursJoueur.progres = valeursActuelles.progres;
+    etatFeedbackCompteursJoueur.initialise = true;
+    return;
+  }
+
+  for (const typeRessource of RESSOURCES_FEEDBACK_COMPTEURS_JOUEUR) {
+    const valeurPrecedente = Number(etatFeedbackCompteursJoueur[typeRessource] || 0);
+    const valeurActuelle = Number(valeursActuelles[typeRessource] || 0);
+    const variation = valeurActuelle - valeurPrecedente;
+
+    if (variation !== 0) {
+      afficherFeedbackVariationRessourceJoueur(typeRessource, variation);
+    }
+
+    etatFeedbackCompteursJoueur[typeRessource] = valeurActuelle;
+  }
+}
+
 function afficherCompteursJoueur() {
   const valeurActions = getElement("valeur-actions");
   const valeurEpuisement = getElement("valeur-epuisement");
@@ -29850,6 +29942,8 @@ function afficherCompteursJoueur() {
   if (valeurPopulation) valeurPopulation.textContent = jeu.joueur.population;
   if (valeurMateriaux) valeurMateriaux.textContent = jeu.joueur.materiaux;
   if (valeurProgres) valeurProgres.textContent = jeu.joueur.progres;
+
+  mettreAJourFeedbackCompteursJoueur();
 }
 
 /* =========================================================
@@ -34953,6 +35047,7 @@ if (btnFermerDeckJoueur) {
 }
 
 function initialiserDonneesJeu() {
+  reinitialiserFeedbackCompteursJoueur();
   initialiserPilesCommunes();
   construirePilesNation();
   construireHautMarche();
