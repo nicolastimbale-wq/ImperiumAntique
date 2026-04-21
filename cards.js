@@ -1849,7 +1849,8 @@ solsticeCode: [
         {
           type: "developperCarteSansPayer",
           quantite: 1,
-          nePasEpuiserPileEtoile: true
+          nePasEpuiserPileEtoile: true,
+          continuerSiAucuneCarte: true
         }
       ]
     },
@@ -8884,7 +8885,7 @@ function botBonusRessourcesDepartSelonDifficulte() {
 const UI = Object.freeze({
   LARGEUR_CARTE_MAIN: 260,
   LARGEUR_ZONE_MAIN: 1420,
-  TAILLE_TABLEAU_JOUEUR: 24,
+  TAILLE_TABLEAU_JOUEUR: 20,
   SCALE_JOUEUR: 1,
    SCALE_MAIN: 1
 });
@@ -12109,8 +12110,7 @@ ACTIONS_BOT.traditionVikingsBarbare = async function({ carte }) {
     message: `${carte.nom} : la première carte de la pioche Dynastie va dans la défausse du Bot.`,
     cartes: [carte],
     callback: async () => {
-      const dynastie = etatBot.piocheDynastie || [];
-      const carteDynastie = dynastie.shift() || null;
+      const carteDynastie = botRetirerPremiereCartePiocheDynastie();
       if (carteDynastie) {
         etatBot.defausse.push(carteDynastie);
         afficherZoneBot?.();
@@ -12193,8 +12193,7 @@ ACTIONS_BOT.persistanteVikingsBarbare = async function({ carte }) {
     message: `${carte.nom} : la première carte de la pioche Dynastie va dans la défausse du Bot.`,
     cartes: [carte],
     callback: async () => {
-      const dynastie = etatBot.piocheDynastie || [];
-      const carteDynastie = dynastie.shift() || null;
+      const carteDynastie = botRetirerPremiereCartePiocheDynastie();
       if (carteDynastie) {
         etatBot.defausse.push(carteDynastie);
         afficherZoneBot?.();
@@ -12215,6 +12214,8 @@ ACTIONS_BOT.persistanteVikingsBarbare = async function({ carte }) {
 };
 
 ACTIONS_BOT.autreVikingsBarbare = async function({ carte }) {
+  let archiverCarteResolue = false;
+
   if (botRetirerUneInstabiliteDeLaDefausse()) {
     ajouterEtapeBot({
       message: `${carte.nom} : le Bot renvoie 1 Instabilité depuis sa défausse.`,
@@ -12234,8 +12235,7 @@ ACTIONS_BOT.autreVikingsBarbare = async function({ carte }) {
       cartes: [carte],
       callback: async () => {
         abandonnerRegionsBotSelonRegles(1);
-        const dynastie = etatBot.piocheDynastie || [];
-        const carteDynastie = dynastie.shift() || null;
+        const carteDynastie = botRetirerPremiereCartePiocheDynastie();
         if (carteDynastie) {
           etatBot.defausse.push(carteDynastie);
         }
@@ -12244,21 +12244,33 @@ ACTIONS_BOT.autreVikingsBarbare = async function({ carte }) {
     });
   } else {
     ajouterEtapeBot({
-      message: `${carte.nom} : le Bot archive la première carte de la pile Renommée dans son Histoire.`,
+      message: `${carte.nom} : le Bot pioche 1 Renommée.`,
       cartes: [carte],
       callback: async () => {
-        botArchiverPremiereRenommeeDansHistoire();
+        botPiocherRenommee();
+      }
+    });
+
+    archiverCarteResolue = true;
+  }
+
+  if (archiverCarteResolue) {
+    ajouterEtapeBot({
+      message: `${carte.nom} est archivée dans l’Histoire du Bot.`,
+      cartes: [carte],
+      callback: async () => {
+        botArchiverCarteResolue(carte);
+      }
+    });
+  } else {
+    ajouterEtapeBot({
+      message: `${carte.nom} est défaussée.`,
+      cartes: [carte],
+      callback: async () => {
+        botDefausserCarteResolue(carte);
       }
     });
   }
-
-  ajouterEtapeBot({
-    message: `${carte.nom} est défaussée.`,
-    cartes: [carte],
-    callback: async () => {
-      botDefausserCarteResolue(carte);
-    }
-  });
 
   await jouerEtapesBot();
   return true;
@@ -14430,7 +14442,7 @@ function botCarteDynastieVersDefausseCiv() {
     (etatBot.piocheDynastie || []).map(c => `${c.nom} [${c.localisationDepart}]`)
   );
 
-  const carte = etatBot.piocheDynastie.shift() || null;
+  const carte = botRetirerPremiereCartePiocheDynastie();
 
   debugLog(
     "CARTE RETIRÉE =",
@@ -14443,14 +14455,36 @@ function botCarteDynastieVersDefausseCiv() {
 
   etatBot.defausse.push(carte);
 
-  if (String(carte.localisationDepart || "").trim() === "Pleine") {
-    etatBot.statut = STATUTS.EMPIRE;
-    debugLog("BOT -> passage en Empire :", carte.nom);
-  }
-
   debugLog("STATUT BOT APRÈS RETRAIT =", etatBot.statut);
 
   afficherZoneBot?.();
+  return carte;
+}
+
+function botRetirerPremiereCartePiocheDynastie() {
+  const carte = etatBot.piocheDynastie.shift() || null;
+
+  if (!carte) {
+    return null;
+  }
+
+  if (String(carte.localisationDepart || "").trim() === "Pleine") {
+    const nationBot = String(etatBot.nation || "").trim().toLowerCase();
+
+    if (nationBot === "vikings") {
+      // Règle spéciale Vikings : la sortie de "Pleine" déclenche le Décompte
+      // mais ne fait pas passer le bot en Empire.
+      declencherDecompte();
+    } else {
+      etatBot.statut = STATUTS.EMPIRE;
+      debugLog("BOT -> passage en Empire :", carte.nom);
+    }
+  }
+
+  if ((etatBot.piocheDynastie || []).length === 0) {
+    declencherDecompte();
+  }
+
   return carte;
 }
 
@@ -18891,6 +18925,107 @@ async function acquerirRegionDepuisExilAvecRetour() {
   return carte;
 }
 
+function decrireBonusRoiDesRoisSelonFaceEtStatut(carteRoi, statutActuel) {
+  const pin = String(carteRoi?.pin || "").trim().toUpperCase();
+  const statut = String(statutActuel || "").trim();
+
+  if (pin === "A") {
+    if (statut === "Barbare") {
+      return "6 Progrès";
+    }
+
+    if (statut === "Empire") {
+      return "3 Progrès puis développez 1 carte sans payer son coût";
+    }
+  }
+
+  if (pin === "B") {
+    if (statut === "Barbare") {
+      return "4 Progrès";
+    }
+
+    if (statut === "Empire") {
+      return "développez 1 carte sans payer son coût";
+    }
+  }
+
+  return "aucun bonus spécifique";
+}
+
+function construireMessageRoiDesRois(carteRoi, statutActuel) {
+  const pin = String(carteRoi?.pin || "").trim().toUpperCase() || "?";
+  const bonus = decrireBonusRoiDesRoisSelonFaceEtStatut(carteRoi, statutActuel);
+  const messageBase = `Aucune carte Renommée restante. Vous obtenez : ${bonus}.`;
+
+  if (pin === "A") {
+    return `${messageBase} Le Décompte est déclenché.`;
+  }
+
+  return messageBase;
+}
+
+function afficherZoomRoiDesRoisAvecConfirmation(carteRoi, message) {
+  return new Promise(resolve => {
+    const zoomCarte = getElement("zoom-carte");
+
+    if (!zoomCarte || !carteRoi) {
+      resolve(false);
+      return;
+    }
+
+    jeu.ui.zoomVerrouille = true;
+    jeu.ui.sourceZoomVerrouille = "roi-des-rois";
+    jeu.ui.timestampOuvertureZoom = Date.now();
+
+    zoomCarte.innerHTML = "";
+    zoomCarte.style.display = "block";
+    zoomCarte.style.zIndex = "130000";
+    zoomCarte.style.pointerEvents = "auto";
+    zoomCarte.classList.add("zoom-force-visible");
+
+    const wrapper = document.createElement("div");
+    wrapper.className = "zoom-roi-des-rois";
+
+    const messageDiv = document.createElement("div");
+    messageDiv.className = "zoom-roi-des-rois-message";
+    messageDiv.textContent = message || "Aucune carte Renommée restante.";
+
+    const carteDiv = document.createElement("div");
+    carteDiv.className = "carte";
+    carteDiv.innerHTML = creerCarteHTML(carteRoi);
+
+    const actionsDiv = document.createElement("div");
+    actionsDiv.className = "zoom-roi-des-rois-actions";
+
+    const boutonOk = document.createElement("button");
+    boutonOk.type = "button";
+    boutonOk.textContent = "OK";
+    boutonOk.onclick = event => {
+      event.preventDefault();
+      event.stopPropagation();
+
+      fermerZoomTemporaireSpecial();
+      resolve(true);
+    };
+
+    actionsDiv.appendChild(boutonOk);
+
+    wrapper.appendChild(messageDiv);
+    wrapper.appendChild(carteDiv);
+    wrapper.appendChild(actionsDiv);
+
+    wrapper.addEventListener("click", event => {
+      event.stopPropagation();
+    });
+
+    zoomCarte.appendChild(wrapper);
+
+    setTimeout(() => {
+      boutonOk.focus?.();
+    }, 0);
+  });
+}
+
    async function piocherOuRegarderRenommeeOuRoiDesRois(quantite = 1, mode = "piocher") {
   if (quantite <= 0) {
     return null;
@@ -18918,9 +19053,9 @@ async function acquerirRegionDepuisExilAvecRetour() {
     return false;
   }
 
-  await revelerCarteAuCentre(carte, 1800);
-
   const statutActuel = jeu.joueurZones.carteStatutVisible?.nom;
+  const messageRoi = construireMessageRoiDesRois(carte, statutActuel);
+  await afficherZoomRoiDesRoisAvecConfirmation(carte, messageRoi);
 
   if (carte.pin === "A") {
     if (statutActuel === "Barbare") {
@@ -24475,7 +24610,8 @@ function obtenirCartesTableauParCategorie(categorie) {
   return jeu.joueurZones.tableauJoueur.filter(carte => inclutCategorie(carte, categorie));
 }
 
-async function choisirEtAbandonnerCartesTableauParCategorie(categorie, quantite) {
+async function choisirEtAbandonnerCartesTableauParCategorie(categorie, quantite, options = {}) {
+  const obligatoireSelection = options.obligatoireSelection !== false;
   const cartesEligibles = obtenirCartesTableauParCategorie(categorie);
 
   if (cartesEligibles.length < quantite) {
@@ -24501,7 +24637,7 @@ async function choisirEtAbandonnerCartesTableauParCategorie(categorie, quantite)
       demarrerSelectionCarte({
         source: "tableau",
         message: `Choisissez une carte ${categorie} à abandonner (${i + 1}/${quantite}).`,
-        obligatoire: true,
+        obligatoire: obligatoireSelection,
         predicate: carte =>
           inclutCategorie(carte, categorie) &&
           !cartesChoisies.includes(carte),
@@ -26693,7 +26829,10 @@ autresJoueursGagnentPopulation(effet) {
     !carteEstDansPileInstabilite(carte) &&
     !contexteEffetsRegion.carteSourceDejaDeplacee
   ) {
-    if (carteEstPersistante(carte)) {
+    if (
+      carteEstPersistante(carte) &&
+      jeu.joueurZones.tableauJoueur.length < UI.TAILLE_TABLEAU_JOUEUR
+    ) {
       jeu.joueurZones.tableauJoueur.push(carte);
     } else {
       jeu.joueurZones.defausseJoueur.push(carte);
@@ -27139,6 +27278,7 @@ volerProgresAuxJoueursEmpire(effet) {
   async developperCarteSansPayer(effet) {
   const quantite = effet.quantite || 1;
   const nePasEpuiserPileEtoile = effet.nePasEpuiserPileEtoile === true;
+  const continuerSiAucuneCarte = effet.continuerSiAucuneCarte === true;
 
   if (quantite <= 0) {
     return true;
@@ -27154,6 +27294,10 @@ volerProgresAuxJoueursEmpire(effet) {
   const cartesDisponibles = jeu.joueurZones.pileEtoileJoueur;
 
   if (!Array.isArray(cartesDisponibles) || cartesDisponibles.length === 0) {
+    if (continuerSiAucuneCarte) {
+      return true;
+    }
+
     ouvrirPanneauUI("Aucune carte Étoile disponible à développer.", [
       { label: "OK" }
     ]);
@@ -28086,14 +28230,20 @@ async optionnel(effet, contexte) {
     );
   },
 
-  async abandonnerTableauCategorie(effet) {
+  async abandonnerTableauCategorie(effet, contexte) {
     if (!effet.categorie) {
       return false;
     }
 
+    const carteReference = contexte?.carteSource || null;
+    const annulationAutorisee =
+      effet.autoriserAnnulation === true ||
+      carteReference?.nom === "Gloire";
+
     return await choisirEtAbandonnerCartesTableauParCategorie(
       effet.categorie,
-      effet.quantite || 1
+      effet.quantite || 1,
+      { obligatoireSelection: !annulationAutorisee }
     );
   },
 
@@ -28230,7 +28380,10 @@ async function jouerCarteDepuisMain(indexCarte, options = {}) {
     return true;
   }
 
-    if (carteEstPersistante(carte)) {
+  if (
+    carteEstPersistante(carte) &&
+    jeu.joueurZones.tableauJoueur.length < UI.TAILLE_TABLEAU_JOUEUR
+  ) {
     jeu.joueurZones.tableauJoueur.push(carte);
   } else {
     jeu.joueurZones.defausseJoueur.push(carte);
@@ -28604,26 +28757,54 @@ function initialiserEtatCarte(carte) {
   initialiserReserveCarte(carte);
 }
 
-function cartePeutEtreEpuisee(carte) {
+function cartePossedeEffetEpuiser(carte) {
+  return (
+    !!carte &&
+    Array.isArray(carte.epuiserCode) &&
+    carte.epuiserCode.length > 0
+  );
+}
+
+function cartePeutEtreEpuisee(carte, options = {}) {
+  const afficherMessageCondition = options.afficherMessageCondition !== false;
+
   if (!carte) {
     return false;
   }
 
   if (typeof carte.conditionEpuiser === "function" && !carte.conditionEpuiser()) {
-  ouvrirPanneauUI(
-    carte.messageConditionEpuiser || "Cette carte ne peut pas être épuisée maintenant.",
-    [{ label: "OK" }]
-  );
-  return false;
-}
+    if (afficherMessageCondition) {
+      ouvrirPanneauUI(
+        carte.messageConditionEpuiser || "Cette carte ne peut pas être épuisée maintenant.",
+        [{ label: "OK" }]
+      );
+    }
+    return false;
+  }
 
   initialiserEtatCarte(carte);
 
-  return (
-    Array.isArray(carte.epuiserCode) &&
-    carte.epuiserCode.length > 0 &&
-    carte.epuisee === false
-  );
+  return cartePossedeEffetEpuiser(carte) && carte.epuisee === false;
+}
+
+function carteEpuiserEstActivableMaintenant(carte) {
+  if (!cartePeutEtreEpuisee(carte, { afficherMessageCondition: false })) {
+    return false;
+  }
+
+  if (jeu?.finPartie?.terminee) {
+    return false;
+  }
+
+  if (jeu?.ui?.solsticeActif) {
+    return false;
+  }
+
+  if (jeu?.manche?.phase !== PHASES.TOUR) {
+    return false;
+  }
+
+  return (jeu?.joueur?.epuisement || 0) > 0;
 }
 
 async function epuiserCarte(carte) {
@@ -30011,6 +30192,20 @@ function afficherTableauJoueur() {
       carteDiv.dataset.indexTableau = String(i);
       carteDiv.innerHTML = creerCarteHTML(carte);
 
+      const afficherPulseEpuiser = !jeu.ui.solsticeActif;
+
+      if (
+        afficherPulseEpuiser &&
+        cartePossedeEffetEpuiser(carte) &&
+        carte.epuisee !== true
+      ) {
+        carteDiv.classList.add("carte-tableau-epuiser");
+
+        if (carteEpuiserEstActivableMaintenant(carte)) {
+          carteDiv.classList.add("carte-tableau-epuiser-disponible");
+        }
+      }
+
       if (carte.epuisee) {
         carteDiv.classList.add("carte-epuisee");
         carteDiv.style.opacity = "0.7";
@@ -31103,7 +31298,39 @@ function fermerInterfacesAvantChoixMarche() {
    37) RAFRAÎCHISSEMENT GLOBAL DE LA ZONE JOUEUR
    ========================================================= */
 
+const NATIONS_THEME_FOND_JOUEUR = [
+  "carthaginois",
+  "celtes",
+  "grecs",
+  "macedoniens",
+  "perses",
+  "romains",
+  "scythes",
+  "vikings"
+];
+
+const CLASSES_THEME_FOND_JOUEUR = NATIONS_THEME_FOND_JOUEUR.map(
+  nationSlug => `theme-zone-joueur-${nationSlug}`
+);
+
+function appliquerThemeFondJoueur() {
+  const zoneJoueur = getElement("zone-joueur");
+
+  if (!zoneJoueur) {
+    return;
+  }
+
+  zoneJoueur.classList.remove(...CLASSES_THEME_FOND_JOUEUR);
+
+  const nationSlug = slugNationPourFond(configurationPartie?.nationJoueur);
+
+  if (NATIONS_THEME_FOND_JOUEUR.includes(nationSlug)) {
+    zoneJoueur.classList.add(`theme-zone-joueur-${nationSlug}`);
+  }
+}
+
 function afficherZoneJoueur() {
+  appliquerThemeFondJoueur();
   afficherSlotStatut();
   afficherSlotEtoile();
   afficherSlotPleine();
@@ -31606,6 +31833,12 @@ function initialiserRaccourcisClavier() {
     }
 
     if (jeu?.ui?.menuEchapOuvert) {
+      return;
+    }
+
+    const raccourciNavigationVue =
+      event.key === "1" || event.key === "2" || event.key === "3";
+    if (raccourciNavigationVue && vueAccueilVisible()) {
       return;
     }
 
@@ -32139,12 +32372,16 @@ function initialiserSurvolCartesDansZoom() {
 }
 
 function initialiserFermetureZoomVerrouille() {
+  const zoomVerrouilleDoitResterOuvert = () =>
+    jeu.ui.sourceZoomVerrouille === "regard-renommee" ||
+    jeu.ui.sourceZoomVerrouille === "roi-des-rois";
+
   document.addEventListener("click", event => {
     if (!jeu.ui.zoomVerrouille) {
       return;
     }
 
-    if (jeu.ui.sourceZoomVerrouille === "regard-renommee") {
+    if (zoomVerrouilleDoitResterOuvert()) {
       return;
     }
 
@@ -32177,7 +32414,7 @@ function initialiserFermetureZoomVerrouille() {
 
   document.addEventListener("keydown", event => {
     if (event.key === "Escape" && jeu.ui.zoomVerrouille) {
-      if (jeu.ui.sourceZoomVerrouille === "regard-renommee") {
+      if (zoomVerrouilleDoitResterOuvert()) {
         return;
       }
 
@@ -34244,7 +34481,11 @@ const playlistMusique = [
   "assets/audio/theme-Perses.mp3",
   "assets/audio/theme-Carthaginois.mp3",
   "assets/audio/theme-Macedoniens.mp3",
-  "assets/audio/theme-Scythes.mp3"
+  "assets/audio/theme-Scythes.mp3",
+  "assets/audio/Bronze Caravan.mp3",
+  "assets/audio/Harbor of Cypresses.mp3",
+  "assets/audio/Ali Khattab - Sueño Claro - Nuevos Medios (192k).mp3",
+  "assets/audio/Ali Khattab - A...diós - Nuevos Medios (192k).mp3"
 ];
 
 const VOLUME_MUSIQUE_PAR_DEFAUT = 0.4;

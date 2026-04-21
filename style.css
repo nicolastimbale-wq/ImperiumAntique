@@ -35,22 +35,25 @@ body {
 #vue-joueur {
   width: 100%;
   min-height: 0;
-  background-image: url("assets/backgrounds/fond-joueur.png");
-  background-size: cover;
-  background-position: center;
-  background-repeat: no-repeat;
+  background: #2f2016;
   min-height: 100vh;
 }
-
-
-
-
 
   :root {
   --carte-largeur: 260px;
   --carte-scale: 0.80;
   --offset-compteur: 6px;
   --scale-zones-joueur: 0.95;
+  --fond-joueur-bois-image: url("assets/backgrounds/fond-joueur-bois.png");
+  --fond-joueur-nation-image: none;
+  --fond-joueur-nation-largeur: 40%;
+  --tableau-joueur-slot-largeur: 150px;
+  --tableau-joueur-slot-hauteur: 239px;
+  --tableau-joueur-gap-horizontal: 20px;
+  --tableau-joueur-gap-vertical: 10px;
+  --tableau-joueur-carte-scale: 0.552;
+  --tableau-joueur-carte-scale-pulse: 0.56;
+  --tableau-joueur-carte-scale-disponible: 0.568;
 }
 
 
@@ -135,6 +138,91 @@ body {
   justify-content: center;
   align-items: flex-start;
   min-height: 0;
+  position: relative;
+  isolation: isolate;
+}
+
+#zone-joueur::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background-image: var(--fond-joueur-bois-image);
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+}
+
+#zone-joueur::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: var(--fond-joueur-nation-largeur);
+  height: 100%;
+  z-index: 0;
+  pointer-events: none;
+  background-image: var(--fond-joueur-nation-image);
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  opacity: 0.96;
+  -webkit-mask-image: linear-gradient(
+    to right,
+    rgba(0, 0, 0, 0) 0%,
+    rgba(0, 0, 0, 0.35) 10%,
+    rgba(0, 0, 0, 0.82) 18%,
+    rgba(0, 0, 0, 1) 24%,
+    rgba(0, 0, 0, 1) 100%
+  );
+  mask-image: linear-gradient(
+    to right,
+    rgba(0, 0, 0, 0) 0%,
+    rgba(0, 0, 0, 0.35) 10%,
+    rgba(0, 0, 0, 0.82) 18%,
+    rgba(0, 0, 0, 1) 24%,
+    rgba(0, 0, 0, 1) 100%
+  );
+}
+
+#zone-joueur.theme-zone-joueur-carthaginois {
+  --fond-joueur-nation-image: url("assets/backgrounds/nations/fond-joueur-nation-carthaginois.png");
+}
+
+#zone-joueur.theme-zone-joueur-celtes {
+  --fond-joueur-nation-image: url("assets/backgrounds/nations/fond-joueur-nation-celtes.png");
+}
+
+#zone-joueur.theme-zone-joueur-grecs {
+  --fond-joueur-nation-image: url("assets/backgrounds/nations/fond-joueur-nation-grecs.png");
+}
+
+#zone-joueur.theme-zone-joueur-macedoniens {
+  --fond-joueur-nation-image: url("assets/backgrounds/nations/fond-joueur-nation-macedoniens.png");
+}
+
+#zone-joueur.theme-zone-joueur-perses {
+  --fond-joueur-nation-image: url("assets/backgrounds/nations/fond-joueur-nation-perses.png");
+}
+
+#zone-joueur.theme-zone-joueur-romains {
+  --fond-joueur-nation-image: url("assets/backgrounds/nations/fond-joueur-nation-romains.png");
+}
+
+#zone-joueur.theme-zone-joueur-scythes {
+  --fond-joueur-nation-image: url("assets/backgrounds/nations/fond-joueur-nation-scythes.png");
+}
+
+#zone-joueur.theme-zone-joueur-vikings {
+  --fond-joueur-nation-image: url("assets/backgrounds/nations/fond-joueur-nation-vikings.png");
+}
+
+#fond-joueur {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  z-index: 1;
 }
 
 #joueur-wrapper {
@@ -145,6 +233,7 @@ body {
   display: flex;
   justify-content: center;
   align-items: flex-start;
+  z-index: 1;
 }
 
 #joueur-scale {
@@ -1508,18 +1597,7 @@ body {
 }
 
 #bloc-main-joueur::before {
-  content: "";
-  position: absolute;
-  inset: -290px -22px 8px -22px;
-  border-radius: 22px;
-  border: 1px solid rgba(68, 85, 107, 0.34);
-  background: linear-gradient(to bottom, rgba(14, 21, 31, 0.20), rgba(14, 21, 31, 0.08));
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.15),
-    inset 0 0 0 1px rgba(9, 14, 22, 0.22),
-    0 8px 20px rgba(8, 12, 18, 0.14);
-  pointer-events: none;
-  z-index: 0;
+  content: none;
 }
 
 #slot-main {
@@ -1542,10 +1620,10 @@ body {
 
 #bloc-tableau-joueur {
   position: relative;
-  left: 1750px;
-  top: 120px;
-  width: 600px;
-  height: 1200px;
+  left: 1520px;
+  top: 88px;
+  width: 660px;
+  height: 1270px;
   background: transparent;
   padding: 16px;
   box-sizing: border-box;
@@ -1560,15 +1638,16 @@ body {
 
 #contenu-tableau-joueur {
   display: grid;
-  grid-template-columns: repeat(4, 120px);
-  grid-template-rows: repeat(6, 180px);
-  gap: 10px;
+  grid-template-columns: repeat(4, var(--tableau-joueur-slot-largeur));
+  grid-template-rows: repeat(5, var(--tableau-joueur-slot-hauteur));
+  column-gap: var(--tableau-joueur-gap-horizontal);
+  row-gap: var(--tableau-joueur-gap-vertical);
   justify-content: start;
 }
 
 .case-tableau-joueur {
-  width: 120px;
-  height: 180px;
+  width: var(--tableau-joueur-slot-largeur);
+  height: var(--tableau-joueur-slot-hauteur);
   border: 2px dashed #999;
   border-radius: 10px;
   background: rgba(255, 255, 255, 0.45);
@@ -1579,7 +1658,7 @@ body {
 
 .case-tableau-joueur .carte,
 #contenu-tableau-joueur .carte {
-  transform: scale(0.42);
+  transform: scale(var(--tableau-joueur-carte-scale));
   transform-origin: top left;
 }
 
@@ -1629,6 +1708,50 @@ body {
   width: 40px;
   height: 40px;
   object-fit: contain;
+}
+
+#contenu-tableau-joueur .carte.carte-tableau-epuiser,
+.case-tableau-joueur .carte.carte-tableau-epuiser {
+  animation: pulse-epuiser-tableau 2.2s ease-in-out infinite;
+  transform-origin: top left;
+  will-change: transform, box-shadow;
+}
+
+#contenu-tableau-joueur .carte.carte-tableau-epuiser-disponible,
+.case-tableau-joueur .carte.carte-tableau-epuiser-disponible {
+  animation: pulse-epuiser-disponible-tableau 1.2s ease-in-out infinite;
+}
+
+@keyframes pulse-epuiser-tableau {
+  0%,
+  100% {
+    transform: scale(var(--tableau-joueur-carte-scale));
+    box-shadow:
+      0 0 0 2px rgba(255, 255, 255, 0.16),
+      0 0 10px rgba(255, 255, 255, 0.12);
+  }
+  50% {
+    transform: scale(var(--tableau-joueur-carte-scale-pulse));
+    box-shadow:
+      0 0 0 2px rgba(255, 255, 255, 0.30),
+      0 0 16px rgba(255, 255, 255, 0.24);
+  }
+}
+
+@keyframes pulse-epuiser-disponible-tableau {
+  0%,
+  100% {
+    transform: scale(var(--tableau-joueur-carte-scale));
+    box-shadow:
+      0 0 0 3px rgba(255, 215, 0, 0.55),
+      0 0 14px rgba(255, 215, 0, 0.68);
+  }
+  50% {
+    transform: scale(var(--tableau-joueur-carte-scale-disponible));
+    box-shadow:
+      0 0 0 3px rgba(255, 215, 0, 0.86),
+      0 0 24px rgba(255, 215, 0, 0.95);
+  }
 }
 
 /* =========================================================
@@ -2721,9 +2844,9 @@ body {
 }
 
 @keyframes solsticePulse {
-  0% { transform: scale(0.42); }
-  50% { transform: scale(0.429); }
-  100% { transform: scale(0.42); }
+  0% { transform: scale(var(--tableau-joueur-carte-scale)); }
+  50% { transform: scale(var(--tableau-joueur-carte-scale-pulse)); }
+  100% { transform: scale(var(--tableau-joueur-carte-scale)); }
 }
 
 .contenu-archiver {
@@ -2902,13 +3025,28 @@ body {
   pointer-events: auto;
 }
 
+.zoom-roi-des-rois {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+  pointer-events: auto;
+}
+
 .zoom-voie-sacree-actions {
   display: flex;
   gap: 12px;
   justify-content: center;
 }
 
-.zoom-voie-sacree-actions button {
+.zoom-roi-des-rois-actions {
+  display: flex;
+  gap: 12px;
+  justify-content: center;
+}
+
+.zoom-voie-sacree-actions button,
+.zoom-roi-des-rois-actions button {
   padding: 10px 18px;
   font-size: 16px;
   font-weight: bold;
@@ -2928,6 +3066,18 @@ body {
   font-weight: bold;
   text-align: center;
   max-width: 700px;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.24);
+}
+
+.zoom-roi-des-rois-message {
+  background: rgba(255,255,255,0.96);
+  border: 2px solid #222;
+  border-radius: 12px;
+  padding: 12px 16px;
+  font-size: 18px;
+  font-weight: bold;
+  text-align: center;
+  max-width: 860px;
   box-shadow: 0 8px 24px rgba(0,0,0,0.24);
 }
 
@@ -3751,6 +3901,7 @@ body {
 .btn-choix-marche,
 .btn-choix-texte,
 .zoom-voie-sacree-actions button,
+.zoom-roi-des-rois-actions button,
 .zoom-choix-carte-actions button,
 .boutons-choix-deck-nation button,
 #btn-annuler-choix-carte,
@@ -3802,6 +3953,7 @@ body {
 .btn-choix-marche::after,
 .btn-choix-texte::after,
 .zoom-voie-sacree-actions button::after,
+.zoom-roi-des-rois-actions button::after,
 .zoom-choix-carte-actions button::after,
 .boutons-choix-deck-nation button::after,
 #btn-annuler-choix-carte::after,
@@ -3830,6 +3982,7 @@ body {
 .btn-choix-marche:hover,
 .btn-choix-texte:hover,
 .zoom-voie-sacree-actions button:hover,
+.zoom-roi-des-rois-actions button:hover,
 .zoom-choix-carte-actions button:hover,
 .boutons-choix-deck-nation button:hover,
 #btn-annuler-choix-carte:hover,
@@ -3855,6 +4008,7 @@ body {
 .btn-choix-marche:active,
 .btn-choix-texte:active,
 .zoom-voie-sacree-actions button:active,
+.zoom-roi-des-rois-actions button:active,
 .zoom-choix-carte-actions button:active,
 .boutons-choix-deck-nation button:active,
 #btn-annuler-choix-carte:active,
@@ -3880,6 +4034,7 @@ body {
 .btn-choix-marche:focus-visible,
 .btn-choix-texte:focus-visible,
 .zoom-voie-sacree-actions button:focus-visible,
+.zoom-roi-des-rois-actions button:focus-visible,
 .zoom-choix-carte-actions button:focus-visible,
 .boutons-choix-deck-nation button:focus-visible,
 #btn-annuler-choix-carte:focus-visible,
@@ -3903,6 +4058,7 @@ body {
 .btn-choix-marche:disabled,
 .btn-choix-texte:disabled,
 .zoom-voie-sacree-actions button:disabled,
+.zoom-roi-des-rois-actions button:disabled,
 .zoom-choix-carte-actions button:disabled,
 .boutons-choix-deck-nation button:disabled,
 #btn-annuler-choix-carte:disabled,
@@ -4621,6 +4777,7 @@ body {
 .contenu-panneau-choix-marche,
 .boite-choix-oracle,
 .zoom-voie-sacree-message,
+.zoom-roi-des-rois-message,
 .zoom-choix-carte-message,
 .message-choix-oracle {
   position: relative;
@@ -4644,6 +4801,7 @@ body {
 .contenu-panneau-choix-marche::before,
 .boite-choix-oracle::before,
 .zoom-voie-sacree-message::before,
+.zoom-roi-des-rois-message::before,
 .zoom-choix-carte-message::before,
 .message-choix-oracle::before {
   content: "";
@@ -4668,6 +4826,7 @@ body {
 #panneau-choix-marche-selection-message,
 .titre-choix-marche,
 .zoom-voie-sacree-message,
+.zoom-roi-des-rois-message,
 .zoom-choix-carte-message,
 .message-choix-oracle {
   font-family: "Palatino Linotype", "Book Antiqua", Georgia, serif;
@@ -4689,6 +4848,7 @@ body {
 }
 
 .zoom-voie-sacree-message,
+.zoom-roi-des-rois-message,
 .zoom-choix-carte-message,
 .message-choix-oracle {
   margin: 0;
@@ -4739,6 +4899,7 @@ body {
   }
 
   .zoom-voie-sacree-message,
+  .zoom-roi-des-rois-message,
   .zoom-choix-carte-message,
   .message-choix-oracle {
     font-size: 16px;
