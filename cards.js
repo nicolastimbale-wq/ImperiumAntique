@@ -25431,7 +25431,7 @@ async function lancerPaiementPuisInnovation(ressource, quantite, categories) {
    24) VALIDATION DE JOUABILITÉ DES CARTES
    ========================================================= */
 
-function cartePeutEtreJouee(carte) {
+function cartePeutEtreJouee(carte, options = {}) {
   if (!carte) {
     return false;
   }
@@ -25485,7 +25485,9 @@ function cartePeutEtreJouee(carte) {
     }
   }
 
-  if (!estActionGratuite(carte) && jeu.joueur.actions <= 0) {
+  const ignorerCoutAction = options?.ignorerCoutAction === true;
+
+  if (!ignorerCoutAction && !estActionGratuite(carte) && jeu.joueur.actions <= 0) {
     avertir("Vous n'avez plus d'actions.");
     return false;
   }
@@ -26996,7 +26998,7 @@ autresJoueursGagnentPopulation(effet) {
 
   // Important : si la carte acquise n'est pas jouable,
   // elle reste dans la main, mais Parménion a quand même réussi.
-  if (!cartePeutEtreJouee(carteAcquise)) {
+  if (!cartePeutEtreJouee(carteAcquise, { ignorerCoutAction: true })) {
     return true;
   }
 
@@ -28319,7 +28321,7 @@ async function jouerCarteDepuisMain(indexCarte, options = {}) {
 
   const carte = main[indexCarte];
 
-  if (!cartePeutEtreJouee(carte)) {
+  if (!cartePeutEtreJouee(carte, { ignorerCoutAction: options.gratuite === true })) {
     return false;
   }
 
@@ -29352,9 +29354,18 @@ const MOTS_CLES_EFFET_GRAS_PAR_DEFAUT = [
 
 let motsClesEffetEnGras = [...MOTS_CLES_EFFET_GRAS_PAR_DEFAUT];
 let motifsMotsClesEffetEnGras = [];
+let motifMotsClesEffetEnGrasGlobal = null;
 
 function echapperExpressionReguliere(texte = "") {
   return String(texte || "").replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function echapperAttributHTML(texte = "") {
+  return String(texte || "")
+    .replace(/&/g, "&amp;")
+    .replace(/"/g, "&quot;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;");
 }
 
 function reconstruireMotifsMotsClesEffetEnGras() {
@@ -29362,15 +29373,21 @@ function reconstruireMotifsMotsClesEffetEnGras() {
     (motsClesEffetEnGras || [])
       .map(mot => String(mot || "").trim())
       .filter(Boolean)
-  )]
-    .sort((a, b) => b.length - a.length)
-    .map(mot => ({
-      mot,
-      regex: new RegExp(
-        `(^|[^\\p{L}\\p{N}_])(${echapperExpressionReguliere(mot)})(?=[:\\s]|$|[^\\p{L}\\p{N}_])`,
-        "giu"
-      )
-    }));
+  )].sort((a, b) => b.length - a.length);
+
+  if (motifsMotsClesEffetEnGras.length === 0) {
+    motifMotsClesEffetEnGrasGlobal = null;
+    return;
+  }
+
+  const alternanceMots = motifsMotsClesEffetEnGras
+    .map(mot => echapperExpressionReguliere(mot))
+    .join("|");
+
+  motifMotsClesEffetEnGrasGlobal = new RegExp(
+    `(^|[^\\p{L}\\p{N}_])(${alternanceMots})(?=[:\\s]|$|[^\\p{L}\\p{N}_])`,
+    "giu"
+  );
 }
 
 function definirMotsClesEffetEnGras(mots = []) {
@@ -29384,15 +29401,34 @@ function definirMotsClesEffetEnGras(mots = []) {
 }
 
 function mettreMotsClesEffetEnGras(texte = "") {
-  let resultat = String(texte || "");
+  const texteSource = String(texte || "");
 
-  motifsMotsClesEffetEnGras.forEach(({ regex }) => {
-    resultat = resultat.replace(regex, (correspondance, prefixe, motTrouve) => {
-      return `${prefixe}<strong class="mot-cle-effet">${motTrouve}</strong>`;
-    });
-  });
+  if (!(motifMotsClesEffetEnGrasGlobal instanceof RegExp)) {
+    return texteSource;
+  }
 
-  return resultat;
+  const segments = texteSource.split(/(<[^>]+>)/g);
+
+  return segments
+    .map(segment => {
+      if (!segment || segment.startsWith("<")) {
+        return segment;
+      }
+
+      return segment.replace(
+        motifMotsClesEffetEnGrasGlobal,
+        (correspondance, prefixe, motTrouve) => {
+          const termeLexique = obtenirTermeLexiqueTooltipPourMotCle(motTrouve);
+
+          if (!termeLexique) {
+            return `${prefixe}<strong class="mot-cle-effet">${motTrouve}</strong>`;
+          }
+
+          return `${prefixe}<strong class="mot-cle-effet mot-cle-tooltip" data-terme-lexique="${echapperAttributHTML(termeLexique)}" tabindex="-1">${motTrouve}</strong>`;
+        }
+      );
+    })
+    .join("");
 }
 
 reconstruireMotifsMotsClesEffetEnGras();
@@ -34351,6 +34387,123 @@ const LEXIQUE_MENU_ENTREES_PAR_DEFAUT = [
   },
 ];
 
+const ALIAS_TERMES_LEXIQUE_MOT_CLE = Object.freeze({
+  abandonne: "abandonner",
+  abandonnee: "abandonner",
+  abandonnez: "abandonner",
+  acquerez: "acquerir",
+  archivee: "archiver",
+  archivees: "archiver",
+  archivez: "archiver",
+  exil: "exiler",
+  exilee: "exiler",
+  exilez: "exiler",
+  innovez: "innover",
+  piocher: "piocher x cartes",
+  rappelle: "rappeler",
+  rappelez: "rappeler",
+  recupere: "recuperer",
+  recuperee: "recuperer",
+  recuperez: "recuperer",
+  renvoyez: "renvoyer",
+  reservee: "reserver",
+  reservez: "reserver"
+});
+
+const ID_TOOLTIP_LEXIQUE_MOT_CLE = "tooltip-lexique-mot-cle";
+const indexLexiqueTooltipsParTerme = new Map();
+let tooltipLexiqueMotCleElement = null;
+let tooltipLexiqueMotCleActif = null;
+let tooltipsMotsClesEffetInitialises = false;
+
+function normaliserTermeLexiqueTooltip(terme = "") {
+  return normaliserTexteSansAccents(terme).replace(/\s+/g, " ").trim();
+}
+
+function obtenirEntreesLexiqueTooltip() {
+  if (Array.isArray(lexiqueMenuEntrees) && lexiqueMenuEntrees.length > 0) {
+    return lexiqueMenuEntrees;
+  }
+
+  if (Array.isArray(LEXIQUE_MENU_ENTREES_PAR_DEFAUT)) {
+    return LEXIQUE_MENU_ENTREES_PAR_DEFAUT;
+  }
+
+  return [];
+}
+
+function reconstruireIndexLexiqueTooltips() {
+  indexLexiqueTooltipsParTerme.clear();
+
+  obtenirEntreesLexiqueTooltip().forEach(entree => {
+    const cle = normaliserTermeLexiqueTooltip(entree?.terme || "");
+    if (!cle || indexLexiqueTooltipsParTerme.has(cle)) {
+      return;
+    }
+
+    indexLexiqueTooltipsParTerme.set(cle, entree);
+  });
+}
+
+function obtenirEntreeLexiqueTooltipParTerme(terme = "") {
+  const cle = normaliserTermeLexiqueTooltip(terme);
+  if (!cle) {
+    return null;
+  }
+
+  if (indexLexiqueTooltipsParTerme.size === 0) {
+    reconstruireIndexLexiqueTooltips();
+  }
+
+  return indexLexiqueTooltipsParTerme.get(cle) || null;
+}
+
+function trouverEntreeLexiqueTooltipParApproximation(terme = "") {
+  const termeNormalise = normaliserTermeLexiqueTooltip(terme);
+  if (!termeNormalise) {
+    return null;
+  }
+
+  const entrees = obtenirEntreesLexiqueTooltip();
+
+  for (const entree of entrees) {
+    const termeEntree = normaliserTermeLexiqueTooltip(entree?.terme || "");
+    if (!termeEntree) {
+      continue;
+    }
+
+    if (
+      termeEntree.startsWith(`${termeNormalise} `) ||
+      termeEntree.endsWith(` ${termeNormalise}`) ||
+      termeEntree.includes(` ${termeNormalise} `)
+    ) {
+      return entree;
+    }
+  }
+
+  return null;
+}
+
+function obtenirTermeLexiqueTooltipPourMotCle(motCle = "") {
+  const motNormalise = normaliserTermeLexiqueTooltip(motCle);
+  if (!motNormalise) {
+    return "";
+  }
+
+  const alias = ALIAS_TERMES_LEXIQUE_MOT_CLE[motNormalise] || motNormalise;
+  const entree =
+    obtenirEntreeLexiqueTooltipParTerme(alias) ||
+    (alias !== motNormalise
+      ? obtenirEntreeLexiqueTooltipParTerme(motNormalise)
+      : null) ||
+    trouverEntreeLexiqueTooltipParApproximation(alias) ||
+    (alias !== motNormalise
+      ? trouverEntreeLexiqueTooltipParApproximation(motNormalise)
+      : null);
+
+  return entree?.terme || "";
+}
+
 function vueAccueilVisible() {
   const vueAccueil = getElement("vue-accueil");
   return !!(vueAccueil && !vueAccueil.classList.contains("vue-cachee"));
@@ -34358,6 +34511,231 @@ function vueAccueilVisible() {
 
 function menuEchapAutorise() {
   return !vueAccueilVisible();
+}
+
+function extraireElementMotCleTooltip(cible) {
+  if (!(cible instanceof Element)) {
+    return null;
+  }
+
+  return cible.closest(".mot-cle-tooltip[data-terme-lexique]");
+}
+
+function obtenirElementTooltipLexiqueMotCle() {
+  if (tooltipLexiqueMotCleElement && document.body?.contains(tooltipLexiqueMotCleElement)) {
+    return tooltipLexiqueMotCleElement;
+  }
+
+  const tooltip = document.createElement("div");
+  tooltip.id = ID_TOOLTIP_LEXIQUE_MOT_CLE;
+  tooltip.className = "tooltip-lexique-mot-cle";
+  tooltip.setAttribute("role", "tooltip");
+  tooltip.setAttribute("aria-hidden", "true");
+  tooltip.dataset.position = "haut";
+
+  const terme = document.createElement("div");
+  terme.className = "tooltip-lexique-terme";
+
+  const definition = document.createElement("div");
+  definition.className = "tooltip-lexique-definition";
+
+  tooltip.appendChild(terme);
+  tooltip.appendChild(definition);
+  document.body?.appendChild(tooltip);
+
+  tooltipLexiqueMotCleElement = tooltip;
+  return tooltip;
+}
+
+function mettreAJourContenuTooltipLexiqueMotCle(tooltip, entree) {
+  if (!tooltip || !entree) {
+    return;
+  }
+
+  const termeElement = tooltip.querySelector(".tooltip-lexique-terme");
+  const definitionElement = tooltip.querySelector(".tooltip-lexique-definition");
+
+  if (!termeElement || !definitionElement) {
+    return;
+  }
+
+  termeElement.textContent = entree.terme;
+  definitionElement.textContent = entree.definition;
+}
+
+function positionnerTooltipLexiqueMotCle(elementMotCle, tooltip) {
+  if (!elementMotCle || !tooltip) {
+    return;
+  }
+
+  const margeEcran = 10;
+  const ecartVertical = 12;
+  const rectMotCle = elementMotCle.getBoundingClientRect();
+  const rectTooltip = tooltip.getBoundingClientRect();
+
+  let gauche = rectMotCle.left + (rectMotCle.width - rectTooltip.width) / 2;
+  gauche = Math.max(margeEcran, Math.min(gauche, window.innerWidth - rectTooltip.width - margeEcran));
+
+  let haut = rectMotCle.top - rectTooltip.height - ecartVertical;
+  let position = "haut";
+
+  if (haut < margeEcran) {
+    haut = rectMotCle.bottom + ecartVertical;
+    position = "bas";
+  }
+
+  if (haut + rectTooltip.height > window.innerHeight - margeEcran) {
+    haut = Math.max(margeEcran, window.innerHeight - rectTooltip.height - margeEcran);
+  }
+
+  tooltip.style.left = `${Math.round(gauche)}px`;
+  tooltip.style.top = `${Math.round(haut)}px`;
+  tooltip.dataset.position = position;
+}
+
+function afficherTooltipLexiqueMotCleDepuisElement(elementMotCle) {
+  if (!elementMotCle || !document.body?.contains(elementMotCle)) {
+    return;
+  }
+
+  const termeCible = elementMotCle.getAttribute("data-terme-lexique") || "";
+  const entree =
+    obtenirEntreeLexiqueTooltipParTerme(termeCible) ||
+    trouverEntreeLexiqueTooltipParApproximation(termeCible);
+
+  if (!entree) {
+    masquerTooltipLexiqueMotCle();
+    return;
+  }
+
+  const tooltip = obtenirElementTooltipLexiqueMotCle();
+
+  if (tooltipLexiqueMotCleActif && tooltipLexiqueMotCleActif !== elementMotCle) {
+    tooltipLexiqueMotCleActif.removeAttribute("aria-describedby");
+  }
+
+  tooltipLexiqueMotCleActif = elementMotCle;
+  tooltipLexiqueMotCleActif.setAttribute("aria-describedby", ID_TOOLTIP_LEXIQUE_MOT_CLE);
+
+  mettreAJourContenuTooltipLexiqueMotCle(tooltip, entree);
+  tooltip.classList.add("est-visible");
+  tooltip.setAttribute("aria-hidden", "false");
+  positionnerTooltipLexiqueMotCle(elementMotCle, tooltip);
+}
+
+function masquerTooltipLexiqueMotCle({ conserverElementActif = false } = {}) {
+  if (tooltipLexiqueMotCleElement) {
+    tooltipLexiqueMotCleElement.classList.remove("est-visible");
+    tooltipLexiqueMotCleElement.setAttribute("aria-hidden", "true");
+  }
+
+  if (!conserverElementActif && tooltipLexiqueMotCleActif) {
+    tooltipLexiqueMotCleActif.removeAttribute("aria-describedby");
+    tooltipLexiqueMotCleActif = null;
+  }
+}
+
+function repositionnerTooltipLexiqueMotCleActif() {
+  if (
+    !tooltipLexiqueMotCleElement ||
+    !tooltipLexiqueMotCleElement.classList.contains("est-visible") ||
+    !tooltipLexiqueMotCleActif
+  ) {
+    return;
+  }
+
+  if (!document.body?.contains(tooltipLexiqueMotCleActif)) {
+    masquerTooltipLexiqueMotCle();
+    return;
+  }
+
+  positionnerTooltipLexiqueMotCle(tooltipLexiqueMotCleActif, tooltipLexiqueMotCleElement);
+}
+
+function gererSurvolMotCleTooltip(event) {
+  const elementMotCle = extraireElementMotCleTooltip(event.target);
+  if (!elementMotCle) {
+    return;
+  }
+
+  afficherTooltipLexiqueMotCleDepuisElement(elementMotCle);
+}
+
+function gererSortieSurvolMotCleTooltip(event) {
+  const elementSortant = extraireElementMotCleTooltip(event.target);
+  if (!elementSortant) {
+    return;
+  }
+
+  const elementEntrant = extraireElementMotCleTooltip(event.relatedTarget);
+
+  if (elementEntrant) {
+    if (elementEntrant !== elementSortant) {
+      afficherTooltipLexiqueMotCleDepuisElement(elementEntrant);
+    }
+    return;
+  }
+
+  if (document.activeElement === elementSortant) {
+    return;
+  }
+
+  masquerTooltipLexiqueMotCle();
+}
+
+function gererFocusMotCleTooltip(event) {
+  const elementMotCle = extraireElementMotCleTooltip(event.target);
+  if (!elementMotCle) {
+    return;
+  }
+
+  afficherTooltipLexiqueMotCleDepuisElement(elementMotCle);
+}
+
+function gererPerteFocusMotCleTooltip(event) {
+  const elementSortant = extraireElementMotCleTooltip(event.target);
+  if (!elementSortant) {
+    return;
+  }
+
+  const elementEntrant = extraireElementMotCleTooltip(event.relatedTarget);
+
+  if (elementEntrant) {
+    afficherTooltipLexiqueMotCleDepuisElement(elementEntrant);
+    return;
+  }
+
+  masquerTooltipLexiqueMotCle();
+}
+
+function gererRaccourciFermetureTooltipMotCle(event) {
+  if (event.key !== "Escape") {
+    return;
+  }
+
+  const tooltipVisible = tooltipLexiqueMotCleElement?.classList.contains("est-visible");
+  if (!tooltipVisible) {
+    return;
+  }
+
+  event.preventDefault();
+  event.stopPropagation();
+  masquerTooltipLexiqueMotCle();
+}
+
+function initialiserTooltipsMotsClesEffet() {
+  if (tooltipsMotsClesEffetInitialises) {
+    return;
+  }
+
+  tooltipsMotsClesEffetInitialises = true;
+  document.addEventListener("mouseover", gererSurvolMotCleTooltip);
+  document.addEventListener("mouseout", gererSortieSurvolMotCleTooltip);
+  document.addEventListener("focusin", gererFocusMotCleTooltip);
+  document.addEventListener("focusout", gererPerteFocusMotCleTooltip);
+  document.addEventListener("keydown", gererRaccourciFermetureTooltipMotCle, true);
+  window.addEventListener("resize", repositionnerTooltipLexiqueMotCleActif);
+  window.addEventListener("scroll", repositionnerTooltipLexiqueMotCleActif, true);
 }
 
 function mettreAJourContenuLexiqueMenu() {
@@ -34426,6 +34804,7 @@ function definirLexiqueMenu(entrees = []) {
   }
 
   trierLexiqueMenuAlphabetique();
+  reconstruireIndexLexiqueTooltips();
   mettreAJourContenuLexiqueMenu();
 }
 
@@ -34443,6 +34822,7 @@ function ajouterEntreeLexiqueMenu(terme, definition) {
   });
 
   trierLexiqueMenuAlphabetique();
+  reconstruireIndexLexiqueTooltips();
   mettreAJourContenuLexiqueMenu();
 }
 
@@ -35014,6 +35394,7 @@ function initialiserInterfaces() {
   initialiserPanneauExil();
   initialiserMusique();
   initialiserControleMusique();
+  initialiserTooltipsMotsClesEffet();
   initialiserMenuEchap();
   initialiserMiniTutorielInterface();
    initialiserOuverturePileEtoile();
