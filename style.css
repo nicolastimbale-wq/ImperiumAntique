@@ -1682,6 +1682,19 @@ body {
   z-index: 1;
 }
 
+#slot-main .slot-main-adversaire-cachee {
+  width: 210px;
+  height: 240px;
+  margin: 8px auto 0 auto;
+  pointer-events: none;
+}
+
+#slot-main .slot-main-adversaire-cachee .dos-carte-verticale {
+  width: 100%;
+  height: 100%;
+  transform: none;
+}
+
 .carte-main-joueur {
   position: absolute;
   top: 0;
@@ -2397,7 +2410,9 @@ body {
 }
 
 #panneau-ui,
-#panneau-menu-echap {
+#panneau-menu-echap,
+#panneau-accueil-multijoueur,
+#panneau-journal-actions {
   position: fixed;
   top: 0;
   left: 0;
@@ -2411,7 +2426,9 @@ body {
 }
 
 #panneau-ui.panneau-ui-ouvert,
-#panneau-menu-echap.panneau-ui-ouvert {
+#panneau-menu-echap.panneau-ui-ouvert,
+#panneau-accueil-multijoueur.panneau-ui-ouvert,
+#panneau-journal-actions.panneau-ui-ouvert {
   display: flex;
 }
 
@@ -2602,6 +2619,30 @@ body {
   margin-right: auto;
 }
 
+body.multijoueur-lecture-seule #bloc-controles-tour::after {
+  content: "Lecture seule - tour adverse";
+  display: inline-flex;
+  align-items: center;
+  margin-left: 8px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  border: 1px solid rgba(139, 34, 34, 0.55);
+  background: rgba(244, 214, 214, 0.9);
+  color: #7c1f1f;
+  font-family: "Palatino Linotype", "Book Antiqua", Georgia, serif;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+body.multijoueur-lecture-seule #btn-pacifier,
+body.multijoueur-lecture-seule #btn-innover-tour,
+body.multijoueur-lecture-seule #btn-fin-tour,
+body.multijoueur-lecture-seule #btn-fin-nettoyage,
+body.multijoueur-lecture-seule #btn-commencer-tour-bot,
+body.multijoueur-lecture-seule #btn-fin-solstice {
+  pointer-events: none;
+}
+
 #vue-joueur,
 #vue-marche {
   width: 100%;
@@ -2655,10 +2696,12 @@ body {
   min-height: 100vh;
   display: flex;
   justify-content: center;
-  align-items: center;
+  align-items: flex-start;
   text-align: center;
   padding: 40px;
   box-sizing: border-box;
+  overflow-y: auto;
+  overflow-x: hidden;
   background-color: #1b140d;
 
   background:
@@ -2674,6 +2717,7 @@ body {
   max-width: 620px;
   padding: 36px 40px;
   border-radius: 18px;
+  margin: 0 auto;
 
   background: rgba(245, 236, 214, 0.75);
   border: 3px solid rgba(120, 90, 40, 0.85);
@@ -2742,6 +2786,64 @@ body {
   color: #6d4f27;
   font-size: 13px;
   line-height: 1.35;
+}
+
+.resume-campagne-accueil {
+  margin-top: 8px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  border: 1px solid rgba(116, 85, 43, 0.25);
+  background: rgba(255, 252, 245, 0.72);
+  color: #3f2f1e;
+  font-family: "Palatino Linotype", "Book Antiqua", Georgia, serif;
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1.35;
+}
+
+.resume-campagne-accueil.est-terminee-victoire {
+  color: #1e5e2f;
+}
+
+.resume-campagne-accueil.est-terminee-defaite {
+  color: #8b2222;
+}
+
+.accueil-multijoueur {
+  display: grid;
+  gap: 8px;
+  text-align: left;
+}
+
+.accueil-multijoueur .menu-echap-sous-titre {
+  margin: 0 0 2px 0;
+  font-size: 17px;
+}
+
+.accueil-multi-ligne-joueur {
+  min-height: 18px;
+  color: #3f2f1e;
+  font-family: "Palatino Linotype", "Book Antiqua", Georgia, serif;
+  font-size: 13px;
+  font-weight: 700;
+  border-radius: 7px;
+  border: 1px solid rgba(116, 85, 43, 0.25);
+  background: rgba(255, 252, 245, 0.72);
+  padding: 5px 8px;
+}
+
+.panneau-accueil-multijoueur-contenu {
+  width: min(640px, 92vw);
+  max-height: 88vh;
+  overflow: auto;
+  display: grid;
+  gap: 12px;
+  align-items: start;
+  text-align: left;
+}
+
+#panneau-accueil-multijoueur .accueil-multijoueur {
+  margin: 0;
 }
 
 #vue-accueil select {
@@ -3773,6 +3875,38 @@ body {
   line-height: 1.35;
 }
 
+#panneau-attente-interaction-passif-duel {
+  position: fixed;
+  inset: 0;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  background: rgba(8, 12, 18, 0.58);
+  z-index: 60020;
+}
+
+#panneau-attente-interaction-passif-duel.panneau-ui-ouvert {
+  display: flex;
+}
+
+.panneau-attente-interaction-passif-contenu {
+  min-width: 420px;
+  max-width: min(760px, 90vw);
+  padding: 22px 26px;
+  border-radius: 14px;
+  border: 2px solid rgba(214, 178, 94, 0.9);
+  background: rgba(30, 25, 18, 0.95);
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.45);
+  text-align: center;
+}
+
+#panneau-attente-interaction-passif-message {
+  color: #f5ead2;
+  font-size: 24px;
+  font-weight: 700;
+  line-height: 1.35;
+}
+
 /* =========================
    CARTES BOT = mêmes effets que joueur
    ========================= */
@@ -4010,6 +4144,7 @@ body {
 #bloc-controles-tour button,
 #bloc-musique button,
 #panneau-menu-echap button,
+#panneau-accueil-multijoueur button,
 #panneau-ui-boutons button,
 #panneau-choix-texte-actions button,
 #panneau-choix-marche-selection button,
@@ -4062,6 +4197,7 @@ body {
 #bloc-controles-tour button::after,
 #bloc-musique button::after,
 #panneau-menu-echap button::after,
+#panneau-accueil-multijoueur button::after,
 #panneau-ui-boutons button::after,
 #panneau-choix-texte-actions button::after,
 #panneau-choix-marche-selection button::after,
@@ -4091,6 +4227,7 @@ body {
 #bloc-controles-tour button:hover,
 #bloc-musique button:hover,
 #panneau-menu-echap button:hover,
+#panneau-accueil-multijoueur button:hover,
 #panneau-ui-boutons button:hover,
 #panneau-choix-texte-actions button:hover,
 #panneau-choix-marche-selection button:hover,
@@ -4117,6 +4254,7 @@ body {
 #bloc-controles-tour button:active,
 #bloc-musique button:active,
 #panneau-menu-echap button:active,
+#panneau-accueil-multijoueur button:active,
 #panneau-ui-boutons button:active,
 #panneau-choix-texte-actions button:active,
 #panneau-choix-marche-selection button:active,
@@ -4143,6 +4281,7 @@ body {
 #bloc-controles-tour button:focus-visible,
 #bloc-musique button:focus-visible,
 #panneau-menu-echap button:focus-visible,
+#panneau-accueil-multijoueur button:focus-visible,
 #panneau-ui-boutons button:focus-visible,
 #panneau-choix-texte-actions button:focus-visible,
 #panneau-choix-marche-selection button:focus-visible,
@@ -4167,6 +4306,7 @@ body {
 #bloc-controles-tour button:disabled,
 #bloc-musique button:disabled,
 #panneau-menu-echap button:disabled,
+#panneau-accueil-multijoueur button:disabled,
 #panneau-ui-boutons button:disabled,
 #panneau-choix-texte-actions button:disabled,
 #panneau-choix-marche-selection button:disabled,
@@ -4257,7 +4397,8 @@ body {
 }
 
 #btn-musique,
-#btn-musique-suivante {
+#btn-musique-suivante,
+#btn-journal-actions {
   --btn-ton-haut: #566f88;
   --btn-ton-milieu: #415a75;
   --btn-ton-bas: #2d465d;
@@ -4281,12 +4422,65 @@ body {
   align-items: flex-end;
 }
 
-#btn-musique-suivante {
+#btn-journal-actions {
   order: 1;
 }
 
-#btn-musique {
+#btn-musique-suivante {
   order: 2;
+}
+
+#btn-musique {
+  order: 3;
+}
+
+.panneau-journal-actions-contenu {
+  width: min(760px, 94vw);
+  max-height: 86vh;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  text-align: left;
+}
+
+.journal-actions-liste {
+  flex: 1;
+  min-height: 180px;
+  max-height: 62vh;
+  overflow: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 4px 6px 4px 2px;
+}
+
+.journal-actions-entree {
+  border: 1px solid rgba(56, 75, 95, 0.24);
+  border-radius: 8px;
+  background: rgba(236, 243, 250, 0.7);
+  padding: 8px 10px;
+}
+
+.journal-actions-entete {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 4px;
+  font-size: 12px;
+  color: #3d566f;
+  font-weight: 700;
+}
+
+.journal-actions-message {
+  font-size: 14px;
+  color: #253445;
+  line-height: 1.35;
+}
+
+.journal-actions-vide {
+  margin: 0;
+  color: #4b6076;
+  font-style: italic;
 }
 
 .menu-echap-contenu {
@@ -4299,6 +4493,7 @@ body {
     "titre titre"
     "actions actions"
     "audio raccourcis"
+    "multijoueur raccourcis"
     "lexique lexique"
     "pied pied";
   gap: 12px;
@@ -4376,6 +4571,66 @@ body {
   color: #3a2a17;
   font-family: "Palatino Linotype", "Book Antiqua", Georgia, serif;
   font-weight: 700;
+}
+
+.menu-echap-multijoueur {
+  grid-area: multijoueur;
+  border: 1px solid rgba(116, 85, 43, 0.35);
+  border-radius: 10px;
+  background: rgba(255, 248, 234, 0.6);
+  padding: 10px 12px;
+  margin: 0;
+  min-width: 0;
+  display: grid;
+  gap: 8px;
+}
+
+.menu-multijoueur-ligne {
+  display: grid;
+  grid-template-columns: 88px minmax(0, 1fr);
+  align-items: center;
+  gap: 8px;
+}
+
+.menu-multijoueur-ligne label {
+  color: #3a2a17;
+  font-family: "Palatino Linotype", "Book Antiqua", Georgia, serif;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.menu-multijoueur-ligne input {
+  min-width: 0;
+  padding: 4px 6px;
+  border-radius: 6px;
+  border: 1px solid rgba(80, 58, 31, 0.45);
+  background: rgba(255, 252, 245, 0.94);
+  color: #2f2114;
+  font-family: "Palatino Linotype", "Book Antiqua", Georgia, serif;
+  font-size: 14px;
+}
+
+.menu-multijoueur-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: flex-start;
+}
+
+.menu-multi-statut {
+  min-height: 18px;
+  color: #3f2f1e;
+  font-family: "Palatino Linotype", "Book Antiqua", Georgia, serif;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.menu-multi-statut.est-connecte {
+  color: #1e5e2f;
+}
+
+.menu-multi-statut.est-erreur {
+  color: #8b2222;
 }
 
 .menu-echap-lexique {
@@ -4531,7 +4786,8 @@ body {
 @media (max-width: 900px) {
   #bloc-controles-tour button,
   #bloc-musique button,
-  #panneau-menu-echap button {
+  #panneau-menu-echap button,
+  #panneau-accueil-multijoueur button {
     padding: 3px 6px;
     min-height: 22px;
     font-size: 10px;
@@ -4545,6 +4801,7 @@ body {
       "titre"
       "actions"
       "audio"
+      "multijoueur"
       "raccourcis"
       "lexique"
       "pied";
@@ -4588,6 +4845,7 @@ body {
 
 #panneau-ui,
 #panneau-menu-echap,
+#panneau-accueil-multijoueur,
 #panneau-choix-texte,
 #panneau-choix-marche,
 .overlay-choix-oracle {

@@ -58,17 +58,17 @@
     <p class="sous-titre-accueil">Choisissez votre nation et préparez la partie</p>
 
     <div class="bloc-choix">
-      <label for="choix-nation-joueur">Nation du joueur</label>
+      <label id="label-nation-joueur" for="choix-nation-joueur">Nation du joueur 1</label>
       <select id="choix-nation-joueur"></select>
     </div>
 
     <div class="bloc-choix">
-      <label for="choix-nation-bot">Nation du bot</label>
+      <label id="label-nation-bot" for="choix-nation-bot">Nation du bot</label>
       <select id="choix-nation-bot"></select>
     </div>
 
     <div class="bloc-choix">
-      <label for="choix-difficulte-bot">Difficulté du bot</label>
+      <label id="label-difficulte-bot" for="choix-difficulte-bot">Difficulté du bot</label>
       <select id="choix-difficulte-bot">
         <option value="chef_de_clan">Chef de clan</option>
         <option value="seigneur_de_guerre">Seigneur de guerre</option>
@@ -76,6 +76,24 @@
         <option value="souverain">Souverain</option>
         <option value="suzerain">Suzerain</option>
       </select>
+    </div>
+
+    <div class="bloc-choix bloc-choix-tutoriel">
+      <label class="option-tutoriel-accueil">
+        <input id="option-mode-duel" type="checkbox">
+        Activer le mode Duel contre joueur
+      </label>
+    </div>
+
+    <div class="bloc-choix bloc-choix-tutoriel">
+      <label class="option-tutoriel-accueil">
+        <input id="option-mode-campagne" type="checkbox">
+        Activer le mode Campagne solo (5 victoires avant 4 defaites)
+      </label>
+      <p class="aide-tutoriel-accueil">
+        Une nation joueur fixe, difficulte croissante (Chef de clan a Suzerain), bonus ressources apres une defaite.
+      </p>
+      <div id="resume-campagne-accueil" class="resume-campagne-accueil">Campagne inactive.</div>
     </div>
 
     <div class="bloc-choix bloc-choix-tutoriel">
@@ -88,7 +106,11 @@
       </p>
     </div>
 
-    <button class="bouton-accueil" onclick="commencerNouvellePartie()">
+    <button id="btn-accueil-ouvrir-multijoueur" class="bouton-accueil" type="button">
+      Multijoueur
+    </button>
+
+    <button id="btn-accueil-commencer-partie" class="bouton-accueil" onclick="commencerNouvellePartie()">
       Commencer la partie
     </button>
     <button id="btn-reprendre-sauvegarde" class="bouton-accueil" type="button">
@@ -386,9 +408,58 @@
   <audio id="musique-fond"></audio>
 
 <div id="bloc-musique">
+  <button id="btn-journal-actions" class="ui-cachee">Journal</button>
   <button id="btn-musique">🔊 Musique</button>
   <button id="btn-musique-suivante">⏭️ Suivante</button>
 </div>
+
+  <div id="panneau-journal-actions" class="panneau-ui-cache" aria-hidden="true">
+    <div class="panneau-ui-contenu panneau-journal-actions-contenu" role="dialog" aria-modal="true" aria-labelledby="journal-actions-titre">
+      <div id="journal-actions-titre" class="menu-echap-titre">Journal des actions</div>
+      <div id="journal-actions-liste" class="journal-actions-liste">
+        <p class="journal-actions-vide">Aucune action enregistree.</p>
+      </div>
+      <div class="menu-echap-pied">
+        <button id="btn-fermer-journal-actions" type="button">Fermer</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="panneau-accueil-multijoueur" class="panneau-ui-cache" aria-hidden="true">
+    <div class="panneau-ui-contenu panneau-accueil-multijoueur-contenu" role="dialog" aria-modal="true" aria-labelledby="accueil-multijoueur-titre">
+      <div id="accueil-multijoueur-titre" class="menu-echap-titre">Multijoueur</div>
+      <section id="accueil-multijoueur" class="bloc-choix bloc-choix-tutoriel accueil-multijoueur">
+        <div class="menu-echap-sous-titre">Lobby en ligne (duel 1v1)</div>
+        <div class="menu-multijoueur-ligne">
+          <label for="accueil-multi-serveur-url">Serveur</label>
+          <input id="accueil-multi-serveur-url" type="text" value="http://localhost:8787" spellcheck="false">
+        </div>
+        <div class="menu-multijoueur-ligne">
+          <label for="accueil-multi-nom">Pseudo</label>
+          <input id="accueil-multi-nom" type="text" value="Joueur" maxlength="24" spellcheck="false">
+        </div>
+        <div class="menu-multijoueur-ligne">
+          <label for="accueil-multi-code-salle">Code salle</label>
+          <input id="accueil-multi-code-salle" type="text" maxlength="12" spellcheck="false">
+        </div>
+        <div class="menu-multijoueur-actions">
+          <button id="btn-accueil-multi-creer-salle" type="button">Creer lobby</button>
+          <button id="btn-accueil-multi-rejoindre-salle" type="button">Rejoindre lobby</button>
+          <button id="btn-accueil-multi-quitter-salle" type="button">Quitter</button>
+        </div>
+        <div class="menu-multijoueur-actions">
+          <button id="btn-accueil-multi-pret" type="button">Je suis pret</button>
+          <button id="btn-accueil-multi-demarrer" type="button">Demarrer la partie (hote)</button>
+        </div>
+        <div id="accueil-multi-lobby-j1" class="accueil-multi-ligne-joueur">Joueur 1: en attente</div>
+        <div id="accueil-multi-lobby-j2" class="accueil-multi-ligne-joueur">Joueur 2: en attente</div>
+        <div id="accueil-multi-statut" class="menu-multi-statut">Hors ligne</div>
+      </section>
+      <div class="menu-echap-pied">
+        <button id="btn-fermer-accueil-multijoueur" type="button">Fermer</button>
+      </div>
+    </div>
+  </div>
 
   <div id="panneau-menu-echap" class="panneau-ui-cache" aria-hidden="true">
     <div class="panneau-ui-contenu menu-echap-contenu" role="dialog" aria-modal="true" aria-labelledby="menu-echap-titre">
@@ -411,6 +482,28 @@
           <span>Muet</span>
         </label>
       </div>
+
+      <section id="menu-multijoueur" class="menu-echap-multijoueur">
+        <div class="menu-echap-sous-titre">Multijoueur en ligne (experimental)</div>
+        <div class="menu-multijoueur-ligne">
+          <label for="menu-multi-serveur-url">Serveur</label>
+          <input id="menu-multi-serveur-url" type="text" value="http://localhost:8787" spellcheck="false">
+        </div>
+        <div class="menu-multijoueur-ligne">
+          <label for="menu-multi-nom">Pseudo</label>
+          <input id="menu-multi-nom" type="text" value="Joueur" maxlength="24" spellcheck="false">
+        </div>
+        <div class="menu-multijoueur-ligne">
+          <label for="menu-multi-code-salle">Code salle</label>
+          <input id="menu-multi-code-salle" type="text" maxlength="12" spellcheck="false">
+        </div>
+        <div class="menu-multijoueur-actions">
+          <button id="btn-multi-creer-salle" type="button">Creer salle</button>
+          <button id="btn-multi-rejoindre-salle" type="button">Rejoindre salle</button>
+          <button id="btn-multi-quitter-salle" type="button">Quitter</button>
+        </div>
+        <div id="menu-multi-statut" class="menu-multi-statut">Hors ligne</div>
+      </section>
 
       <section id="menu-raccourcis" class="menu-echap-raccourcis">
         <div class="menu-echap-sous-titre">Raccourcis clavier</div>

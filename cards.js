@@ -16594,7 +16594,7 @@ function remplirPileBot(idElement, idCompteur, pile) {
   zone.appendChild(dos);
 }
 
-function afficherTableauBot() {
+function afficherTableauBot(tableauSource = null) {
   const zone = getElement("bot-tableau");
 
   if (!zone) {
@@ -16603,7 +16603,9 @@ function afficherTableauBot() {
 
   zone.innerHTML = "";
 
-  const tableau = Array.isArray(etatBot.tableau) ? etatBot.tableau : [];
+  const tableau = Array.isArray(tableauSource)
+    ? tableauSource
+    : (Array.isArray(etatBot.tableau) ? etatBot.tableau : []);
   const nombreCases = 24; // 4 colonnes x 6 rangées
 
   for (let i = 0; i < nombreCases; i++) {
@@ -16645,7 +16647,73 @@ function afficherTableauBot() {
   }
 }
 
+function afficherZoneAdversaireDuelDansVueBot() {
+  const etatAdverse = duelObtenirEtatJoueurAdversePerspectiveLocale();
+  const cleAdverse = duelObtenirCleJoueurAdversePerspectiveLocale();
+  if (!etatAdverse) {
+    return;
+  }
+
+  const population = getElement("bot-population");
+  const materiaux = getElement("bot-materiaux");
+  const progres = getElement("bot-progres");
+  const zonePuissance = getElement("bot-carte-puissance");
+  const zoneStatut = getElement("bot-carte-statut");
+  const blocEmplacements = getElement("bloc-emplacements-bot");
+  const titreBloc = document.querySelector("#bloc-compteurs-bot h2");
+  const titreDeck = document.querySelector("#bot-deck-civ")?.previousElementSibling;
+  const titreDynastie = document.querySelector("#bot-pioche-dynastie")?.previousElementSibling;
+
+  if (titreBloc) {
+    titreBloc.textContent = `${etatAdverse.nom || duelNomParCle(cleAdverse)}`;
+  }
+
+  if (population) {
+    population.textContent = Number(etatAdverse.joueur?.population || 0);
+  }
+
+  if (materiaux) {
+    materiaux.textContent = Number(etatAdverse.joueur?.materiaux || 0);
+  }
+
+  if (progres) {
+    progres.textContent = Number(etatAdverse.joueur?.progres || 0);
+  }
+
+  if (blocEmplacements) {
+    blocEmplacements.classList.add("ui-cachee");
+  }
+
+  if (titreDeck) {
+    titreDeck.textContent = "Deck";
+  }
+
+  if (titreDynastie) {
+    titreDynastie.textContent = "Main (cachee)";
+  }
+
+  const zoneStatutCarte = etatAdverse.zones?.carteStatutVisible || null;
+  const zonePuissanceCarte = etatAdverse.zones?.cartePuissanceVisible || null;
+
+  remplirSlotCarteBot("bot-carte-puissance", zonePuissanceCarte);
+  remplirSlotCarteBot("bot-carte-statut", zoneStatutCarte);
+  remplirPileBot("bot-deck-civ", "bot-deck-civ-compteur", etatAdverse.zones?.deckJoueur || []);
+  remplirPileBot("bot-defausse", "bot-defausse-compteur", etatAdverse.zones?.defausseJoueur || []);
+  remplirPileBot("bot-pioche-dynastie", "bot-pioche-dynastie-compteur", etatAdverse.zones?.mainJoueur || []);
+  afficherTableauBot(etatAdverse.zones?.tableauJoueur || []);
+
+  if (zonePuissance) {
+    zonePuissance.onclick = null;
+    zonePuissance.style.cursor = "default";
+  }
+}
+
 function afficherZoneBot() {
+  if (duelEtatActif()) {
+    afficherZoneAdversaireDuelDansVueBot();
+    return;
+  }
+
   const population = getElement("bot-population");
   const materiaux = getElement("bot-materiaux");
   const progres = getElement("bot-progres");
@@ -16655,6 +16723,19 @@ function afficherZoneBot() {
   const blocEmplacements = getElement("bloc-emplacements-bot");
   const grilleEmplacements = getElement("grille-emplacements-bot");
   const colonneEmplacement6 = getElement("bot-colonne-emplacement-6");
+  const titreBloc = document.querySelector("#bloc-compteurs-bot h2");
+  const titreDeck = document.querySelector("#bot-deck-civ")?.previousElementSibling;
+  const titreDynastie = document.querySelector("#bot-pioche-dynastie")?.previousElementSibling;
+
+  if (titreBloc) {
+    titreBloc.textContent = "Bot";
+  }
+  if (titreDeck) {
+    titreDeck.textContent = "Deck C.I.V.";
+  }
+  if (titreDynastie) {
+    titreDynastie.textContent = "Dynastie";
+  }
 
 if (zonePuissance) {
   zonePuissance.style.cursor = "pointer";
@@ -16695,6 +16776,7 @@ if (zonePuissance) {
   }
 
   if (blocEmplacements) {
+    blocEmplacements.classList.remove("ui-cachee");
     blocEmplacements.classList.toggle("bloc-emplacements-bot-suzerain", afficherEmplacement6);
   }
 
@@ -16932,6 +17014,14 @@ async function lancerTourBotSiPossible() {
 }
 
 async function commencerTourBotDepuisInterface() {
+  if (modeDuelActif()) {
+    return false;
+  }
+
+  if (interactionLocaleMultijoueurBloquee()) {
+    return false;
+  }
+
   definirEtatBoutonTourBot(false);
 
   await lancerTourBotSiPossible();
@@ -16956,7 +17046,17 @@ function definirEtatBoutonTourBot(actif) {
     return;
   }
 
+  if (modeDuelActif()) {
+    bouton.disabled = true;
+    bouton.classList.add("bouton-inactif");
+    bouton.classList.add("ui-cachee");
+    return;
+  }
+
+  bouton.classList.remove("ui-cachee");
+
   bouton.disabled = !actif;
+  bouton.classList.toggle("bouton-inactif", !actif);
 }
 
 async function terminerTourJoueurEtJouerBot() {
@@ -17960,13 +18060,25 @@ function fermerVueDeckNation(confirmerAnnulationSelection = true) {
   }
 }
 
-   function obtenirZoneArchivageJoueur() {
+function obtenirZoneArchivageJoueur() {
   return joueurEstVikings()
     ? jeu.joueurZones.defausseJoueur
     : jeu.joueurZones.histoireJoueur;
 } 
 
-  function joueurEstVikings() {
+function joueurEstVikings() {
+  if (jeu?.joueurZones?.cartePuissanceVisible?.nom === "Vikings") {
+    return true;
+  }
+
+  if (duelEtatActif()) {
+    const clePerspective = duelObtenirCleJoueurPerspectiveLocale();
+    const etatPerspective = duelObtenirEtatJoueur(clePerspective);
+    if (etatPerspective?.nation) {
+      return String(etatPerspective.nation) === "Vikings";
+    }
+  }
+
   return configurationPartie?.nationJoueur === "Vikings";
 }
 
@@ -18373,8 +18485,9 @@ async function proposerEpuisementPuissanceCeltesSiTradition(categorie) {
   afficherSlotPuissance?.();
   afficherZoneJoueur?.();
 
-  const gagnees = botRecevoirInstabilite(1);
-  journal(`Le Bot récupère ${gagnees} carte(s) Instabilité.`);
+  const nomAdversaire = obtenirNomAdversaireEffets();
+  const gagnees = adversaireRecevoirInstabilite(1);
+  journal(`${nomAdversaire} recupere ${gagnees} carte(s) Instabilite.`);
 
   afficherZoneBot?.();
   return true;
@@ -18887,6 +19000,7 @@ async function declencherCeltesSiPossible(categorie) {
 
   const carte = pileExil.splice(index, 1)[0];
   jeu.joueurZones.mainJoueur.push(carte);
+  campagneMarquerCarteGagneeCettePartie(carte);
 
   if (drakkarsActif()) {
     gagnerRessource("population", 1);
@@ -18914,6 +19028,7 @@ async function acquerirRegionDepuisExilAvecRetour() {
 
   const carte = pileExil.splice(index, 1)[0];
   jeu.joueurZones.mainJoueur.push(carte);
+  campagneMarquerCarteGagneeCettePartie(carte);
 
   if (drakkarsActif()) {
     gagnerRessource("population", 1);
@@ -20395,8 +20510,134 @@ if (btnBarbare) {
   }
 }
 
+const LIMITE_JOURNAL_ACTIONS_MULTIJOUEUR = 80;
+
+function formaterMessageJournalActionsDepuisArgs(args = []) {
+  if (!Array.isArray(args) || args.length === 0) {
+    return "";
+  }
+
+  const morceaux = args
+    .map(valeur => {
+      if (typeof valeur === "string") {
+        return valeur;
+      }
+
+      if (typeof valeur === "number" || typeof valeur === "boolean") {
+        return String(valeur);
+      }
+
+      if (valeur == null) {
+        return "";
+      }
+
+      try {
+        return JSON.stringify(valeur);
+      } catch (error) {
+        return String(valeur);
+      }
+    })
+    .filter(Boolean);
+
+  return morceaux.join(" ").replace(/\s+/g, " ").trim();
+}
+
+function messageJournalActionMultijoueurPeutEtreDiffuse(message = "") {
+  const texte = String(message || "").trim();
+  if (!texte) {
+    return false;
+  }
+
+  const texteNormalise = texte.toLowerCase();
+  const motifsExclus = [
+    "->",
+    "debug",
+    "phases.nettoyage",
+    "btn fin nettoyage",
+    "sauvegarde automatique"
+  ];
+
+  return !motifsExclus.some(motif => texteNormalise.includes(motif));
+}
+
+function personnaliserMessageJournalActionMultijoueur(message = "", acteurCle = "joueur1") {
+  const texte = String(message || "").trim();
+  if (!texte) {
+    return "";
+  }
+
+  const nationActeur = duelNationParCle(acteurCle);
+  const nationJoueur1 = duelNationParCle("joueur1");
+  const nationJoueur2 = duelNationParCle("joueur2");
+
+  let textePersonnalise = texte;
+
+  if (nationActeur) {
+    textePersonnalise = textePersonnalise
+      .replace(/Le joueur actif/g, nationActeur)
+      .replace(/le joueur actif/g, nationActeur);
+  }
+
+  if (nationJoueur1) {
+    textePersonnalise = textePersonnalise.replace(/joueur 1/gi, nationJoueur1);
+  }
+
+  if (nationJoueur2) {
+    textePersonnalise = textePersonnalise.replace(/joueur 2/gi, nationJoueur2);
+  }
+
+  return textePersonnalise;
+}
+
+function ajouterEntreeJournalActionMultijoueur(message = "") {
+  if (!duelEtatActif() || !multijoueurConnecte()) {
+    return;
+  }
+
+  if (!multijoueurPublicationLocaleAutorisee()) {
+    return;
+  }
+
+  const texte = String(message || "").trim();
+  if (!messageJournalActionMultijoueurPeutEtreDiffuse(texte)) {
+    return;
+  }
+
+  if (!Array.isArray(jeu.journalActionsMultijoueur)) {
+    jeu.journalActionsMultijoueur = [];
+  }
+
+  const acteurCle = duelObtenirCleJoueurActif();
+  if (acteurCle !== "joueur1" && acteurCle !== "joueur2") {
+    return;
+  }
+
+  const textePersonnalise = personnaliserMessageJournalActionMultijoueur(texte, acteurCle);
+
+  const entree = {
+    id: `action-${Date.now()}-${Math.floor(Math.random() * 1e9)}`,
+    acteurCle,
+    message: textePersonnalise || texte,
+    creeLe: Date.now()
+  };
+
+  jeu.journalActionsMultijoueur.push(entree);
+
+  if (jeu.journalActionsMultijoueur.length > LIMITE_JOURNAL_ACTIONS_MULTIJOUEUR) {
+    jeu.journalActionsMultijoueur.splice(
+      0,
+      jeu.journalActionsMultijoueur.length - LIMITE_JOURNAL_ACTIONS_MULTIJOUEUR
+    );
+  }
+
+  rafraichirContenuPanneauJournalActions();
+}
+
 function journal(...args) {
   debugLog(...args);
+
+  const message = formaterMessageJournalActionsDepuisArgs(args);
+  ajouterEntreeJournalActionMultijoueur(message);
 }
 
 const DEBUG_LOGS = false;
@@ -20490,6 +20731,29 @@ const jeu = {
     pileEtoileEpuisee: false,
   },
 
+  duel: {
+    actif: false,
+    joueurActifCle: "joueur1",
+    numeroTour: 1,
+    progressionManche: {
+      nettoyageTermine: {
+        joueur1: false,
+        joueur2: false
+      },
+      solsticeTermine: {
+        joueur1: false,
+        joueur2: false
+      }
+    },
+    interactionPassif: null,
+    joueurs: {
+      joueur1: null,
+      joueur2: null
+    }
+  },
+
+  journalActionsMultijoueur: [],
+
   ui: {
     selectionRedressementActive: false,
     cartesEligiblesRedressement: [],
@@ -20508,6 +20772,7 @@ const jeu = {
     
 
     actionMarcheEnAttente: null,
+    nettoyageCartesDefausseesTour: 0,
 
   selectionDansDefausseActive: false,
   callbackSelectionDansDefausse: null,
@@ -20537,6 +20802,7 @@ const jeu = {
 
   solsticeActif: false,
   solsticeCartesTraitees: [],
+  solsticeResolutionEnCours: false,
   modeInteraction: null,
 
   histoireOuverte: false,
@@ -20552,6 +20818,8 @@ callbackSelectionDansHistoire: null,
   miniTutorielDerniereManche: 1,
   miniTutorielIntroTermine: false,
   miniTutorielEtapeScript: 0,
+  duelAffichageAdversaireActif: false,
+  duelRenduLectureAdversaireActif: false,
   
   }
   
@@ -20691,6 +20959,153 @@ function rehydraterCarteSauvegardee(carteSauvegardee) {
   return carteRehydratee;
 }
 
+function rehydraterZonesJoueurDepuisSauvegarde(zonesSauvees = {}) {
+  return {
+    carteStatutVisible: rehydraterCarteSauvegardee(zonesSauvees.carteStatutVisible),
+    cartePuissanceVisible: rehydraterCarteSauvegardee(zonesSauvees.cartePuissanceVisible),
+    cartePleineVisible: rehydraterCarteSauvegardee(zonesSauvees.cartePleineVisible),
+    pileEtoileJoueur: rehydraterListeCartesSauvegardees(zonesSauvees.pileEtoileJoueur),
+    pileCroissantJoueur: rehydraterListeCartesSauvegardees(zonesSauvees.pileCroissantJoueur),
+    deckJoueur: rehydraterListeCartesSauvegardees(zonesSauvees.deckJoueur),
+    tableauJoueur: rehydraterListeCartesSauvegardees(zonesSauvees.tableauJoueur),
+    mainJoueur: rehydraterListeCartesSauvegardees(zonesSauvees.mainJoueur),
+    defausseJoueur: rehydraterListeCartesSauvegardees(zonesSauvees.defausseJoueur),
+    histoireJoueur: rehydraterListeCartesSauvegardees(zonesSauvees.histoireJoueur),
+    pileRafraichissementNationEpuisee: !!zonesSauvees.pileRafraichissementNationEpuisee,
+    pileEtoileEpuisee: !!zonesSauvees.pileEtoileEpuisee
+  };
+}
+
+function serialiserEtatDuelPourSnapshot() {
+  if (!duelEtatActif()) {
+    return { actif: false };
+  }
+
+  const progression = jeu.duel.progressionManche || creerProgressionDuelParDefaut();
+  const interactionPassif = serialiserInteractionPassifDuel(jeu.duel.interactionPassif);
+
+  return JSON.parse(JSON.stringify({
+    actif: true,
+    joueurActifCle: duelObtenirCleJoueurActif(),
+    numeroTour: Number(jeu.duel.numeroTour || 1),
+    progressionManche: {
+      nettoyageTermine: {
+        joueur1: !!progression.nettoyageTermine?.joueur1,
+        joueur2: !!progression.nettoyageTermine?.joueur2
+      },
+      solsticeTermine: {
+        joueur1: !!progression.solsticeTermine?.joueur1,
+        joueur2: !!progression.solsticeTermine?.joueur2
+      }
+    },
+    interactionPassif,
+    joueurs: {
+      joueur1: jeu.duel.joueurs?.joueur1 || null,
+      joueur2: jeu.duel.joueurs?.joueur2 || null
+    }
+  }));
+}
+
+function serialiserInteractionPassifDuel(interaction = null) {
+  if (!interaction || typeof interaction !== "object") {
+    return null;
+  }
+
+  const type = String(interaction.type || "").trim();
+  if (!type) {
+    return null;
+  }
+
+  const sourceCle = interaction.sourceCle === "joueur2" ? "joueur2" : "joueur1";
+  const cibleCle = interaction.cibleCle === "joueur1" ? "joueur1" : "joueur2";
+  const statut = String(interaction.statut || "en_attente");
+
+  return {
+    id: String(interaction.id || ""),
+    type,
+    sourceCle,
+    cibleCle,
+    statut,
+    quantite: Math.max(0, Number(interaction.quantite) || 0),
+    categorie: String(interaction.categorie || ""),
+    message: String(interaction.message || ""),
+    creeLe: Number(interaction.creeLe || Date.now()),
+    resolueLe: Number(interaction.resolueLe || 0),
+    resultat:
+      interaction.resultat && typeof interaction.resultat === "object"
+        ? JSON.parse(JSON.stringify(interaction.resultat))
+        : null
+  };
+}
+
+function rehydraterEtatJoueurDuelDepuisSauvegarde(etatSauve = null, cle = "joueur1") {
+  if (!etatSauve || typeof etatSauve !== "object") {
+    return null;
+  }
+
+  const joueurSource = etatSauve.joueur || {};
+  const zonesSource = etatSauve.zones || {};
+
+  return {
+    nation: String(etatSauve.nation || ""),
+    nom: String(etatSauve.nom || duelNomParCle(cle)),
+    joueur: {
+      actions: Number(joueurSource.actions || 0),
+      epuisement: Number(joueurSource.epuisement || 0),
+      population: Number(joueurSource.population || 0),
+      materiaux: Number(joueurSource.materiaux || 0),
+      progres: Number(joueurSource.progres || 0)
+    },
+    zones: rehydraterZonesJoueurDepuisSauvegarde(zonesSource)
+  };
+}
+
+function appliquerEtatDuelDepuisSauvegarde(duelSauve = null) {
+  if (!modeDuelActif()) {
+    reinitialiserEtatDuel();
+    return;
+  }
+
+  if (
+    !duelSauve ||
+    typeof duelSauve !== "object" ||
+    duelSauve.actif !== true
+  ) {
+    reinitialiserEtatDuel();
+    return;
+  }
+
+  const joueur1 = rehydraterEtatJoueurDuelDepuisSauvegarde(duelSauve.joueurs?.joueur1, "joueur1");
+  const joueur2 = rehydraterEtatJoueurDuelDepuisSauvegarde(duelSauve.joueurs?.joueur2, "joueur2");
+
+  if (!joueur1 || !joueur2) {
+    reinitialiserEtatDuel();
+    return;
+  }
+
+  const progressionSauvee = duelSauve.progressionManche || {};
+  const progression = creerProgressionDuelParDefaut();
+  progression.nettoyageTermine.joueur1 = !!progressionSauvee.nettoyageTermine?.joueur1;
+  progression.nettoyageTermine.joueur2 = !!progressionSauvee.nettoyageTermine?.joueur2;
+  progression.solsticeTermine.joueur1 = !!progressionSauvee.solsticeTermine?.joueur1;
+  progression.solsticeTermine.joueur2 = !!progressionSauvee.solsticeTermine?.joueur2;
+  const interactionPassif = serialiserInteractionPassifDuel(duelSauve.interactionPassif);
+
+  jeu.duel = {
+    actif: true,
+    joueurActifCle: duelSauve.joueurActifCle === "joueur2" ? "joueur2" : "joueur1",
+    numeroTour: Number(duelSauve.numeroTour || 1),
+    progressionManche: progression,
+    interactionPassif,
+    joueurs: {
+      joueur1,
+      joueur2
+    }
+  };
+
+  duelSynchroniserZonePrincipaleSelonPerspectiveLocale();
+}
+
 function estObjetCartePourSauvegarde(valeur) {
   if (!valeur || typeof valeur !== "object") {
     return false;
@@ -20698,7 +21113,6 @@ function estObjetCartePourSauvegarde(valeur) {
 
   return (
     "templateId" in valeur ||
-    "nom" in valeur ||
     "categorie" in valeur ||
     "jetons" in valeur ||
     "reservees" in valeur
@@ -20777,6 +21191,7 @@ function validerIntegriteCartesAvantSauvegarde() {
     { chemin: "jeu.piles", valeur: jeu.piles },
     { chemin: "jeu.zonesMarche", valeur: jeu.zonesMarche },
     { chemin: "jeu.joueurZones", valeur: jeu.joueurZones },
+    { chemin: "jeu.duel", valeur: jeu.duel },
     { chemin: "etatBot", valeur: etatBot }
   ];
 
@@ -20839,10 +21254,13 @@ function creerSnapshotSauvegardePartie() {
       piles: jeu.piles,
       zonesMarche: jeu.zonesMarche,
       joueurZones: jeu.joueurZones,
+      duel: serialiserEtatDuelPourSnapshot(),
+      journalActionsMultijoueur: jeu.journalActionsMultijoueur,
       ui: {
         optionSpecialeDebutTourDisponible: jeu.ui.optionSpecialeDebutTourDisponible,
         optionSpecialeDebutTourChoisie: jeu.ui.optionSpecialeDebutTourChoisie,
         choixProgresMarcheActif: jeu.ui.choixProgresMarcheActif,
+        nettoyageCartesDefausseesTour: Number(jeu.ui.nettoyageCartesDefausseesTour || 0),
         miniTutorielActif: !!jeu.ui.miniTutorielActif,
         miniTutorielTermine: !!jeu.ui.miniTutorielTermine,
         miniTutorielMasque: !!jeu.ui.miniTutorielMasque,
@@ -20867,11 +21285,14 @@ function appliquerConfigurationPartieSauvegardee(configurationSauvee = {}) {
     ...configurationPartie,
     ...configurationSauvee
   };
+  configurationPartie.modeJeu = normaliserModeJeu(configurationPartie.modeJeu);
   configurationPartie.difficulteBot = normaliserDifficulteBot(configurationPartie.difficulteBot);
 
   const selectNationJoueur = getElement("choix-nation-joueur");
   const selectNationBot = getElement("choix-nation-bot");
   const selectDifficulteBot = getElement("choix-difficulte-bot");
+  const optionModeDuel = getElement("option-mode-duel");
+  const optionModeCampagne = getElement("option-mode-campagne");
   const optionMiniTutoriel = getElement("option-mini-tutoriel");
 
   if (selectNationJoueur && configurationPartie.nationJoueur) {
@@ -20896,6 +21317,23 @@ function appliquerConfigurationPartieSauvegardee(configurationSauvee = {}) {
     }
   }
 
+  if (optionModeDuel) {
+    optionModeDuel.checked = normaliserModeJeu(configurationPartie.modeJeu) === MODES_JEU.DUEL;
+    if (typeof optionModeDuel.onchange === "function") {
+      optionModeDuel.onchange();
+    }
+  }
+
+  if (optionModeCampagne) {
+    optionModeCampagne.checked = normaliserModeJeu(configurationPartie.modeJeu) === MODES_JEU.CAMPAGNE;
+    if (typeof optionModeCampagne.onchange === "function") {
+      optionModeCampagne.onchange();
+    }
+  }
+
+  mettreAJourLibellesModeJeu();
+  mettreAJourResumeCampagneAccueil();
+
 }
 
 function reinitialiserEtatUIApresChargement(uiSauve = {}) {
@@ -20911,6 +21349,10 @@ function reinitialiserEtatUIApresChargement(uiSauve = {}) {
   jeu.ui.choixProgresMarcheActif =
     jeu.manche.phase === PHASES.NETTOYAGE_CHOIX_PROGRES ||
     !!uiSauve.choixProgresMarcheActif;
+  jeu.ui.nettoyageCartesDefausseesTour = Math.max(
+    0,
+    Number(uiSauve.nettoyageCartesDefausseesTour || 0)
+  );
 
   jeu.ui.resolveChoixRegardRenommee = null;
   jeu.ui.regardRenommeeActif = false;
@@ -20949,6 +21391,7 @@ function reinitialiserEtatUIApresChargement(uiSauve = {}) {
 
   jeu.ui.solsticeActif = jeu.manche.phase === PHASES.SOLSTICE;
   jeu.ui.solsticeCartesTraitees = [];
+  jeu.ui.solsticeResolutionEnCours = false;
   jeu.ui.modeInteraction = null;
 
   jeu.ui.histoireOuverte = false;
@@ -20966,7 +21409,40 @@ function reinitialiserEtatUIApresChargement(uiSauve = {}) {
   );
   jeu.ui.miniTutorielIntroTermine = !!uiSauve.miniTutorielIntroTermine;
   jeu.ui.miniTutorielEtapeScript = Number(uiSauve.miniTutorielEtapeScript || 0);
+  jeu.ui.duelAffichageAdversaireActif = false;
+  jeu.ui.duelRenduLectureAdversaireActif = false;
   miniTutorielDerniereEtapeScriptRendue = -1;
+}
+
+function rehydraterJournalActionsMultijoueurDepuisSauvegarde(entreesSauvees = []) {
+  if (!Array.isArray(entreesSauvees)) {
+    return [];
+  }
+
+  return entreesSauvees
+    .map(entree => {
+      if (!entree || typeof entree !== "object") {
+        return null;
+      }
+
+      const acteurCle = entree.acteurCle === "joueur2" ? "joueur2" : "joueur1";
+      const message = String(entree.message || "").trim();
+      const id = String(entree.id || "");
+      const creeLe = Number(entree.creeLe || 0);
+
+      if (!message) {
+        return null;
+      }
+
+      return {
+        id: id || `action-${creeLe || Date.now()}`,
+        acteurCle,
+        message,
+        creeLe: creeLe > 0 ? creeLe : Date.now()
+      };
+    })
+    .filter(Boolean)
+    .slice(-LIMITE_JOURNAL_ACTIONS_MULTIJOUEUR);
 }
 
 function appliquerSauvegardePartie(snapshot) {
@@ -20992,6 +21468,10 @@ function appliquerSauvegardePartie(snapshot) {
     ...jeu.joueur,
     ...(jeuSauve.joueur || {})
   };
+
+  jeu.journalActionsMultijoueur = rehydraterJournalActionsMultijoueurDepuisSauvegarde(
+    jeuSauve.journalActionsMultijoueur
+  );
 
   const clesPiles = [
     "tradition",
@@ -21024,18 +21504,13 @@ function appliquerSauvegardePartie(snapshot) {
   jeu.zonesMarche.zone5 = rehydraterListeCartesSauvegardees(zonesSauvees.zone5);
   jeu.zonesMarche.roiDesRois = rehydraterCarteSauvegardee(zonesSauvees.roiDesRois);
 
-  jeu.joueurZones.carteStatutVisible = rehydraterCarteSauvegardee(zonesJoueurSauvees.carteStatutVisible);
-  jeu.joueurZones.cartePuissanceVisible = rehydraterCarteSauvegardee(zonesJoueurSauvees.cartePuissanceVisible);
-  jeu.joueurZones.cartePleineVisible = rehydraterCarteSauvegardee(zonesJoueurSauvees.cartePleineVisible);
-  jeu.joueurZones.pileEtoileJoueur = rehydraterListeCartesSauvegardees(zonesJoueurSauvees.pileEtoileJoueur);
-  jeu.joueurZones.pileCroissantJoueur = rehydraterListeCartesSauvegardees(zonesJoueurSauvees.pileCroissantJoueur);
-  jeu.joueurZones.deckJoueur = rehydraterListeCartesSauvegardees(zonesJoueurSauvees.deckJoueur);
-  jeu.joueurZones.tableauJoueur = rehydraterListeCartesSauvegardees(zonesJoueurSauvees.tableauJoueur);
-  jeu.joueurZones.mainJoueur = rehydraterListeCartesSauvegardees(zonesJoueurSauvees.mainJoueur);
-  jeu.joueurZones.defausseJoueur = rehydraterListeCartesSauvegardees(zonesJoueurSauvees.defausseJoueur);
-  jeu.joueurZones.histoireJoueur = rehydraterListeCartesSauvegardees(zonesJoueurSauvees.histoireJoueur);
-  jeu.joueurZones.pileRafraichissementNationEpuisee = !!zonesJoueurSauvees.pileRafraichissementNationEpuisee;
-  jeu.joueurZones.pileEtoileEpuisee = !!zonesJoueurSauvees.pileEtoileEpuisee;
+  const zonesJoueurRehydratees = rehydraterZonesJoueurDepuisSauvegarde(zonesJoueurSauvees);
+  jeu.joueurZones = {
+    ...jeu.joueurZones,
+    ...zonesJoueurRehydratees
+  };
+
+  appliquerEtatDuelDepuisSauvegarde(jeuSauve.duel || null);
 
   etatBot.nation = botSauve.nation || etatBot.nation;
   etatBot.statut = botSauve.statut || etatBot.statut;
@@ -21079,6 +21554,10 @@ function appliquerSauvegardePartie(snapshot) {
 }
 
 function determinerVueApresChargement() {
+  if (duelEtatActif()) {
+    return "vue-joueur";
+  }
+
   if (jeu.finPartie?.terminee) {
     return "vue-joueur";
   }
@@ -21142,6 +21621,7 @@ function chargerPartieSauvegardee({ silencieux = false } = {}) {
     reinitialiserFeedbackCompteursJoueur();
 
     afficherUIPartie();
+    mettreAJourLibellesModeJeu();
     document.getElementById("barre-navigation-vues")?.classList.remove("ui-cachee");
 
     afficherHautMarche();
@@ -21296,6 +21776,74 @@ function viderPilesNation() {
   jeu.piles.nationPuissance = null;
 }
 
+function campagneConstruireDeckDepartTemplateIdsActuel() {
+  const nationJoueur = String(etatCampagne.nationJoueur || "").trim();
+  if (!nationJoueur) {
+    return [];
+  }
+
+  const base = clonerListeCartes(cartesNations).filter(carte =>
+    carte &&
+    carte.nation === nationJoueur &&
+    carte.localisationDepart === "Base"
+  );
+
+  const deckTemplateIds = base
+    .map(carte => String(carte?.templateId || "").trim())
+    .filter(Boolean);
+
+  normaliserTemplateIdsCampagne(etatCampagne.cartesAjouteesDeckDepart).forEach(templateId => {
+    deckTemplateIds.push(templateId);
+  });
+
+  normaliserTemplateIdsCampagne(etatCampagne.cartesRetireesDeckDepart).forEach(templateId => {
+    const index = deckTemplateIds.indexOf(templateId);
+    if (index !== -1) {
+      deckTemplateIds.splice(index, 1);
+    }
+  });
+
+  return deckTemplateIds;
+}
+
+function campagneAppliquerAjustementsDeckDepartSurListe(deckBase = []) {
+  if (!Array.isArray(deckBase)) {
+    return [];
+  }
+
+  if (!modeCampagneActif() || !campagneEstActive()) {
+    return deckBase;
+  }
+
+  const indexTemplates = obtenirIndexTemplatesCartesSauvegarde();
+
+  normaliserTemplateIdsCampagne(etatCampagne.cartesAjouteesDeckDepart).forEach(templateId => {
+    const template = indexTemplates.get(templateId);
+    if (!template) {
+      return;
+    }
+
+    const carteAjoutee = clonerCartePourJeu(template);
+    if (!carteAjoutee) {
+      return;
+    }
+
+    deckBase.push(carteAjoutee);
+  });
+
+  normaliserTemplateIdsCampagne(etatCampagne.cartesRetireesDeckDepart).forEach(templateId => {
+    const indexCarte = deckBase.findIndex(carte =>
+      String(carte?.templateId || "").trim() === templateId
+    );
+
+    if (indexCarte !== -1) {
+      deckBase.splice(indexCarte, 1);
+    }
+  });
+
+  return deckBase;
+}
+
 function construirePilesNation() {
   viderPilesNation();
 
@@ -21333,6 +21881,8 @@ function construirePilesNation() {
         break;
     }
   });
+
+  campagneAppliquerAjustementsDeckDepartSurListe(jeu.piles.nationBase);
 
   melanger(jeu.piles.nationBase);
   melanger(jeu.piles.nationCroissant);
@@ -22214,26 +22764,624 @@ function calculerScoreJoueurFinal() {
   };
 }
 
-function terminerPartieParScoreFinal() {
+function calculerScoreJoueurDepuisEtat(etatJoueur = null) {
+  if (!etatJoueur || typeof etatJoueur !== "object") {
+    return calculerScoreJoueurFinal();
+  }
+
+  const zones = etatJoueur.zones || {};
+  const joueur = etatJoueur.joueur || {};
+  const toutesLesCartes = aplatirCartesAvecReservees([
+    ...(zones.mainJoueur || []),
+    ...(zones.tableauJoueur || []),
+    ...(zones.deckJoueur || []),
+    ...(zones.defausseJoueur || []),
+    ...(zones.histoireJoueur || []),
+    ...(zones.cartePuissanceVisible ? [zones.cartePuissanceVisible] : [])
+  ].filter(Boolean));
+
+  const progres = Number(joueur.progres || 0);
+
+  const main = calculerScoreZoneJoueur(
+    zones.mainJoueur || [],
+    "main",
+    toutesLesCartes
+  );
+
+  const tableau = calculerScoreZoneJoueur(
+    zones.tableauJoueur || [],
+    "tableau",
+    toutesLesCartes
+  );
+
+  const deck = calculerScoreZoneJoueur(
+    zones.deckJoueur || [],
+    "deck",
+    toutesLesCartes
+  );
+
+  const defausse = calculerScoreZoneJoueur(
+    zones.defausseJoueur || [],
+    "defausse",
+    toutesLesCartes
+  );
+
+  const histoire = calculerScoreZoneJoueur(
+    zones.histoireJoueur || [],
+    "histoire",
+    toutesLesCartes
+  );
+
+  const puissance = calculerScoreZoneJoueur(
+    zones.cartePuissanceVisible ? [zones.cartePuissanceVisible] : [],
+    "puissance",
+    toutesLesCartes
+  );
+
+  return {
+    progres,
+    main,
+    tableau,
+    deck,
+    defausse,
+    histoire,
+    puissance,
+    total:
+      progres +
+      main.total +
+      tableau.total +
+      deck.total +
+      defausse.total +
+      histoire.total +
+      puissance.total
+  };
+}
+
+function calculerScoreDuelFinal() {
+  const joueur1 = jeu.duel?.joueurs?.joueur1 || null;
+  const joueur2 = jeu.duel?.joueurs?.joueur2 || null;
+
+  if (!joueur1 || !joueur2) {
+    return null;
+  }
+
+  return {
+    joueur1: calculerScoreJoueurDepuisEtat(joueur1),
+    joueur2: calculerScoreJoueurDepuisEtat(joueur2),
+    noms: {
+      joueur1: String(joueur1.nom || duelNomParCle("joueur1")),
+      joueur2: String(joueur2.nom || duelNomParCle("joueur2"))
+    }
+  };
+}
+
+function campagneDeterminerIssuePartieCourante() {
+  if (!campagnePartieEnCoursValide()) {
+    return null;
+  }
+
+  const resultat = String(jeu?.finPartie?.resultat || "").trim();
+  if (!resultat) {
+    return null;
+  }
+
+  if (resultat === "victoire") {
+    return {
+      issue: "victoire",
+      egaliteScore: false
+    };
+  }
+
+  if (resultat === "defaite") {
+    return {
+      issue: "defaite",
+      egaliteScore: false
+    };
+  }
+
+  if (resultat !== "score") {
+    return null;
+  }
+
+  const scoreFinal = jeu?.finPartie?.scoreFinal || {};
+  if (String(scoreFinal.mode || "") !== "solo") {
+    return null;
+  }
+
+  const scoreJoueur = Number(scoreFinal?.joueur?.total);
+  const scoreBot = Number(scoreFinal?.bot?.total);
+  if (!Number.isFinite(scoreJoueur) || !Number.isFinite(scoreBot)) {
+    return null;
+  }
+
+  const egaliteScore = scoreJoueur === scoreBot;
+  return {
+    issue: scoreJoueur > scoreBot ? "victoire" : "defaite",
+    egaliteScore
+  };
+}
+
+function campagneTraiterFinPartieSiNecessaire() {
+  if (!campagnePartieEnCoursValide()) {
+    return null;
+  }
+
+  const partie = etatCampagne.partieEnCours;
+  if (!partie) {
+    return null;
+  }
+
+  if (partie.resolue) {
+    return {
+      issue: String(partie.issue || ""),
+      egaliteScore: !!partie.egaliteScore
+    };
+  }
+
+  const issue = campagneDeterminerIssuePartieCourante();
+  if (!issue || (issue.issue !== "victoire" && issue.issue !== "defaite")) {
+    return null;
+  }
+
+  partie.resolue = true;
+  partie.issue = issue.issue;
+  partie.egaliteScore = !!issue.egaliteScore;
+
+  if (issue.issue === "victoire") {
+    etatCampagne.victoires = Math.min(
+      OBJECTIF_VICTOIRES_CAMPAGNE,
+      Number(etatCampagne.victoires || 0) + 1
+    );
+    etatCampagne.bonusDefaiteActif = false;
+
+    const nationBot = String(partie.nationBot || "").trim();
+    if (nationBot && !campagneNationDejaBattue(nationBot)) {
+      etatCampagne.nationsBattues.push(nationBot);
+    }
+
+    if (etatCampagne.victoires >= OBJECTIF_VICTOIRES_CAMPAGNE) {
+      etatCampagne.active = false;
+      etatCampagne.terminee = true;
+      etatCampagne.resultatFinal = "victoire";
+      etatCampagne.recompenseEnAttente = false;
+      etatCampagne.partieEnCours = null;
+    } else {
+      etatCampagne.recompenseEnAttente = true;
+    }
+  } else {
+    etatCampagne.defaites = Math.min(
+      LIMITE_DEFAITES_CAMPAGNE,
+      Number(etatCampagne.defaites || 0) + 1
+    );
+    etatCampagne.bonusDefaiteActif = true;
+    etatCampagne.recompenseEnAttente = false;
+    etatCampagne.partieEnCours = null;
+
+    if (etatCampagne.defaites >= LIMITE_DEFAITES_CAMPAGNE) {
+      etatCampagne.active = false;
+      etatCampagne.terminee = true;
+      etatCampagne.resultatFinal = "defaite";
+    }
+
+    if (issue.egaliteScore && String(jeu?.finPartie?.resultat || "") === "score") {
+      const raisonCourante = String(jeu?.finPartie?.raison || "").trim();
+      const noteCampagne = "Egalite au score: en campagne, cela compte comme une defaite.";
+      jeu.finPartie.raison = raisonCourante
+        ? `${raisonCourante} ${noteCampagne}`
+        : noteCampagne;
+    }
+  }
+
+  etatCampagne.nationsBattues = [...new Set(etatCampagne.nationsBattues)];
+  sauvegarderEtatCampagneDansStockage();
+  mettreAJourResumeCampagneAccueil();
+
+  return issue;
+}
+
+function campagneNettoyerTexteEffetCarte(texte = "") {
+  return String(texte || "")
+    .replace(/<[^>]*>/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function campagneCartesEligiblesZonesRecompense() {
+  const cartes = [
+    ...(jeu?.joueurZones?.mainJoueur || []),
+    ...(jeu?.joueurZones?.deckJoueur || []),
+    ...(jeu?.joueurZones?.defausseJoueur || []),
+    ...(jeu?.joueurZones?.histoireJoueur || [])
+  ];
+
+  return aplatirCartesAvecReservees(cartes);
+}
+
+function campagneMarquerCartesInitialesPartie() {
+  if (!modeCampagneActif() || !campagneEstActive()) {
+    return;
+  }
+
+  const cartesDepart = [
+    ...(jeu?.joueurZones?.mainJoueur || []),
+    ...(jeu?.joueurZones?.deckJoueur || []),
+    ...(jeu?.joueurZones?.defausseJoueur || []),
+    ...(jeu?.joueurZones?.histoireJoueur || []),
+    ...(jeu?.joueurZones?.tableauJoueur || []),
+    ...(jeu?.joueurZones?.pileEtoileJoueur || []),
+    ...(jeu?.joueurZones?.pileCroissantJoueur || []),
+    ...(jeu?.joueurZones?.carteStatutVisible ? [jeu.joueurZones.carteStatutVisible] : []),
+    ...(jeu?.joueurZones?.cartePuissanceVisible ? [jeu.joueurZones.cartePuissanceVisible] : []),
+    ...(jeu?.joueurZones?.cartePleineVisible ? [jeu.joueurZones.cartePleineVisible] : [])
+  ];
+
+  aplatirCartesAvecReservees(cartesDepart).forEach(carte => {
+    if (!carte || typeof carte !== "object") {
+      return;
+    }
+    carte.campagneCarteInitialePartie = true;
+  });
+}
+
+function campagneCarteCommuneEligibileAjout(carte) {
+  if (!carte) {
+    return false;
+  }
+
+  const templateId = String(carte.templateId || "").trim();
+  if (!templateId || !templateId.startsWith("commune:")) {
+    return false;
+  }
+
+  if (inclutCategorie(carte, CATEGORIES.INSTABILITE) || inclutCategorie(carte, CATEGORIES.RENOMMEE)) {
+    return false;
+  }
+
+  if (carte.campagneCarteInitialePartie === true) {
+    return false;
+  }
+
+  return true;
+}
+
+function campagneListerChoixAjoutCarteDepart() {
+  const templatesDeckDepartActuel = new Set(
+    campagneConstruireDeckDepartTemplateIdsActuel()
+      .map(templateId => String(templateId || "").trim())
+      .filter(Boolean)
+  );
+  const indexParTemplate = new Map();
+
+  campagneCartesEligiblesZonesRecompense().forEach(carte => {
+    if (!campagneCarteCommuneEligibileAjout(carte)) {
+      return;
+    }
+
+    const templateId = String(carte.templateId || "").trim();
+    if (!templateId) {
+      return;
+    }
+
+    if (templatesDeckDepartActuel.has(templateId)) {
+      return;
+    }
+
+    if (!indexParTemplate.has(templateId)) {
+      indexParTemplate.set(templateId, {
+        templateId,
+        nom: String(carte.nom || "Carte"),
+        categorie: String(carte.categorie || ""),
+        effet: campagneNettoyerTexteEffetCarte(carte.effet || ""),
+        quantite: 0
+      });
+    }
+
+    indexParTemplate.get(templateId).quantite += 1;
+  });
+
+  return Array.from(indexParTemplate.values())
+    .sort((a, b) => String(a.nom || "").localeCompare(String(b.nom || ""), "fr", { sensitivity: "base" }));
+}
+
+function campagneListerChoixRetraitCarteDepart() {
+  const templateIds = campagneConstruireDeckDepartTemplateIdsActuel();
+  const indexTemplates = obtenirIndexTemplatesCartesSauvegarde();
+  const indexParTemplate = new Map();
+
+  templateIds.forEach(templateId => {
+    const id = String(templateId || "").trim();
+    if (!id) {
+      return;
+    }
+
+    if (!indexParTemplate.has(id)) {
+      const template = indexTemplates.get(id);
+      indexParTemplate.set(id, {
+        templateId: id,
+        nom: String(template?.nom || "Carte"),
+        categorie: String(template?.categorie || ""),
+        effet: campagneNettoyerTexteEffetCarte(template?.effet || ""),
+        quantite: 0
+      });
+    }
+
+    indexParTemplate.get(id).quantite += 1;
+  });
+
+  return Array.from(indexParTemplate.values())
+    .sort((a, b) => String(a.nom || "").localeCompare(String(b.nom || ""), "fr", { sensitivity: "base" }));
+}
+
+function campagneChoisirRecompenseAjout(index = -1) {
+  const idx = Number(index);
+  if (!Number.isInteger(idx) || idx < 0 || idx >= campagneChoixRecompenseAjout.length) {
+    return;
+  }
+
+  const choix = campagneChoixRecompenseAjout[idx];
+  const templateId = String(choix?.templateId || "").trim();
+  if (!templateId) {
+    return;
+  }
+
+  const templatesDeckDepartActuel = new Set(
+    campagneConstruireDeckDepartTemplateIdsActuel()
+      .map(id => String(id || "").trim())
+      .filter(Boolean)
+  );
+
+  if (templatesDeckDepartActuel.has(templateId)) {
+    avertir("Cette carte est deja presente dans le deck de depart de campagne.");
+    return;
+  }
+
+  etatCampagne.cartesAjouteesDeckDepart.push(templateId);
+  etatCampagne.recompenseEnAttente = false;
+  etatCampagne.partieEnCours = null;
+  sauvegarderEtatCampagneDansStockage();
+  location.reload();
+}
+
+function campagneChoisirRecompenseRetrait(index = -1) {
+  const idx = Number(index);
+  if (!Number.isInteger(idx) || idx < 0 || idx >= campagneChoixRecompenseRetrait.length) {
+    return;
+  }
+
+  const choix = campagneChoixRecompenseRetrait[idx];
+  const templateId = String(choix?.templateId || "").trim();
+  if (!templateId) {
+    return;
+  }
+
+  etatCampagne.cartesRetireesDeckDepart.push(templateId);
+  etatCampagne.recompenseEnAttente = false;
+  etatCampagne.partieEnCours = null;
+  sauvegarderEtatCampagneDansStockage();
+  location.reload();
+}
+
+window.campagneChoisirRecompenseAjout = campagneChoisirRecompenseAjout;
+window.campagneChoisirRecompenseRetrait = campagneChoisirRecompenseRetrait;
+
+function campagnePasserRecompenseVictoire() {
+  etatCampagne.recompenseEnAttente = false;
+  etatCampagne.partieEnCours = null;
+  sauvegarderEtatCampagneDansStockage();
+  location.reload();
+}
+
+window.campagnePasserRecompenseVictoire = campagnePasserRecompenseVictoire;
+
+function campagneConstruireLigneChoixCarte(choix, index, type = "ajout") {
+  const nom = String(choix?.nom || "Carte");
+  const categorie = String(choix?.categorie || "").trim();
+  const effet = String(choix?.effet || "").trim();
+  const quantite = Math.max(1, Number(choix?.quantite || 1));
+  const etiquetteBouton = type === "retrait" ? "Retirer" : "Ajouter";
+  const action = type === "retrait"
+    ? `campagneChoisirRecompenseRetrait(${index})`
+    : `campagneChoisirRecompenseAjout(${index})`;
+  const suffixeQuantite = quantite > 1 ? ` (x${quantite})` : "";
+  const ligneCategorie = categorie
+    ? `<div style="font-size:12px; opacity:0.8; margin-top:2px;">Categorie: ${echapperAttributHTML(categorie)}</div>`
+    : "";
+  const ligneEffet = effet
+    ? `<div style="font-size:13px; line-height:1.35; margin-top:6px; opacity:0.95;">Effet: ${echapperAttributHTML(effet)}</div>`
+    : "";
+
+  return `
+    <div style="
+      display:flex;
+      justify-content:space-between;
+      align-items:flex-start;
+      gap:10px;
+      border:1px solid rgba(255,255,255,0.2);
+      border-radius:10px;
+      padding:10px;
+      background:rgba(255,255,255,0.06);
+    ">
+      <div style="min-width:0;">
+        <div style="font-weight:700;">${echapperAttributHTML(nom)}${suffixeQuantite}</div>
+        ${ligneCategorie}
+        ${ligneEffet}
+      </div>
+      <button onclick="${action}" style="padding:8px 12px; font-size:14px; cursor:pointer;">
+        ${etiquetteBouton}
+      </button>
+    </div>
+  `;
+}
+
+function campagneConstruireBlocFinPartieHTML() {
+  if (!modeCampagneActif()) {
+    campagneChoixRecompenseAjout = [];
+    campagneChoixRecompenseRetrait = [];
+    return "";
+  }
+
+  const ligneProgression = `Progression campagne: ${Number(etatCampagne.victoires || 0)}/${OBJECTIF_VICTOIRES_CAMPAGNE} victoires, ${Number(etatCampagne.defaites || 0)}/${LIMITE_DEFAITES_CAMPAGNE} defaites.`;
+
+  if (!etatCampagne.recompenseEnAttente) {
+    const ligneEtatFinal = etatCampagne.terminee
+      ? `<div style="font-size:16px; margin-top:6px;">Campagne terminee: ${echapperAttributHTML(etatCampagne.resultatFinal === "victoire" ? "victoire" : "defaite")}.</div>`
+      : `<div style="font-size:16px; margin-top:6px;">
+          Difficulte suivante: ${echapperAttributHTML(libelleDifficulteBot(campagneDifficulteCourante()))}
+        </div>`;
+
+    return `
+      <div style="
+        margin-top:20px;
+        padding:14px 16px;
+        border-radius:12px;
+        background:rgba(255,255,255,0.12);
+        text-align:left;
+      ">
+        <div style="font-weight:bold; margin-bottom:6px;">Mode Campagne</div>
+        <div style="font-size:16px;">${echapperAttributHTML(ligneProgression)}</div>
+        ${ligneEtatFinal}
+      </div>
+    `;
+  }
+
+  campagneChoixRecompenseAjout = campagneListerChoixAjoutCarteDepart();
+  campagneChoixRecompenseRetrait = campagneListerChoixRetraitCarteDepart();
+
+  const boutonsAjout = campagneChoixRecompenseAjout.length === 0
+    ? `<div style="opacity:0.82;">Aucune carte eligible disponible.</div>`
+    : campagneChoixRecompenseAjout.map((choix, index) =>
+      campagneConstruireLigneChoixCarte(choix, index, "ajout")
+    ).join("");
+
+  const boutonsRetrait = campagneChoixRecompenseRetrait.length === 0
+    ? `<div style="opacity:0.82;">Aucune carte disponible dans le deck de depart.</div>`
+    : campagneChoixRecompenseRetrait.map((choix, index) =>
+      campagneConstruireLigneChoixCarte(choix, index, "retrait")
+    ).join("");
+
+  const aucunChoixDisponible =
+    campagneChoixRecompenseAjout.length === 0 &&
+    campagneChoixRecompenseRetrait.length === 0;
+  const boutonSecoursSansChoix = aucunChoixDisponible
+    ? `
+      <div style="margin-top:14px;">
+        <button onclick="campagnePasserRecompenseVictoire()" style="padding:10px 14px; font-size:15px; cursor:pointer;">
+          Continuer sans recompense
+        </button>
+      </div>
+    `
+    : "";
+
+  return `
+    <div style="
+      margin-top:22px;
+      padding:16px;
+      border-radius:12px;
+      background:rgba(255,255,255,0.12);
+      text-align:left;
+    ">
+      <div style="font-weight:bold; margin-bottom:8px;">Recompense de victoire (choisissez une option)</div>
+      <div style="font-size:15px; margin-bottom:12px;">${echapperAttributHTML(ligneProgression)}</div>
+
+      <div style="margin-bottom:14px;">
+        <div style="font-weight:700; margin-bottom:6px;">Option 1: ajouter une carte du marche gagnee cette partie au deck de depart</div>
+        <div style="display:grid; gap:8px;">${boutonsAjout}</div>
+      </div>
+
+      <div>
+        <div style="font-weight:700; margin-bottom:6px;">Option 2: retirer une carte du deck de depart pour le reste de la campagne</div>
+        <div style="display:grid; gap:8px;">${boutonsRetrait}</div>
+      </div>
+      ${boutonSecoursSansChoix}
+    </div>
+  `;
+}
+
+function campagneConstruireBoutonsFinPartieHTML() {
+  if (!modeCampagneActif()) {
+    return `
+      <button onclick="location.reload()" style="
+        padding: 14px 28px;
+        font-size: 20px;
+        cursor: pointer;
+      ">
+        Rejouer
+      </button>
+    `;
+  }
+
+  if (etatCampagne.recompenseEnAttente) {
+    return "";
+  }
+
+  if (etatCampagne.terminee) {
+    return `
+      <button onclick="campagneContinuerDepuisFinPartie()" style="
+        padding: 14px 28px;
+        font-size: 20px;
+        cursor: pointer;
+      ">
+        Retour a l'accueil
+      </button>
+      <button onclick="campagneReinitialiserDepuisFinPartie()" style="
+        padding: 14px 28px;
+        font-size: 20px;
+        cursor: pointer;
+      ">
+        Nouvelle campagne
+      </button>
+    `;
+  }
+
+  return `
+    <button onclick="campagneContinuerDepuisFinPartie()" style="
+      padding: 14px 28px;
+      font-size: 20px;
+      cursor: pointer;
+    ">
+      Continuer la campagne
+    </button>
+  `;
+}
+
+function terminerPartieParScoreFinal(raisonPersonnalisee = "") {
   if (jeu.finPartie.terminee) {
     return true;
   }
 
   jeu.finPartie.terminee = true;
   jeu.finPartie.resultat = "score";
-  jeu.finPartie.raison = "Le Décompte est terminé.";
+  jeu.finPartie.raison = String(raisonPersonnalisee || "").trim() || "Le Décompte est terminé.";
 
   tourBotEnCours = false;
-  retirerJusquaDeuxInstabilitesAvecSumeriens();
 
-  const scoreBot = calculerScoreBotFinal();
-  const scoreJoueur = calculerScoreJoueurFinal();
+  if (duelEtatActif()) {
+    const scoreDuel = calculerScoreDuelFinal();
+    if (!scoreDuel) {
+      return terminerPartie(
+        "defaite",
+        "Erreur de decompte duel: score introuvable."
+      );
+    }
 
-  jeu.finPartie.scoreFinal = {
-    bot: scoreBot,
-    joueur: scoreJoueur
-  };
+    jeu.finPartie.scoreFinal = {
+      mode: "duel",
+      ...scoreDuel
+    };
+  } else {
+    retirerJusquaDeuxInstabilitesAvecSumeriens();
 
+    const scoreBot = calculerScoreBotFinal();
+    const scoreJoueur = calculerScoreJoueurFinal();
+
+    jeu.finPartie.scoreFinal = {
+      mode: "solo",
+      bot: scoreBot,
+      joueur: scoreJoueur
+    };
+  }
+
+  campagneTraiterFinPartieSiNecessaire();
   afficherEcranScoreFinal();
 
   return true;
@@ -22292,12 +23440,95 @@ function blocDetailsScoreZoneHTML(titre, bloc) {
 }
 
 function afficherEcranScoreFinal() {
+  campagneTraiterFinPartieSiNecessaire();
+
   const app = document.getElementById("app");
   if (!app) return;
   activerScrollPagesScore();
 
+  const scoreFinal = jeu.finPartie?.scoreFinal || {};
+  if (scoreFinal.mode === "duel") {
+    const scoreJoueur1 = scoreFinal.joueur1;
+    const scoreJoueur2 = scoreFinal.joueur2;
+    const nomJoueur1 = String(scoreFinal.noms?.joueur1 || "Joueur 1");
+    const nomJoueur2 = String(scoreFinal.noms?.joueur2 || "Joueur 2");
+
+    if (!scoreJoueur1 || !scoreJoueur2) {
+      app.innerHTML = `<div style="padding:40px;color:white;background:#222;">Erreur : score duel introuvable.</div>`;
+      return;
+    }
+
+    const resultat =
+      scoreJoueur1.total > scoreJoueur2.total
+        ? `Victoire de ${nomJoueur1}`
+        : scoreJoueur1.total < scoreJoueur2.total
+        ? `Victoire de ${nomJoueur2}`
+        : "Egalite";
+
+    app.innerHTML = `
+      <div id="ecran-score-final" style="
+        min-height: 100vh;
+        background: #1c1c1c;
+        color: white;
+        padding: 40px;
+        box-sizing: border-box;
+        font-family: Arial, sans-serif;
+      ">
+        <h1 style="font-size: 56px; margin-top: 0;">Score final</h1>
+        <p style="font-size: 22px;">${jeu.finPartie.raison || ""}</p>
+
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:32px;margin-top:32px;">
+          <div style="background:rgba(255,255,255,0.06);padding:24px;border-radius:16px;">
+            <h2>${nomJoueur1}</h2>
+            <p><strong>Progres :</strong> ${scoreJoueur1.progres} PV</p>
+            <p><strong>Main :</strong> ${scoreJoueur1.main.total} PV</p>
+            <p><strong>Tableau :</strong> ${scoreJoueur1.tableau.total} PV</p>
+            <p><strong>Deck :</strong> ${scoreJoueur1.deck.total} PV</p>
+            <p><strong>Defausse :</strong> ${scoreJoueur1.defausse.total} PV</p>
+            <p><strong>Histoire :</strong> ${scoreJoueur1.histoire.total} PV</p>
+            <p><strong>Puissance :</strong> ${scoreJoueur1.puissance.total} PV</p>
+            <hr>
+            <p style="font-size:28px;"><strong>Total : ${scoreJoueur1.total} PV</strong></p>
+          </div>
+
+          <div style="background:rgba(255,255,255,0.06);padding:24px;border-radius:16px;">
+            <h2>${nomJoueur2}</h2>
+            <p><strong>Progres :</strong> ${scoreJoueur2.progres} PV</p>
+            <p><strong>Main :</strong> ${scoreJoueur2.main.total} PV</p>
+            <p><strong>Tableau :</strong> ${scoreJoueur2.tableau.total} PV</p>
+            <p><strong>Deck :</strong> ${scoreJoueur2.deck.total} PV</p>
+            <p><strong>Defausse :</strong> ${scoreJoueur2.defausse.total} PV</p>
+            <p><strong>Histoire :</strong> ${scoreJoueur2.histoire.total} PV</p>
+            <p><strong>Puissance :</strong> ${scoreJoueur2.puissance.total} PV</p>
+            <hr>
+            <p style="font-size:28px;"><strong>Total : ${scoreJoueur2.total} PV</strong></p>
+          </div>
+        </div>
+
+        <div style="margin-top:32px;">
+          <h2>Resultat</h2>
+          <p style="font-size:30px;"><strong>${resultat}</strong></p>
+        </div>
+
+        <div style="margin-top:32px; display:flex; gap:12px; flex-wrap:wrap;">
+          <button onclick="location.reload()" style="
+            padding: 14px 28px;
+            font-size: 20px;
+            cursor: pointer;
+          ">
+            Rejouer
+          </button>
+        </div>
+      </div>
+    `;
+    return;
+  }
+
   const scoreBot = jeu.finPartie?.scoreFinal?.bot;
   const scoreJoueur = jeu.finPartie?.scoreFinal?.joueur;
+  const blocCampagne = campagneConstruireBlocFinPartieHTML();
+  const boutonsCampagne = campagneConstruireBoutonsFinPartieHTML();
+  const afficherBoutonDetailCampagne = !modeCampagneActif();
 
   if (!scoreBot || !scoreJoueur) {
     app.innerHTML = `<div style="padding:40px;color:white;background:#222;">Erreur : score final introuvable.</div>`;
@@ -22355,22 +23586,19 @@ function afficherEcranScoreFinal() {
         </p>
       </div>
 
-     <div style="margin-top:32px; display:flex; gap:12px; flex-wrap:wrap;">
-  <button onclick="afficherEcranScoreAvance()" style="
-    padding: 14px 28px;
-    font-size: 20px;
-    cursor: pointer;
-  ">
-    Voir le détail
-  </button>
+      ${blocCampagne}
 
-  <button onclick="location.reload()" style="
-    padding: 14px 28px;
-    font-size: 20px;
-    cursor: pointer;
-  ">
-    Rejouer
-  </button>
+     <div style="margin-top:32px; display:flex; gap:12px; flex-wrap:wrap;">
+  ${afficherBoutonDetailCampagne ? `
+    <button onclick="afficherEcranScoreAvance()" style="
+      padding: 14px 28px;
+      font-size: 20px;
+      cursor: pointer;
+    ">
+      Voir le détail
+    </button>
+  ` : ""}
+  ${boutonsCampagne}
 </div>
     </div>
   `;
@@ -22380,6 +23608,11 @@ function afficherEcranScoreAvance() {
   const app = document.getElementById("app");
   if (!app) return;
   activerScrollPagesScore();
+
+  if (jeu.finPartie?.scoreFinal?.mode === "duel") {
+    afficherEcranScoreFinal();
+    return;
+  }
 
   const scoreJoueur = jeu.finPartie?.scoreFinal?.joueur;
   const scoreBotSimple = jeu.finPartie?.scoreFinal?.bot;
@@ -22613,12 +23846,59 @@ function verifierFinParDecompte() {
   return false;
 }
 
-   function verifierEffondrement() {
+function compterInstabilitesDepuisEtatJoueurDuel(etatJoueur = null) {
+  if (!etatJoueur || typeof etatJoueur !== "object") {
+    return 0;
+  }
+
+  const zones = etatJoueur.zones || {};
+  const toutesLesCartes = aplatirCartesAvecReservees([
+    ...(zones.mainJoueur || []),
+    ...(zones.tableauJoueur || []),
+    ...(zones.deckJoueur || []),
+    ...(zones.defausseJoueur || []),
+    ...(zones.histoireJoueur || []),
+    ...(zones.cartePuissanceVisible ? [zones.cartePuissanceVisible] : []),
+    ...(zones.cartePleineVisible ? [zones.cartePleineVisible] : []),
+    ...(zones.carteStatutVisible ? [zones.carteStatutVisible] : [])
+  ].filter(Boolean));
+
+  return toutesLesCartes.filter(carte =>
+    inclutCategorie(carte, CATEGORIES.INSTABILITE)
+  ).length;
+}
+
+function verifierEffondrement() {
   if (jeu.finPartie.terminee) {
     return true;
   }
 
   if (jeu.piles.piocheMarcheInstabilite.length === 0) {
+    if (duelEtatActif()) {
+      const etatJoueur1 = jeu.duel?.joueurs?.joueur1 || null;
+      const etatJoueur2 = jeu.duel?.joueurs?.joueur2 || null;
+      const nomJoueur1 = String(etatJoueur1?.nom || duelNomParCle("joueur1"));
+      const nomJoueur2 = String(etatJoueur2?.nom || duelNomParCle("joueur2"));
+      const instabilitesJoueur1 = compterInstabilitesDepuisEtatJoueurDuel(etatJoueur1);
+      const instabilitesJoueur2 = compterInstabilitesDepuisEtatJoueurDuel(etatJoueur2);
+
+      if (instabilitesJoueur1 === instabilitesJoueur2) {
+        return terminerPartieParScoreFinal(
+          `Effondrement : la pile Instabilité du marché est vide. ${nomJoueur1}: ${instabilitesJoueur1} | ${nomJoueur2}: ${instabilitesJoueur2}. Égalité d’Instabilité: départage au score final.`
+        );
+      }
+
+      const perdantNom = instabilitesJoueur1 > instabilitesJoueur2
+        ? nomJoueur1
+        : nomJoueur2;
+
+      terminerPartie(
+        "defaite",
+        `Effondrement : la pile Instabilité du marché est vide. ${nomJoueur1}: ${instabilitesJoueur1} | ${nomJoueur2}: ${instabilitesJoueur2}. ${perdantNom} a le plus de cartes Instabilité et perd la partie.`
+      );
+      return true;
+    }
+
     terminerPartie(
       "defaite",
       "Effondrement : la pile Instabilité du marché est vide. Vous perdez la partie."
@@ -22652,6 +23932,7 @@ function verifierFinParDecompte() {
   afficherHautMarche?.();
   afficherZoneBot?.();
 
+  campagneTraiterFinPartieSiNecessaire();
   afficherEcranFinDePartie();
 
   return true;
@@ -23829,6 +25110,10 @@ function ajouterProgresSurCarteMarche(carte) {
     return;
   }
 
+  if (jeu?.ui?.choixProgresMarcheActif) {
+    journal(`Nettoyage: le joueur actif place son jeton sur ${carte.nom}.`);
+  }
+
   if (carthaginoisActif()) {
     ajouterMateriauxSurCarteMarche(carte, 1);
     return;
@@ -23864,6 +25149,7 @@ await proposerEpuisementPuissanceCarthaginoisSiCarteMarcheAvecMateriaux(cartePri
 attribuerMateriauxCarteMarcheRecuperee(cartePrincipale);
 
 jeu.joueurZones.mainJoueur.push(cartePrincipale);
+  campagneMarquerCarteGagneeCettePartie(cartePrincipale);
   
 
   if (carteDessous && categoriePrincipaleCarte(carteDessous) === CATEGORIES.INSTABILITE) {
@@ -23912,6 +25198,7 @@ await proposerEpuisementPuissanceCarthaginoisSiCarteMarcheAvecMateriaux(cartePri
 attribuerMateriauxCarteMarcheRecuperee(cartePrincipale);
 
 jeu.joueurZones.mainJoueur.push(cartePrincipale);
+  campagneMarquerCarteGagneeCettePartie(cartePrincipale);
 
   if (carteDessous && categoriePrincipaleCarte(carteDessous) === CATEGORIES.INSTABILITE) {
     if (prendreInstabilite) {
@@ -23930,23 +25217,50 @@ jeu.joueurZones.mainJoueur.push(cartePrincipale);
 }
 
 async function acquerirCarteDansZone(zone) {
-  return await transfererCarteMarcheVersMain(zone, {
+  const nomCarteVisible = String(zone?.[0]?.nom || "").trim();
+  const succes = await transfererCarteMarcheVersMain(zone, {
     prendreInstabilite: true,
     renvoyerInstabiliteDansPile: false
   });
+
+  if (succes && nomCarteVisible) {
+    journal(
+      `Le joueur actif acquiert ${nomCarteVisible} depuis une carte visible du Marche.`
+    );
+  }
+
+  return succes;
 }
 
-function acquerirCarteDansZoneAvecRetour(zone) {
-  return transfererCarteMarcheVersMainAvecRetour(zone, {
+async function acquerirCarteDansZoneAvecRetour(zone) {
+  const nomCarteVisible = String(zone?.[0]?.nom || "").trim();
+  const carteAcquise = await transfererCarteMarcheVersMainAvecRetour(zone, {
     prendreInstabilite: true,
     renvoyerInstabiliteDansPile: false
   });
+
+  if (carteAcquise && nomCarteVisible) {
+    journal(
+      `Le joueur actif acquiert ${nomCarteVisible} depuis une carte visible du Marche.`
+    );
+  }
+
+  return carteAcquise;
 }
 
 function innoverCarteDansZone(zone) {
+  const nomCarteVisible = String(zone?.[0]?.nom || "").trim();
   return transfererCarteMarcheVersMain(zone, {
     prendreInstabilite: false,
     renvoyerInstabiliteDansPile: true
+  }).then(succes => {
+    if (succes && nomCarteVisible) {
+      journal(
+        `Le joueur actif innove ${nomCarteVisible} depuis une carte visible du Marche.`
+      );
+    }
+
+    return succes;
   });
 }
 
@@ -24137,19 +25451,39 @@ async function innoverCategorieChoisieParmiCategories(categories) {
       onChoose: async cle => {
         let categorieChoisie = null;
         let resultatInnovation = false;
+        let innovationDepuisPioche = false;
+        let innovationDepuisCarteVisible = false;
 
         if (zonesEligibles.includes(cle)) {
           const zone = jeu.zonesMarche[cle];
           categorieChoisie = categoriePrincipaleCarte(zone?.[0]) || null;
           resultatInnovation = await innoverCarteDansZone(zone);
+          innovationDepuisCarteVisible = true;
         } else if (piochesEligibles.includes(cle)) {
           categorieChoisie = cle;
           resultatInnovation = innoverDepuisPiocheCategorie(cle);
+          innovationDepuisPioche = true;
         }
 
         const innovationReussie =
           !!resultatInnovation && resultatInnovation !== "progres";
         const actionValidee = innovationReussie || resultatInnovation === "progres";
+
+        if (actionValidee && categorieChoisie) {
+          const categorieTexte = String(categorieChoisie || "").trim();
+
+          if (resultatInnovation === "progres") {
+            journal(
+              `Le joueur actif tente d'innover en ${categorieTexte}, aucune carte n'est disponible et il gagne 2 Progres.`
+            );
+          } else if (innovationDepuisPioche) {
+            journal(
+              `Le joueur actif innove en ${categorieTexte} depuis la pioche et pige une carte ${categorieTexte}.`
+            );
+          } else {
+            journal(`Le joueur actif innove en ${categorieTexte}.`);
+          }
+        }
 
         if (innovationReussie) {
           await declencherCeltesSiPossible(categorieChoisie);
@@ -24417,6 +25751,10 @@ function trouverIndexCarteDansTableau(carte) {
 }
 
 function defausserCarteDepuisMain(indexCarte) {
+  if (interactionLocaleMultijoueurBloquee({ avertirUtilisateur: false })) {
+    return;
+  }
+
   const main = jeu.joueurZones.mainJoueur;
 
   if (indexCarte < 0 || indexCarte >= main.length) {
@@ -24425,6 +25763,14 @@ function defausserCarteDepuisMain(indexCarte) {
 
   const carte = main.splice(indexCarte, 1)[0];
   jeu.joueurZones.defausseJoueur.push(carte);
+
+  if (jeu.manche.phase === PHASES.NETTOYAGE_DEFAUSSE) {
+    jeu.ui.nettoyageCartesDefausseesTour = Math.max(
+      0,
+      Number(jeu.ui.nettoyageCartesDefausseesTour || 0)
+    ) + 1;
+  }
+
   afficherZoneJoueur();
 }
 
@@ -25150,6 +26496,51 @@ function enrichirLibelleOptionAvecCoutReel(label, effets = []) {
   return `${texte} [Coût réel: ${morceaux.join(" + ")}]`;
 }
 
+function extraireCategoriesInnovationDepuisEffets(effets = []) {
+  const trouves = new Set();
+  const pile = Array.isArray(effets) ? [...effets] : [];
+
+  while (pile.length > 0) {
+    const effet = pile.shift();
+    if (!effet || typeof effet !== "object") {
+      continue;
+    }
+
+    const type = String(effet.type || "").trim();
+
+    if (type === "innover" && typeof effet.categorie === "string") {
+      const categorie = String(effet.categorie || "").trim();
+      if (categorie) {
+        trouves.add(categorie);
+      }
+    }
+
+    if (
+      (type === "innoverParmiCategories" ||
+        type === "payerPuisInnoverParmiCategories" ||
+        type === "lancerPaiementPuisInnoverParmiCategories") &&
+      Array.isArray(effet.categories)
+    ) {
+      effet.categories.forEach(categorie => {
+        const valeur = String(categorie || "").trim();
+        if (valeur) {
+          trouves.add(valeur);
+        }
+      });
+    }
+
+    if (Array.isArray(effet.effets)) {
+      pile.push(...effet.effets);
+    }
+
+    if (Array.isArray(effet.effetSiOui)) {
+      pile.push(...effet.effetSiOui);
+    }
+  }
+
+  return Array.from(trouves);
+}
+
 /* =========================================================
    23) CHOIX DE CATÉGORIES / ACTIONS LIÉES AU MARCHÉ
    ========================================================= */
@@ -25176,7 +26567,13 @@ async function choisirCategorie(categories) {
     return null;
   }
 
-  return categories[indexChoisi];
+  const categorieChoisie = categories[indexChoisi];
+
+  if (categories.length > 1 && categorieChoisie) {
+    journal(`Le joueur actif choisit la categorie: ${categorieChoisie}.`);
+  }
+
+  return categorieChoisie;
 }
 
 async function choisirCategorieAuMarche(categories) {
@@ -25858,6 +27255,796 @@ function fermerChoixCategorieMarche() {
   panneau.style.display = "none";
   panneau.innerHTML = "";
 }
+
+function obtenirEtatAdversaireDuelPourEffets() {
+  if (!duelEtatActif()) {
+    return null;
+  }
+
+  return duelObtenirEtatJoueurSecondaire();
+}
+
+function obtenirNomAdversaireEffets() {
+  const etatDuel = obtenirEtatAdversaireDuelPourEffets();
+  if (etatDuel) {
+    const cleAdverse = duelObtenirCleJoueurSecondaire();
+    return duelNationParCle(cleAdverse);
+  }
+
+  return "Bot";
+}
+
+function adversaireStatutEstEmpire() {
+  const etatDuel = obtenirEtatAdversaireDuelPourEffets();
+  if (etatDuel) {
+    return String(etatDuel.zones?.carteStatutVisible?.nom || "").trim() === STATUTS.EMPIRE;
+  }
+
+  return botStatutEstEmpire();
+}
+
+function adversaireLireRessource(ressource = "") {
+  const cle = String(ressource || "");
+  const etatDuel = obtenirEtatAdversaireDuelPourEffets();
+
+  if (etatDuel) {
+    return Math.max(0, Number(etatDuel.joueur?.[cle]) || 0);
+  }
+
+  return Math.max(0, Number(etatBot?.[cle]) || 0);
+}
+
+function adversairePerdreRessource(ressource, quantite = 1) {
+  const etatDuel = obtenirEtatAdversaireDuelPourEffets();
+  if (!etatDuel) {
+    return botPerdreRessource(ressource, quantite);
+  }
+
+  const q = Math.max(0, Number(quantite) || 0);
+  if (q <= 0) {
+    return 0;
+  }
+
+  const disponible = Math.max(0, Number(etatDuel.joueur?.[ressource]) || 0);
+  const perdu = Math.min(disponible, q);
+  etatDuel.joueur[ressource] = disponible - perdu;
+  return perdu;
+}
+
+function adversaireGagnerRessource(ressource, quantite = 1) {
+  const etatDuel = obtenirEtatAdversaireDuelPourEffets();
+  if (!etatDuel) {
+    return botGagnerRessource(ressource, quantite);
+  }
+
+  const q = Math.max(0, Number(quantite) || 0);
+  if (q <= 0) {
+    return 0;
+  }
+
+  etatDuel.joueur[ressource] = (Number(etatDuel.joueur?.[ressource]) || 0) + q;
+  return q;
+}
+
+function adversaireAUneRegionEnJeu() {
+  const etatDuel = obtenirEtatAdversaireDuelPourEffets();
+  if (!etatDuel) {
+    return botAUneRegionEnJeu();
+  }
+
+  const tableau = Array.isArray(etatDuel.zones?.tableauJoueur)
+    ? etatDuel.zones.tableauJoueur
+    : [];
+
+  return tableau.some(carte => inclutCategorie(carte, CATEGORIES.REGION));
+}
+
+function adversaireRecevoirCarteDonnee(carte = null) {
+  if (!carte) {
+    return false;
+  }
+
+  const etatDuel = obtenirEtatAdversaireDuelPourEffets();
+  if (!etatDuel) {
+    etatBot.deckCiv.unshift(carte);
+    return true;
+  }
+
+  if (!Array.isArray(etatDuel.zones.deckJoueur)) {
+    etatDuel.zones.deckJoueur = [];
+  }
+  etatDuel.zones.deckJoueur.unshift(carte);
+  return true;
+}
+
+function adversaireRecevoirInstabilite(quantite = 1) {
+  if (verifierEffondrement()) {
+    return 0;
+  }
+
+  const etatDuel = obtenirEtatAdversaireDuelPourEffets();
+  let gagnees = 0;
+
+  for (let i = 0; i < quantite; i += 1) {
+    const carteInstabilite = jeu.piles.piocheMarcheInstabilite.pop();
+
+    if (!carteInstabilite) {
+      verifierEffondrement();
+      break;
+    }
+
+    if (etatDuel) {
+      if (!Array.isArray(etatDuel.zones.mainJoueur)) {
+        etatDuel.zones.mainJoueur = [];
+      }
+      etatDuel.zones.mainJoueur.push(carteInstabilite);
+    } else {
+      etatBot.deckCiv.unshift(carteInstabilite);
+    }
+
+    gagnees += 1;
+
+    if (verifierEffondrement()) {
+      break;
+    }
+  }
+
+  return gagnees;
+}
+
+function adversaireAbandonnerCategorie(categorie, quantite = 1) {
+  const etatDuel = obtenirEtatAdversaireDuelPourEffets();
+  if (!etatDuel) {
+    return botAbandonnerCategorie(categorie, quantite);
+  }
+
+  let total = 0;
+  const tableau = Array.isArray(etatDuel.zones.tableauJoueur) ? etatDuel.zones.tableauJoueur : [];
+  if (!Array.isArray(etatDuel.zones.defausseJoueur)) {
+    etatDuel.zones.defausseJoueur = [];
+  }
+
+  for (let i = 0; i < quantite; i += 1) {
+    const eligibles = tableau.filter(carte => inclutCategorie(carte, categorie));
+    if (eligibles.length === 0) {
+      break;
+    }
+
+    const carte = botChoisirCarteMoinsValuable(eligibles);
+    if (!carte) {
+      break;
+    }
+
+    const index = tableau.indexOf(carte);
+    if (index < 0) {
+      break;
+    }
+
+    const carteRetiree = tableau.splice(index, 1)[0];
+    if (!carteRetiree) {
+      break;
+    }
+
+    deplacerCarteEtReserveesVersZone(carteRetiree, etatDuel.zones.defausseJoueur, "fin");
+    total += 1;
+  }
+
+  return total;
+}
+
+function adversaireRappelerCategorie(categorie, quantite = 1) {
+  const etatDuel = obtenirEtatAdversaireDuelPourEffets();
+  if (!etatDuel) {
+    return botRappelerCategorie(categorie, quantite);
+  }
+
+  let total = 0;
+  const tableau = Array.isArray(etatDuel.zones.tableauJoueur) ? etatDuel.zones.tableauJoueur : [];
+  if (!Array.isArray(etatDuel.zones.mainJoueur)) {
+    etatDuel.zones.mainJoueur = [];
+  }
+
+  for (let i = 0; i < quantite; i += 1) {
+    const eligibles = tableau.filter(carte => inclutCategorie(carte, categorie));
+    if (eligibles.length === 0) {
+      break;
+    }
+
+    const carte = botChoisirCarteMoinsValuable(eligibles);
+    if (!carte) {
+      break;
+    }
+
+    const index = tableau.indexOf(carte);
+    if (index < 0) {
+      break;
+    }
+
+    const carteRetiree = tableau.splice(index, 1)[0];
+    if (!carteRetiree) {
+      break;
+    }
+
+    deplacerCarteEtReserveesVersZone(carteRetiree, etatDuel.zones.mainJoueur, "fin");
+    total += 1;
+  }
+
+  return total;
+}
+
+function adversairePiocherVersDefausse(quantite = 1) {
+  const etatDuel = obtenirEtatAdversaireDuelPourEffets();
+  if (!etatDuel) {
+    return botPiocherVersDefausse(quantite);
+  }
+
+  let total = 0;
+  if (!Array.isArray(etatDuel.zones.deckJoueur)) {
+    etatDuel.zones.deckJoueur = [];
+  }
+  if (!Array.isArray(etatDuel.zones.defausseJoueur)) {
+    etatDuel.zones.defausseJoueur = [];
+  }
+
+  for (let i = 0; i < quantite; i += 1) {
+    const carte = etatDuel.zones.deckJoueur.shift();
+    if (!carte) {
+      break;
+    }
+
+    etatDuel.zones.defausseJoueur.push(carte);
+    total += 1;
+  }
+
+  return total;
+}
+
+function adversaireDefausserDepuisMain(quantite = 1) {
+  const etatDuel = obtenirEtatAdversaireDuelPourEffets();
+  if (!etatDuel) {
+    return 0;
+  }
+
+  if (!Array.isArray(etatDuel.zones.mainJoueur)) {
+    etatDuel.zones.mainJoueur = [];
+  }
+  if (!Array.isArray(etatDuel.zones.defausseJoueur)) {
+    etatDuel.zones.defausseJoueur = [];
+  }
+
+  let total = 0;
+
+  for (let i = 0; i < quantite; i += 1) {
+    if (etatDuel.zones.mainJoueur.length === 0) {
+      break;
+    }
+
+    const carte = botChoisirCarteMoinsValuable(etatDuel.zones.mainJoueur) || etatDuel.zones.mainJoueur[0];
+    const index = etatDuel.zones.mainJoueur.indexOf(carte);
+    if (index < 0) {
+      break;
+    }
+
+    const carteRetiree = etatDuel.zones.mainJoueur.splice(index, 1)[0];
+    if (!carteRetiree) {
+      break;
+    }
+
+    etatDuel.zones.defausseJoueur.push(carteRetiree);
+    total += 1;
+  }
+
+  return total;
+}
+
+function interactionPassifDuelActivee() {
+  if (!duelEtatActif() || !multijoueurConnecte()) {
+    return false;
+  }
+
+  const cleLocale = multijoueurCleJoueurControleLocal();
+  if (cleLocale !== "joueur1" && cleLocale !== "joueur2") {
+    return false;
+  }
+
+  return cleLocale === duelObtenirCleJoueurActif();
+}
+
+function duelGenererIdInteractionPassif() {
+  return `duel-passif-${Date.now()}-${Math.floor(Math.random() * 1e9)}`;
+}
+
+function duelLireInteractionPassifCourante() {
+  return serialiserInteractionPassifDuel(jeu?.duel?.interactionPassif || null);
+}
+
+function interactionPassifDuelSansCarteEligible({
+  type = "",
+  quantite = 0,
+  categorie = ""
+} = {}) {
+  if (!duelEtatActif()) {
+    return false;
+  }
+
+  const typeInteraction = String(type || "").trim();
+  const quantiteDemandee = Math.max(0, Number(quantite) || 0);
+  if (quantiteDemandee <= 0) {
+    return true;
+  }
+
+  const etatCible = duelObtenirEtatJoueurSecondaire();
+  if (!etatCible || typeof etatCible !== "object") {
+    return false;
+  }
+
+  if (typeInteraction === "defausserDepuisMain") {
+    const main = Array.isArray(etatCible.zones?.mainJoueur)
+      ? etatCible.zones.mainJoueur
+      : [];
+    return main.length === 0;
+  }
+
+  if (typeInteraction === "abandonnerCategorie" || typeInteraction === "rappelerCategorie") {
+    const categorieDemandee = String(categorie || "").trim();
+    if (!categorieDemandee) {
+      return false;
+    }
+
+    const tableau = Array.isArray(etatCible.zones?.tableauJoueur)
+      ? etatCible.zones.tableauJoueur
+      : [];
+    const eligibles = tableau.filter(carte =>
+      carte && inclutCategorie(carte, categorieDemandee)
+    );
+    return eligibles.length === 0;
+  }
+
+  return false;
+}
+
+function decrireActionInteractionPassifDuel(interaction = null) {
+  if (!interaction || typeof interaction !== "object") {
+    return "faire un choix";
+  }
+
+  const type = String(interaction.type || "").trim();
+  const quantite = Math.max(1, Number(interaction.quantite) || 1);
+  const cartesTexte = `${quantite} carte${quantite > 1 ? "s" : ""}`;
+  const categorie = String(interaction.categorie || "").trim();
+  const detailCategorie = categorie ? ` de categorie ${categorie}` : "";
+
+  if (type === "abandonnerCategorie") {
+    return `abandonner ${cartesTexte}${detailCategorie}`;
+  }
+
+  if (type === "rappelerCategorie") {
+    return `rappeler ${cartesTexte}${detailCategorie}`;
+  }
+
+  if (type === "defausserDepuisMain") {
+    return `defausser ${cartesTexte} de sa main`;
+  }
+
+  if (type === "peutPiocher") {
+    return `choisir s'il pioche ${cartesTexte}`;
+  }
+
+  return "faire un choix";
+}
+
+function construireMessageAttenteInteractionPassifDuel(interaction = null) {
+  const action = decrireActionInteractionPassifDuel(interaction);
+  return `En attente: l'adversaire doit ${action}.`;
+}
+
+function obtenirPanneauAttenteInteractionPassifDuel() {
+  let panneau = getElement("panneau-attente-interaction-passif-duel");
+  if (panneau) {
+    return panneau;
+  }
+
+  panneau = document.createElement("div");
+  panneau.id = "panneau-attente-interaction-passif-duel";
+  panneau.className = "panneau-ui-cache";
+  panneau.setAttribute("aria-live", "polite");
+  panneau.setAttribute("aria-atomic", "true");
+  panneau.innerHTML = `
+    <div class="panneau-attente-interaction-passif-contenu">
+      <div id="panneau-attente-interaction-passif-message"></div>
+    </div>
+  `;
+
+  panneau.addEventListener("click", event => {
+    event.preventDefault();
+    event.stopPropagation();
+  });
+
+  document.body.appendChild(panneau);
+  return panneau;
+}
+
+function afficherPanneauAttenteInteractionPassifDuel(interaction = null) {
+  const panneau = obtenirPanneauAttenteInteractionPassifDuel();
+  const messageDiv = getElement("panneau-attente-interaction-passif-message");
+
+  if (!panneau || !messageDiv) {
+    return;
+  }
+
+  messageDiv.textContent = construireMessageAttenteInteractionPassifDuel(interaction);
+  panneau.classList.remove("panneau-ui-cache");
+  panneau.classList.add("panneau-ui-ouvert");
+}
+
+function masquerPanneauAttenteInteractionPassifDuel() {
+  const panneau = getElement("panneau-attente-interaction-passif-duel");
+  if (!panneau) {
+    return;
+  }
+
+  panneau.classList.remove("panneau-ui-ouvert");
+  panneau.classList.add("panneau-ui-cache");
+}
+
+async function duelChoisirCartePourInteractionPassif({
+  source = "tableau",
+  message = "Choisissez une carte.",
+  obligatoire = true,
+  predicate = null
+} = {}) {
+  return await new Promise(resolve => {
+    demarrerSelectionCarte({
+      source,
+      message,
+      obligatoire,
+      predicate: typeof predicate === "function" ? predicate : () => true,
+      onChoose: async carte => resolve(carte),
+      onCancel: () => resolve(null)
+    });
+  });
+}
+
+async function resoudreInteractionPassifDuel(interaction) {
+  if (!interaction || typeof interaction !== "object") {
+    return false;
+  }
+
+  const interactionId = String(interaction.id || "");
+  if (!interactionId) {
+    return false;
+  }
+
+  const resultat = {
+    total: 0,
+    piochees: 0,
+    aPioche: false
+  };
+
+  const quantite = Math.max(0, Number(interaction.quantite) || 0);
+  const categorie = String(interaction.categorie || "");
+  const messageBase = String(interaction.message || "").trim();
+
+  try {
+    etatMultijoueur.interactionPassifLocaleEnCours = true;
+
+    if (interaction.type === "abandonnerCategorie") {
+      for (let i = 0; i < quantite; i += 1) {
+        const eligibles = (jeu.joueurZones.tableauJoueur || []).filter(carte =>
+          carte && inclutCategorie(carte, categorie)
+        );
+        if (eligibles.length === 0) {
+          break;
+        }
+
+        const carteChoisie = await duelChoisirCartePourInteractionPassif({
+          source: "tableau",
+          message:
+            (messageBase || `Choisissez une carte ${categorie} a abandonner.`) +
+            ` (${i + 1}/${quantite})`,
+          obligatoire: true,
+          predicate: carte =>
+            !!carte &&
+            inclutCategorie(carte, categorie) &&
+            (jeu.joueurZones.tableauJoueur || []).includes(carte)
+        });
+
+        if (!carteChoisie) {
+          break;
+        }
+
+        if (abandonnerCarteObjet(carteChoisie)) {
+          resultat.total += 1;
+        }
+      }
+    } else if (interaction.type === "rappelerCategorie") {
+      for (let i = 0; i < quantite; i += 1) {
+        const eligibles = (jeu.joueurZones.tableauJoueur || []).filter(carte =>
+          carte && inclutCategorie(carte, categorie)
+        );
+        if (eligibles.length === 0) {
+          break;
+        }
+
+        const carteChoisie = await duelChoisirCartePourInteractionPassif({
+          source: "tableau",
+          message:
+            (messageBase || `Choisissez une carte ${categorie} a rappeler.`) +
+            ` (${i + 1}/${quantite})`,
+          obligatoire: true,
+          predicate: carte =>
+            !!carte &&
+            inclutCategorie(carte, categorie) &&
+            (jeu.joueurZones.tableauJoueur || []).includes(carte)
+        });
+
+        if (!carteChoisie) {
+          break;
+        }
+
+        if (rappelerCarteObjetDepuisTableau(carteChoisie)) {
+          resultat.total += 1;
+        }
+      }
+    } else if (interaction.type === "defausserDepuisMain") {
+      for (let i = 0; i < quantite; i += 1) {
+        if (!Array.isArray(jeu.joueurZones.mainJoueur) || jeu.joueurZones.mainJoueur.length === 0) {
+          break;
+        }
+
+        const carteChoisie = await duelChoisirCartePourInteractionPassif({
+          source: "main",
+          message:
+            (messageBase || "Choisissez une carte a defausser.") +
+            ` (${i + 1}/${quantite})`,
+          obligatoire: true,
+          predicate: carte =>
+            !!carte && (jeu.joueurZones.mainJoueur || []).includes(carte)
+        });
+
+        if (!carteChoisie) {
+          break;
+        }
+
+        const indexMain = (jeu.joueurZones.mainJoueur || []).indexOf(carteChoisie);
+        if (indexMain < 0) {
+          continue;
+        }
+
+        const carteRetiree = jeu.joueurZones.mainJoueur.splice(indexMain, 1)[0];
+        if (!carteRetiree) {
+          continue;
+        }
+
+        jeu.joueurZones.defausseJoueur = Array.isArray(jeu.joueurZones.defausseJoueur)
+          ? jeu.joueurZones.defausseJoueur
+          : [];
+        jeu.joueurZones.defausseJoueur.push(carteRetiree);
+        resultat.total += 1;
+      }
+    } else if (interaction.type === "peutPiocher") {
+      const veutPiocher = await confirmerActionOptionnelle(
+        messageBase || `Voulez-vous piocher ${quantite} carte(s) ?`
+      );
+      resultat.aPioche = !!veutPiocher;
+
+      if (veutPiocher && quantite > 0) {
+        const tailleMainAvant = Array.isArray(jeu.joueurZones.mainJoueur)
+          ? jeu.joueurZones.mainJoueur.length
+          : 0;
+        await piocherCartesJoueur(quantite);
+        const tailleMainApres = Array.isArray(jeu.joueurZones.mainJoueur)
+          ? jeu.joueurZones.mainJoueur.length
+          : tailleMainAvant;
+        resultat.piochees = Math.max(0, tailleMainApres - tailleMainAvant);
+      }
+    }
+
+    const interactionCourante = duelLireInteractionPassifCourante();
+    if (!interactionCourante || interactionCourante.id !== interactionId) {
+      return false;
+    }
+
+    jeu.duel.interactionPassif = {
+      ...interactionCourante,
+      statut: "resolue",
+      resolueLe: Date.now(),
+      resultat
+    };
+
+    afficherZoneJoueur?.();
+    afficherZoneBot?.();
+
+    await envoyerSnapshotMultijoueur({
+      force: true,
+      ignorerAutorisation: true
+    });
+
+    return true;
+  } catch (error) {
+    const interactionCourante = duelLireInteractionPassifCourante();
+    if (interactionCourante && interactionCourante.id === interactionId) {
+      jeu.duel.interactionPassif = {
+        ...interactionCourante,
+        statut: "annulee",
+        resolueLe: Date.now(),
+        resultat: {
+          erreur: String(error?.message || "interaction-annulee")
+        }
+      };
+
+      await envoyerSnapshotMultijoueur({
+        force: true,
+        ignorerAutorisation: true
+      });
+    }
+    return false;
+  } finally {
+    etatMultijoueur.interactionPassifLocaleEnCours = false;
+  }
+}
+
+function traiterInteractionPassifDuelSiNecessaire() {
+  if (!multijoueurConnecte() || !duelEtatActif()) {
+    return;
+  }
+
+  const cleLocale = multijoueurCleJoueurControleLocal();
+  if (cleLocale !== "joueur1" && cleLocale !== "joueur2") {
+    return;
+  }
+
+  const interaction = duelLireInteractionPassifCourante();
+  if (!interaction || interaction.statut !== "en_attente") {
+    return;
+  }
+
+  if (interaction.cibleCle !== cleLocale) {
+    return;
+  }
+
+  const interactionId = String(interaction.id || "");
+  if (!interactionId) {
+    return;
+  }
+
+  if (etatMultijoueur.interactionPassifEnCoursId === interactionId) {
+    return;
+  }
+
+  etatMultijoueur.interactionPassifEnCoursId = interactionId;
+
+  void (async () => {
+    try {
+      await resoudreInteractionPassifDuel(interaction);
+    } finally {
+      if (etatMultijoueur.interactionPassifEnCoursId === interactionId) {
+        etatMultijoueur.interactionPassifEnCoursId = "";
+      }
+    }
+  })();
+}
+
+async function demanderResolutionInteractionPassifDuel({
+  type = "",
+  quantite = 1,
+  categorie = "",
+  message = "",
+  timeoutMs = 45000
+} = {}) {
+  if (!interactionPassifDuelActivee()) {
+    return null;
+  }
+
+  const typeInteraction = String(type || "").trim();
+  if (!typeInteraction) {
+    return null;
+  }
+
+  const quantiteNormalisee = Math.max(0, Number(quantite) || 0);
+  if (quantiteNormalisee <= 0) {
+    return {
+      statut: "resolue",
+      resultat: {
+        total: 0,
+        piochees: 0,
+        aPioche: false
+      }
+    };
+  }
+
+  if (
+    interactionPassifDuelSansCarteEligible({
+      type: typeInteraction,
+      quantite: quantiteNormalisee,
+      categorie
+    })
+  ) {
+    return {
+      statut: "resolue",
+      resultat: {
+        total: 0,
+        piochees: 0,
+        aPioche: false
+      }
+    };
+  }
+
+  const sourceCle = duelObtenirCleJoueurActif();
+  const cibleCle = duelObtenirCleJoueurSecondaire();
+  const interaction = {
+    id: duelGenererIdInteractionPassif(),
+    type: typeInteraction,
+    sourceCle,
+    cibleCle,
+    statut: "en_attente",
+    quantite: quantiteNormalisee,
+    categorie: String(categorie || ""),
+    message: String(message || ""),
+    creeLe: Date.now(),
+    resolueLe: 0,
+    resultat: null
+  };
+
+  try {
+    jeu.duel.interactionPassif = interaction;
+    afficherPanneauAttenteInteractionPassifDuel(interaction);
+
+    await envoyerSnapshotMultijoueur({
+      force: true,
+      ignorerAutorisation: true
+    });
+
+    const debut = Date.now();
+    let resolution = null;
+
+    while (Date.now() - debut < timeoutMs) {
+      await attendre(280);
+      try {
+        await recupererSnapshotSalleMultijoueur({ ignorerVerrouInteraction: true });
+      } catch (error) {}
+
+      const interactionCourante = duelLireInteractionPassifCourante();
+      if (!interactionCourante || interactionCourante.id !== interaction.id) {
+        continue;
+      }
+
+      if (interactionCourante.statut !== "en_attente") {
+        resolution = interactionCourante;
+        break;
+      }
+    }
+
+    if (!resolution) {
+      const interactionCourante = duelLireInteractionPassifCourante();
+      if (interactionCourante && interactionCourante.id === interaction.id) {
+        resolution = interactionCourante;
+      }
+    }
+
+    if (jeu?.duel?.interactionPassif?.id === interaction.id) {
+      jeu.duel.interactionPassif = null;
+      await envoyerSnapshotMultijoueur({
+        force: true,
+        ignorerAutorisation: true
+      });
+    }
+
+    if (!resolution) {
+      return {
+        statut: "timeout",
+        resultat: null
+      };
+    }
+
+    return {
+      statut: String(resolution.statut || "timeout"),
+      resultat: resolution.resultat || null
+    };
+  } finally {
+    masquerPanneauAttenteInteractionPassifDuel();
+  }
+}
 /* =========================================================
    26) MOTEUR D’EFFETS
    ========================================================= */
@@ -25865,18 +28052,20 @@ function fermerChoixCategorieMarche() {
 const executeursEffets = {
 
   volerPopulationAuBotSiEmpire(effet) {
-  if (!etatBot || etatBot.statut !== STATUTS.EMPIRE) {
+  const nomAdversaire = obtenirNomAdversaireEffets();
+
+  if (!adversaireStatutEstEmpire()) {
     return true;
   }
 
   const quantite = effet.quantite || 1;
-  const vole = botPerdreRessource("population", quantite);
+  const vole = adversairePerdreRessource("population", quantite);
 
   if (vole > 0) {
     gagnerRessource("population", vole);
-    journal(`Le joueur vole ${vole} Population au Bot.`);
+    journal(`Le joueur vole ${vole} Population a ${nomAdversaire}.`);
   } else {
-    journal("Le Bot n'a aucune Population à voler.");
+    journal(`${nomAdversaire} n'a aucune Population a voler.`);
   }
 
   afficherZoneJoueur?.();
@@ -26131,13 +28320,14 @@ const executeursEffets = {
 
   volerMateriauxSansInstabilite(effet) {
   const quantite = effet.quantite || 1;
-  const vole = botPerdreRessource("materiaux", quantite);
+  const nomAdversaire = obtenirNomAdversaireEffets();
+  const vole = adversairePerdreRessource("materiaux", quantite);
 
   if (vole > 0) {
     gagnerRessource("materiaux", vole);
-    journal(`Le joueur vole ${vole} Matériaux au Bot.`);
+    journal(`Le joueur vole ${vole} Materiaux a ${nomAdversaire}.`);
   } else {
-    journal("Le Bot n'a aucun Matériaux à voler.");
+    journal(`${nomAdversaire} n'a aucun Materiaux a voler.`);
   }
 
   afficherZoneJoueur?.();
@@ -26674,10 +28864,11 @@ async echangerExilMarche() {
 
 autresJoueursGagnentPopulation(effet) {
   const q = effet.quantite || 0;
+  const nomAdversaire = obtenirNomAdversaireEffets();
 
-  botGagnerRessource("population", q);
+  adversaireGagnerRessource("population", q);
 
-  journal(`Le Bot gagne ${q} Population.`);
+  journal(`${nomAdversaire} gagne ${q} Population.`);
   afficherZoneBot?.();
   return true;
 },
@@ -26869,29 +29060,26 @@ autresJoueursGagnentPopulation(effet) {
 
   async volerMateriauxAChaqueAutreJoueur(effet, contexte) {
   const quantite = effet.quantite || 0;
+  const nomAdversaire = obtenirNomAdversaireEffets();
+  const materiauxAdversaire = adversaireLireRessource("materiaux");
 
-  const materiauxBot = etatBot.materiaux || 0;
-
-  if (materiauxBot >= quantite) {
-    // Le bot peut payer normalement
-    etatBot.materiaux -= quantite;
+  if (materiauxAdversaire >= quantite) {
+    adversairePerdreRessource("materiaux", quantite);
     jeu.joueur.materiaux += quantite;
 
-    journal(`Le Bot perd ${quantite} Matériaux.`);
+    journal(`${nomAdversaire} perd ${quantite} Materiaux.`);
   } else {
-    // Le bot ne peut pas payer le total
-    const materiauxVoles = materiauxBot;
+    const materiauxVoles = materiauxAdversaire;
 
     if (materiauxVoles > 0) {
-      etatBot.materiaux = 0;
+      adversairePerdreRessource("materiaux", materiauxVoles);
       jeu.joueur.materiaux += materiauxVoles;
 
-      journal(`Le Bot perd ${materiauxVoles} Matériaux.`);
+      journal(`${nomAdversaire} perd ${materiauxVoles} Materiaux.`);
     }
 
-    // 🔴 RÈGLE CORRIGÉE
-    botRecevoirInstabilite(1);
-    journal(`Le Bot récupère 1 Instabilité.`);
+    adversaireRecevoirInstabilite(1);
+    journal(`${nomAdversaire} recupere 1 Instabilite.`);
   }
 
   afficherZoneJoueur?.();
@@ -27108,19 +29296,20 @@ autresJoueursGagnentPopulation(effet) {
 
     volerMateriauxAuxAutresJoueursAvecRegion(effet) {
     const quantite = effet.quantite || 1;
+    const nomAdversaire = obtenirNomAdversaireEffets();
 
-    if (!botAUneRegionEnJeu()) {
-      journal("Le Bot n'a aucune Région en jeu : aucun Matériaux volé.");
+    if (!adversaireAUneRegionEnJeu()) {
+      journal(`${nomAdversaire} n'a aucune Region en jeu : aucun Materiaux vole.`);
       return true;
     }
 
-    const vole = botPerdreRessource("materiaux", quantite);
+    const vole = adversairePerdreRessource("materiaux", quantite);
 
     if (vole > 0) {
       gagnerRessource("materiaux", vole);
     }
 
-    journal(`Le joueur vole ${vole} Matériaux au Bot (condition Région en jeu).`);
+    journal(`Le joueur vole ${vole} Materiaux a ${nomAdversaire} (condition Region en jeu).`);
 
     afficherZoneJoueur?.();
     afficherZoneBot?.();
@@ -27129,19 +29318,20 @@ autresJoueursGagnentPopulation(effet) {
 
 volerProgresAuxJoueursEmpire(effet) {
     const quantite = effet.quantite || 1;
+    const nomAdversaire = obtenirNomAdversaireEffets();
 
-    if (!botStatutEstEmpire()) {
-      journal("Le Bot n'est pas en Empire : aucun Progrès volé.");
+    if (!adversaireStatutEstEmpire()) {
+      journal(`${nomAdversaire} n'est pas en Empire : aucun Progres vole.`);
       return true;
     }
 
-    const vole = botPerdreRessource("progres", quantite);
+    const vole = adversairePerdreRessource("progres", quantite);
 
     if (vole > 0) {
       gagnerRessource("progres", vole);
     }
 
-    journal(`Le joueur vole ${vole} Progrès au Bot (condition Empire).`);
+    journal(`Le joueur vole ${vole} Progres a ${nomAdversaire} (condition Empire).`);
 
     afficherZoneJoueur?.();
     afficherZoneBot?.();
@@ -27259,18 +29449,19 @@ volerProgresAuxJoueursEmpire(effet) {
 
    volerProgresAChaqueAutreJoueur(effet) {
     const quantite = effet.quantite || 1;
-    const vole = botPerdreRessource("progres", quantite);
+    const nomAdversaire = obtenirNomAdversaireEffets();
+    const vole = adversairePerdreRessource("progres", quantite);
 
     if (vole > 0) {
       gagnerRessource("progres", vole);
-      journal(`Le joueur vole ${vole} Progrès au Bot.`);
+      journal(`Le joueur vole ${vole} Progres a ${nomAdversaire}.`);
     }
 
     const manque = Math.max(0, quantite - vole);
 
     if (manque > 0) {
-      botRecevoirInstabilite(manque);
-      journal(`Le Bot ne pouvait pas payer ${manque} Progrès : il récupère ${manque} Instabilité.`);
+      adversaireRecevoirInstabilite(manque);
+      journal(`${nomAdversaire} ne pouvait pas payer ${manque} Progres : il recupere ${manque} Instabilite.`);
     }
 
     afficherZoneJoueur?.();
@@ -27498,10 +29689,10 @@ volerProgresAuxJoueursEmpire(effet) {
     return false;
   }
 
-  // Nouvelle règle : la carte donnée va au sommet du deck C.I.V. du Bot.
-  etatBot.deckCiv.unshift(carteDonnee);
+  const nomAdversaire = obtenirNomAdversaireEffets();
+  adversaireRecevoirCarteDonnee(carteDonnee);
 
-  journal(`Le joueur donne ${carteDonnee.nom} au Bot (sommet du deck C.I.V.).`);
+  journal(`Le joueur donne ${carteDonnee.nom} a ${nomAdversaire} (sommet du deck).`);
   afficherZoneJoueur?.();
   afficherZoneBot?.();
   return true;
@@ -27548,15 +29739,29 @@ volerProgresAuxJoueursEmpire(effet) {
   return true;
 },
 
-   autresJoueursAbandonnentCategorieAvecRetour(effet, contexte) {
+   async autresJoueursAbandonnentCategorieAvecRetour(effet, contexte) {
     const quantite = effet.quantite || 1;
     const categorie = effet.categorie;
-    const totalAbandonnees = botAbandonnerCategorie(categorie, quantite);
+    const nomAdversaire = obtenirNomAdversaireEffets();
+    let totalAbandonnees = 0;
+
+    const resolutionDistance = await demanderResolutionInteractionPassifDuel({
+      type: "abandonnerCategorie",
+      quantite,
+      categorie,
+      message: `Choisissez ${quantite} carte(s) ${categorie} a abandonner.`
+    });
+
+    if (resolutionDistance?.statut === "resolue") {
+      totalAbandonnees = Math.max(0, Number(resolutionDistance.resultat?.total) || 0);
+    } else {
+      totalAbandonnees = adversaireAbandonnerCategorie(categorie, quantite);
+    }
 
     contexte.variables = contexte.variables || {};
     contexte.variables[effet.stockerDans] = totalAbandonnees;
 
-    journal(`Le Bot abandonne ${totalAbandonnees} carte(s) ${categorie}.`);
+    journal(`${nomAdversaire} abandonne ${totalAbandonnees} carte(s) ${categorie}.`);
 
     afficherZoneBot?.();
     return true;
@@ -27571,10 +29776,11 @@ volerProgresAuxJoueursEmpire(effet) {
 
   autresJoueursGagnentMateriaux(effet) {
     const q = effet.quantite || 0;
+    const nomAdversaire = obtenirNomAdversaireEffets();
 
-    botGagnerRessource("materiaux", q);
+    adversaireGagnerRessource("materiaux", q);
 
-    journal(`Le Bot gagne ${q} Matériaux.`);
+    journal(`${nomAdversaire} gagne ${q} Materiaux.`);
     afficherZoneBot?.();
     return true;
   },
@@ -27659,10 +29865,11 @@ async abandonnerSourcePuisEchangerPremiereCarteDeckNationAvecMain(effet, context
 
   autresJoueursGagnentProgres(effet) {
     const quantite = effet.quantite || 1;
+    const nomAdversaire = obtenirNomAdversaireEffets();
 
-    botGagnerRessource("progres", quantite);
+    const gagnes = adversaireGagnerRessource("progres", quantite);
 
-    journal(`Le Bot gagne ${quantite} Progrès.`);
+    journal(`${nomAdversaire} gagne ${gagnes} Progres.`);
     afficherZoneBot?.();
     return true;
   },
@@ -27786,9 +29993,10 @@ async placerCarteMainAuDessusDeck() {
 
   autresJoueursRecuperentInstabilite(effet) {
     const quantite = effet.quantite || 1;
-    const gagnees = botRecevoirInstabilite(quantite);
+    const nomAdversaire = obtenirNomAdversaireEffets();
+    const gagnees = adversaireRecevoirInstabilite(quantite);
 
-    journal(`Le Bot récupère ${gagnees} carte(s) Instabilité.`);
+    journal(`${nomAdversaire} recupere ${gagnees} carte(s) Instabilite.`);
     return true;
   },
 
@@ -27844,39 +30052,97 @@ async renvoyerInstabiliteDepuisDefausse() {
   return await renvoyerInstabiliteDepuisDefausse();
 },
 
-autresJoueursRappellentCategorie(effet) {
+async autresJoueursRappellentCategorie(effet) {
     const categorie = effet.categorie;
     const quantite = effet.quantite || 1;
-    const rappelees = botRappelerCategorie(categorie, quantite);
+    const nomAdversaire = obtenirNomAdversaireEffets();
+    let rappelees = 0;
 
-    journal(`Le Bot rappelle ${rappelees} carte(s) de catégorie ${categorie}.`);
+    const resolutionDistance = await demanderResolutionInteractionPassifDuel({
+      type: "rappelerCategorie",
+      quantite,
+      categorie,
+      message: `Choisissez ${quantite} carte(s) ${categorie} a rappeler.`
+    });
+
+    if (resolutionDistance?.statut === "resolue") {
+      rappelees = Math.max(0, Number(resolutionDistance.resultat?.total) || 0);
+    } else {
+      rappelees = adversaireRappelerCategorie(categorie, quantite);
+    }
+
+    journal(`${nomAdversaire} rappelle ${rappelees} carte(s) de categorie ${categorie}.`);
     return true;
   },
 
-autresJoueursPeuventPiocher(effet) {
+async autresJoueursPeuventPiocher(effet) {
   const quantite = effet.quantite || 1;
+  const nomAdversaire = obtenirNomAdversaireEffets();
+  let piochees = 0;
 
-  // Nouvelle règle solo : "piocher" pour le Bot = prendre du deck C.I.V. et mettre dans la défausse.
-  const piochees = botPiocherVersDefausse(quantite);
+  const resolutionDistance = await demanderResolutionInteractionPassifDuel({
+    type: "peutPiocher",
+    quantite,
+    message: `Voulez-vous piocher ${quantite} carte(s) ?`
+  });
 
-  journal(`Le Bot pioche ${piochees} carte(s) de son deck C.I.V. vers sa défausse.`);
+  if (resolutionDistance?.statut === "resolue") {
+    piochees = Math.max(0, Number(resolutionDistance.resultat?.piochees) || 0);
+  } else {
+    piochees = adversairePiocherVersDefausse(quantite);
+  }
+
+  journal(`${nomAdversaire} pioche ${piochees} carte(s).`);
   return true;
 },
 
-  autresJoueursAbandonnentCategorie(effet) {
+  async autresJoueursAbandonnentCategorie(effet) {
     const categorie = effet.categorie || "Aucun";
     const quantite = effet.quantite || 1;
-    const total = botAbandonnerCategorie(categorie, quantite);
+    const nomAdversaire = obtenirNomAdversaireEffets();
+    let total = 0;
 
-    journal(`Le Bot abandonne ${total} carte(s) de catégorie ${categorie}.`);
+    const resolutionDistance = await demanderResolutionInteractionPassifDuel({
+      type: "abandonnerCategorie",
+      quantite,
+      categorie,
+      message: `Choisissez ${quantite} carte(s) ${categorie} a abandonner.`
+    });
+
+    if (resolutionDistance?.statut === "resolue") {
+      total = Math.max(0, Number(resolutionDistance.resultat?.total) || 0);
+    } else {
+      total = adversaireAbandonnerCategorie(categorie, quantite);
+    }
+
+    journal(`${nomAdversaire} abandonne ${total} carte(s) de categorie ${categorie}.`);
     return true;
   },
 
-  autresJoueursDefaussent(effet) {
+  async autresJoueursDefaussent(effet) {
   const quantite = effet.quantite || 1;
+  const nomAdversaire = obtenirNomAdversaireEffets();
 
-  // Règle solo : le bot ignore les effets de défausse
-  journal(`Le Bot ignore l'effet : défausser ${quantite} carte(s).`);
+  if (!duelEtatActif()) {
+    journal(`Le Bot ignore l'effet : defausser ${quantite} carte(s).`);
+    return true;
+  }
+
+  let totalDefaussees = 0;
+
+  const resolutionDistance = await demanderResolutionInteractionPassifDuel({
+    type: "defausserDepuisMain",
+    quantite,
+    message: `Choisissez ${quantite} carte(s) a defausser.`
+  });
+
+  if (resolutionDistance?.statut === "resolue") {
+    totalDefaussees = Math.max(0, Number(resolutionDistance.resultat?.total) || 0);
+  } else {
+    totalDefaussees = adversaireDefausserDepuisMain(quantite);
+  }
+
+  journal(`${nomAdversaire} defausse ${totalDefaussees} carte(s).`);
 
   return true;
 },
@@ -28170,6 +30436,13 @@ async optionnel(effet, contexte) {
     return true;
   }
 
+  const messageOptionnel = String(effet.message || "").trim();
+  if (messageOptionnel) {
+    journal(`Le joueur actif active une option: ${messageOptionnel}`);
+  } else {
+    journal("Le joueur actif active une action optionnelle.");
+  }
+
   debugLog("OPTIONNEL: avant executerListeEffets", effet.effetSiOui);
   const succes = await executerListeEffets(effet.effetSiOui || [], contexte);
   debugLog("OPTIONNEL: après executerListeEffets, succes =", succes);
@@ -28203,6 +30476,21 @@ async optionnel(effet, contexte) {
   }
 
   const optionChoisie = effet.options[indexChoisi];
+  const libelleOptionChoisie = String(optionChoisie?.label || "").trim();
+  if (libelleOptionChoisie) {
+    journal(`Le joueur actif choisit: ${libelleOptionChoisie}.`);
+  } else {
+    journal("Le joueur actif valide un choix.");
+  }
+
+  const categoriesInnovation = extraireCategoriesInnovationDepuisEffets(
+    optionChoisie?.effets || []
+  );
+  if (categoriesInnovation.length > 0) {
+    journal(
+      `Le joueur actif choisit la categorie d'innovation: ${categoriesInnovation.join(" / ")}.`
+    );
+  }
   return await executerListeEffets(optionChoisie.effets || [], contexte);
 },
 
@@ -28309,6 +30597,10 @@ async function executerEffetsCarte(carte) {
 }
 
 async function jouerCarteDepuisMain(indexCarte, options = {}) {
+  if (interactionLocaleMultijoueurBloquee()) {
+    return false;
+  }
+
   const main = jeu.joueurZones.mainJoueur;
 
   if (jeu.finPartie.terminee) {
@@ -28332,6 +30624,8 @@ async function jouerCarteDepuisMain(indexCarte, options = {}) {
   }
 
   main.splice(indexCarte, 1);
+
+  journal(`Le joueur actif joue ${carte.nom}.`);
 
   const contexteEffets = {
     carteSource: carte,
@@ -28517,6 +30811,9 @@ function brancherBoutonsNavigationVues() {
   }
 
   gagnerRessource("progres", 2);
+  journal(
+    `Le joueur actif tente d'innover en ${categorie}, aucune carte n'est disponible et il gagne 2 Progres.`
+  );
 
   ouvrirPanneauUI(
     `Aucune carte ${categorie} n'est disponible. Vous gagnez 2 Progrès à la place.`,
@@ -28531,6 +30828,10 @@ function brancherBoutonsNavigationVues() {
 }
 
 async function innoverDebutTour() {
+  if (interactionLocaleMultijoueurBloquee()) {
+    return false;
+  }
+
   if (!optionSpecialeDebutTourDisponible()) {
     return false;
   }
@@ -28594,6 +30895,10 @@ async function innoverDebutTour() {
 }
 
 async function pacifierDebutTour() {
+  if (interactionLocaleMultijoueurBloquee()) {
+    return false;
+  }
+
   if (!optionSpecialeDebutTourDisponible()) {
     return false;
   }
@@ -28640,6 +30945,7 @@ function terminerChoixProgresMarcheEtPasserAuNettoyage(
   message = "Vous pouvez maintenant défausser autant de cartes que vous voulez de votre main, puis terminer le nettoyage."
 ) {
   jeu.ui.choixProgresMarcheActif = false;
+  jeu.ui.nettoyageCartesDefausseesTour = 0;
   fermerPanneauChoixMarcheSelection();
   jeu.manche.phase = PHASES.NETTOYAGE_DEFAUSSE;
   mettreAJourBoutonsPhaseJoueur();
@@ -28811,6 +31117,10 @@ function carteEpuiserEstActivableMaintenant(carte) {
 }
 
 async function epuiserCarte(carte) {
+  if (interactionLocaleMultijoueurBloquee()) {
+    return false;
+  }
+
   if (jeu.finPartie.terminee) {
     return false;
   }
@@ -28887,6 +31197,10 @@ async function resoudreSolsticeJoueur() {
 }
 
 function terminerTourJoueur() {
+  if (interactionLocaleMultijoueurBloquee()) {
+    return;
+  }
+
   if (jeu.finPartie.terminee) {
     return;
   }
@@ -28930,6 +31244,10 @@ debugLog("BTN DISABLED =", getElement("btn-fin-nettoyage")?.disabled);
 }
 
 function terminerNettoyage() {
+  if (interactionLocaleMultijoueurBloquee()) {
+    return;
+  }
+
   if (jeu.finPartie.terminee) {
     return;
   }
@@ -28941,6 +31259,60 @@ function terminerNettoyage() {
   fermerPanneauChoixMarcheSelection();
 
   piocherJusquaLimiteMain(async () => {
+    const cartesDefausseesNettoyage = Math.max(
+      0,
+      Number(jeu.ui.nettoyageCartesDefausseesTour || 0)
+    );
+    journal(
+      `Le joueur actif defausse ${cartesDefausseesNettoyage} carte(s) pendant son nettoyage.`
+    );
+    jeu.ui.nettoyageCartesDefausseesTour = 0;
+
+    if (modeDuelActif()) {
+      const cleActif = duelObtenirCleJoueurActif();
+      const progression = duelObtenirProgressionManche();
+      progression.nettoyageTermine[cleActif] = true;
+
+      if (!duelTousNettoyagesTermines()) {
+        const suivant = cleActif === "joueur1" ? "joueur2" : "joueur1";
+        appliquerEtatJoueurActifDuel(suivant, {
+          rafraichir: false,
+          mettreAJourTourActif: true
+        });
+
+        jeu.manche.phase = PHASES.TOUR;
+        mettreAJourBoutonsPhaseJoueur();
+        preparerDebutTourJoueur();
+        afficherZoneJoueur();
+        afficherZoneBot?.();
+        afficherVue("vue-joueur");
+        definirEtatBoutonTourBot(false);
+        miniTutorielSynchroniser();
+        avertir(`Nettoyage termine. Tour de ${duelNomParCle(suivant)}.`);
+        await diffuserSnapshotMultijoueurApresTransitionTour();
+        return;
+      }
+
+      progression.solsticeTermine.joueur1 = false;
+      progression.solsticeTermine.joueur2 = false;
+
+      appliquerEtatJoueurActifDuel("joueur1", {
+        rafraichir: false,
+        mettreAJourTourActif: true
+      });
+      jeu.manche.phase = PHASES.SOLSTICE;
+      commencerPhaseSolsticeInteractive();
+      afficherZoneJoueur();
+      afficherZoneBot?.();
+      afficherVue("vue-joueur");
+      definirEtatBoutonTourBot(false);
+      mettreAJourBoutonsPhaseJoueur();
+      miniTutorielSynchroniser();
+      avertir("Les deux nettoyages sont termines. Resolvez maintenant le Solstice du Joueur 1.");
+      await diffuserSnapshotMultijoueurApresTransitionTour();
+      return;
+    }
+
     jeu.manche.phase = "attente-tour-bot";
 
     afficherZoneJoueur();
@@ -28959,6 +31331,59 @@ async function finaliserFinDeMancheApresSolstice() {
   reinitialiserModificateursTour();
 
   if (verifierEffondrement()) {
+    return;
+  }
+
+  if (duelEtatActif()) {
+    const joueurSolsticeActuel = duelObtenirCleJoueurActif();
+    const progression = duelObtenirProgressionManche();
+    progression.solsticeTermine[joueurSolsticeActuel] = true;
+
+    if (!duelTousSolsticesTermines()) {
+      const joueurSuivantSolstice = joueurSolsticeActuel === "joueur1" ? "joueur2" : "joueur1";
+      appliquerEtatJoueurActifDuel(joueurSuivantSolstice, {
+        rafraichir: false,
+        mettreAJourTourActif: true
+      });
+
+      jeu.manche.phase = PHASES.SOLSTICE;
+      commencerPhaseSolsticeInteractive();
+      mettreAJourBoutonsPhaseJoueur();
+      afficherZoneJoueur();
+      afficherZoneBot?.();
+      afficherVue("vue-joueur");
+      avertir(
+        `Solstice de ${duelNomParCle(joueurSolsticeActuel)} termine. ` +
+        `Resolvez le Solstice de ${duelNomParCle(joueurSuivantSolstice)}.`
+      );
+      await diffuserSnapshotMultijoueurApresTransitionTour();
+      return;
+    }
+
+    duelReinitialiserProgressionManche();
+    jeu.duel.numeroTour = Number(jeu.duel.numeroTour || 1) + 1;
+    jeu.manche.numero = Number(jeu.duel.numeroTour || jeu.manche.numero || 1);
+    appliquerEtatJoueurActifDuel("joueur1", {
+      rafraichir: false,
+      mettreAJourTourActif: true
+    });
+
+    jeu.manche.phase = PHASES.TOUR;
+    mettreAJourBoutonsPhaseJoueur();
+    preparerDebutTourJoueur();
+    afficherZoneJoueur();
+    afficherZoneBot?.();
+    afficherVue("vue-joueur");
+    miniTutorielNotifierFinDeManche(mancheTerminee);
+
+    if (verifierFinParDecompte()) {
+      await diffuserSnapshotMultijoueurApresTransitionTour();
+      return;
+    }
+
+    sauvegarderPartie({ silencieux: true, origine: "auto-fin-solstice-duel" });
+    avertir("Solstice termine. Nouvelle manche, tour du Joueur 1.");
+    await diffuserSnapshotMultijoueurApresTransitionTour();
     return;
   }
 
@@ -30300,6 +32725,7 @@ function fermerPanneauUI(configuration = {}) {
 
 function afficherTableauJoueur() {
   const zone = getElement("contenu-tableau-joueur");
+  const lectureAdversaire = duelRenduLectureAdversaireActif();
   
 
   if (!zone) {
@@ -30322,7 +32748,7 @@ function afficherTableauJoueur() {
       carteDiv.dataset.indexTableau = String(i);
       carteDiv.innerHTML = creerCarteHTML(carte);
 
-      const afficherPulseEpuiser = !jeu.ui.solsticeActif;
+      const afficherPulseEpuiser = !jeu.ui.solsticeActif && !lectureAdversaire;
 
       if (
         afficherPulseEpuiser &&
@@ -30341,7 +32767,7 @@ function afficherTableauJoueur() {
         carteDiv.style.opacity = "0.7";
       }
 
-      if (jeu.ui.selectionRedressementActive) {
+      if (!lectureAdversaire && jeu.ui.selectionRedressementActive) {
   if (carteEstEligiblePourRedressement(carte)) {
     carteDiv.classList.add("carte-selection-active");
   } else {
@@ -30349,17 +32775,18 @@ function afficherTableauJoueur() {
   }
 }
 
-      if (carteEstSelectionnable(carte, "tableau")) {
+      if (!lectureAdversaire && carteEstSelectionnable(carte, "tableau")) {
         carteDiv.classList.add("carte-selectionnable");
-      } else if (jeu.ui.selectionCarteActive && jeu.ui.selectionCarteSource === "tableau") {
+      } else if (!lectureAdversaire && jeu.ui.selectionCarteActive && jeu.ui.selectionCarteSource === "tableau") {
         carteDiv.classList.add("carte-non-selectionnable-pendant-choix");
       }
 
-      if (cartePeutEtreCliqueePourSolstice(carte)) {
+      if (!lectureAdversaire && cartePeutEtreCliqueePourSolstice(carte)) {
         carteDiv.classList.add("carte-solstice-disponible");
       }
 
       if (
+        !lectureAdversaire &&
         jeu.ui.solsticeActif &&
         carteAPossiblementUnSolstice(carte) &&
         !cartePeutEtreCliqueePourSolstice(carte)
@@ -30372,6 +32799,11 @@ function afficherTableauJoueur() {
       carteDiv.addEventListener("click", event => {
   event.preventDefault();
   event.stopPropagation();
+
+  if (lectureAdversaire) {
+    ouvrirZoomVerrouillePourCarte(carte);
+    return;
+  }
 
   debugLog("TABLEAU CLICK |", carte.nom, {
   selectionRedressementActive: jeu.ui.selectionRedressementActive,
@@ -30409,6 +32841,10 @@ function afficherTableauJoueur() {
      carteDiv.addEventListener("dblclick", event => {
   event.preventDefault();
   event.stopPropagation();
+
+  if (lectureAdversaire) {
+    return;
+  }
 
   if (jeu.ui.selectionRedressementActive) {
     return;
@@ -30527,6 +32963,7 @@ function afficherSlotCroissant() {
 
 function afficherSlotPuissance() {
   const zone = getElement("slot-puissance");
+  const lectureAdversaire = duelRenduLectureAdversaireActif();
 
   if (!zone) {
     return;
@@ -30542,7 +32979,7 @@ function afficherSlotPuissance() {
   const aEffetEpuiser =
     Array.isArray(carte.epuiserCode) && carte.epuiserCode.length > 0;
   const afficherBoutonEpuiserPuissance =
-    aEffetEpuiser && carte.nom !== "Carthaginois";
+    !lectureAdversaire && aEffetEpuiser && carte.nom !== "Carthaginois";
 
   zone.innerHTML = `
     <div class="slot-puissance-wrapper">
@@ -30577,7 +33014,7 @@ function afficherSlotPuissance() {
     cartePuissance.style.opacity = "0.7";
   }
 
-  if (jeu.ui.selectionRedressementActive) {
+  if (!lectureAdversaire && jeu.ui.selectionRedressementActive) {
     if (carteEstEligiblePourRedressement(carte)) {
       cartePuissance.classList.add("carte-selection-active");
     } else {
@@ -30585,22 +33022,24 @@ function afficherSlotPuissance() {
     }
   }
 
-  cartePuissance.addEventListener("click", event => {
-    event.preventDefault();
-    event.stopPropagation();
+  if (!lectureAdversaire) {
+    cartePuissance.addEventListener("click", event => {
+      event.preventDefault();
+      event.stopPropagation();
 
-    if (jeu.ui.selectionRedressementActive) {
-      if (carteEstEligiblePourRedressement(carte)) {
-        const callback = jeu.ui.callbackSelectionRedressement;
-        if (callback) {
-          callback(carte);
+      if (jeu.ui.selectionRedressementActive) {
+        if (carteEstEligiblePourRedressement(carte)) {
+          const callback = jeu.ui.callbackSelectionRedressement;
+          if (callback) {
+            callback(carte);
+          }
         }
+        return;
       }
-      return;
-    }
 
-    ouvrirVueHistoire();
-  });
+      ouvrirVueHistoire();
+    });
+  }
 
   if (boutonEpuiser) {
     boutonEpuiser.disabled = !!carte.epuisee;
@@ -30626,12 +33065,24 @@ function afficherSlotPuissance() {
 
 function afficherSlotMain() {
   const zone = getElement("slot-main");
+  const lectureAdversaire = duelRenduLectureAdversaireActif();
 
   if (!zone) {
     return;
   }
 
   const main = jeu.joueurZones.mainJoueur;
+
+  if (lectureAdversaire) {
+    const nombreCartes = Array.isArray(main) ? main.length : 0;
+    zone.innerHTML = `
+      <div class="pile-verticale-cachee slot-main-adversaire-cachee">
+        <div class="dos-carte-verticale"></div>
+        <div class="compteur-pile-joueur">${nombreCartes}</div>
+      </div>
+    `;
+    return;
+  }
 
   if (!main || main.length === 0) {
     zone.innerHTML = "";
@@ -30745,6 +33196,7 @@ function afficherSlotBase() {
 
 function afficherSlotDefausse() {
   const zone = getElement("slot-defausse");
+  const lectureAdversaire = duelRenduLectureAdversaireActif();
 
   if (!zone) {
     return;
@@ -30771,7 +33223,7 @@ function afficherSlotDefausse() {
 
   const carteDefausse = zone.querySelector(".carte-slot-defausse-cliquable");
 
-  if (carteDefausse) {
+  if (carteDefausse && !lectureAdversaire) {
     carteDefausse.addEventListener("click", () => {
       ouvrirVueDefausse();
     });
@@ -30869,7 +33321,15 @@ function terminerSelectionMarche() {
   afficherPileExil();
 }
 
-   async function tenterTerminerSolstice() {
+async function tenterTerminerSolstice() {
+  if (interactionLocaleMultijoueurBloquee()) {
+    return false;
+  }
+
+  if (jeu.ui.solsticeResolutionEnCours) {
+    return false;
+  }
+
   if (!jeu.ui.solsticeActif) {
     return false;
   }
@@ -30886,23 +33346,34 @@ function terminerSelectionMarche() {
   return true;
 }
 
-   async function resoudreSolsticeCarte(carte) {
+async function resoudreSolsticeCarte(carte) {
   if (!cartePeutEtreCliqueePourSolstice(carte)) {
     return false;
   }
 
-  const succes = await executerListeEffets(
-    carte.solsticeCode || [],
-    { carteSource: carte }
-  );
-
-  if (succes === false) {
+  if (jeu.ui.solsticeResolutionEnCours) {
     return false;
   }
 
-  marquerSolsticeCarteTraitee(carte);
+  jeu.ui.solsticeResolutionEnCours = true;
   afficherZoneJoueur();
-  return true;
+
+  try {
+    const succes = await executerListeEffets(
+      carte.solsticeCode || [],
+      { carteSource: carte }
+    );
+
+    if (succes === false) {
+      return false;
+    }
+
+    marquerSolsticeCarteTraitee(carte);
+    return true;
+  } finally {
+    jeu.ui.solsticeResolutionEnCours = false;
+    afficherZoneJoueur();
+  }
 }
 
    function carteAPossiblementUnSolstice(carte) {
@@ -30910,13 +33381,25 @@ function terminerSelectionMarche() {
 }
 
 function solsticeCarteDejaTraitee(carte) {
-  return jeu.ui.solsticeCartesTraitees.includes(carte);
+  return !!carte?.solsticeTraiteeCettePhase;
 }
 
 function marquerSolsticeCarteTraitee(carte) {
-  if (!solsticeCarteDejaTraitee(carte)) {
-    jeu.ui.solsticeCartesTraitees.push(carte);
+  if (!carte) {
+    return;
   }
+
+  carte.solsticeTraiteeCettePhase = true;
+}
+
+function reinitialiserMarquageSolsticeCartesTableau() {
+  (jeu.joueurZones.tableauJoueur || []).forEach(carte => {
+    if (!carte) {
+      return;
+    }
+
+    carte.solsticeTraiteeCettePhase = false;
+  });
 }
 
 function solsticeCarteEstObligatoire(carte) {
@@ -30929,6 +33412,14 @@ function solsticeCarteEstObligatoire(carte) {
 
 function cartePeutEtreCliqueePourSolstice(carte) {
   if (!jeu.ui.solsticeActif) {
+    return false;
+  }
+
+  if (jeu.ui.solsticeResolutionEnCours) {
+    return false;
+  }
+
+  if (multijoueurConnecte() && !multijoueurPeutJouerTourActif()) {
     return false;
   }
 
@@ -30954,12 +33445,16 @@ function resteDesSolsticesObligatoires() {
 function commencerPhaseSolsticeInteractive() {
   jeu.ui.solsticeActif = true;
   jeu.ui.solsticeCartesTraitees = [];
+  jeu.ui.solsticeResolutionEnCours = false;
+  reinitialiserMarquageSolsticeCartesTableau();
   afficherZoneJoueur();
 }
 
 function terminerPhaseSolsticeInteractive() {
   jeu.ui.solsticeActif = false;
   jeu.ui.solsticeCartesTraitees = [];
+  jeu.ui.solsticeResolutionEnCours = false;
+  reinitialiserMarquageSolsticeCartesTableau();
   afficherZoneJoueur();
 }
 
@@ -31460,17 +33955,48 @@ function appliquerThemeFondJoueur() {
 }
 
 function afficherZoneJoueur() {
-  appliquerThemeFondJoueur();
-  afficherSlotStatut();
-  afficherSlotEtoile();
-  afficherSlotPleine();
-  afficherSlotCroissant();
-  afficherSlotPuissance();
-  afficherSlotBase();
-  afficherSlotDefausse();
-  afficherSlotMain();
-  afficherTableauJoueur();
-  afficherCompteursJoueur();
+  const afficherStructureZoneJoueur = () => {
+    appliquerThemeFondJoueur();
+    afficherSlotStatut();
+    afficherSlotEtoile();
+    afficherSlotPleine();
+    afficherSlotCroissant();
+    afficherSlotPuissance();
+    afficherSlotBase();
+    afficherSlotDefausse();
+    afficherSlotMain();
+    afficherTableauJoueur();
+    afficherCompteursJoueur();
+  };
+
+  if (duelAffichageAdversaireActif()) {
+    const etatAdverse = duelObtenirEtatJoueurAdversePerspectiveLocale();
+    if (!etatAdverse) {
+      return;
+    }
+
+    const joueurOriginal = jeu.joueur;
+    const zonesOriginales = jeu.joueurZones;
+    const nationOriginale = configurationPartie.nationJoueur;
+
+    jeu.ui.duelRenduLectureAdversaireActif = true;
+    try {
+      jeu.joueur = etatAdverse.joueur || creerRessourcesJoueurParDefaut();
+      jeu.joueurZones = etatAdverse.zones || creerZonesJoueurParDefaut();
+      configurationPartie.nationJoueur = etatAdverse.nation || configurationPartie.nationJoueur;
+      afficherStructureZoneJoueur();
+    } finally {
+      jeu.ui.duelRenduLectureAdversaireActif = false;
+      jeu.joueur = joueurOriginal;
+      jeu.joueurZones = zonesOriginales;
+      configurationPartie.nationJoueur = nationOriginale;
+    }
+    return;
+  }
+
+  duelSynchroniserZonePrincipaleSelonPerspectiveLocale();
+  jeu.ui.duelRenduLectureAdversaireActif = false;
+  afficherStructureZoneJoueur();
 }
 
 /* =========================================================
@@ -31760,7 +34286,38 @@ function desactiverScrollPagesScore() {
   }
 }
 
+function activerScrollVueAccueil() {
+  document.body.style.overflowY = "auto";
+  document.body.style.overflowX = "hidden";
+
+  const app = document.getElementById("app");
+  if (app) {
+    app.style.overflowY = "auto";
+    app.style.overflowX = "hidden";
+    app.style.height = "100vh";
+    app.style.maxHeight = "100vh";
+  }
+}
+
+function desactiverScrollVueAccueil() {
+  document.body.style.overflow = "hidden";
+
+  const app = document.getElementById("app");
+  if (app) {
+    app.style.overflow = "hidden";
+    app.style.height = "";
+    app.style.maxHeight = "";
+  }
+}
+
 function mettreAJourEtatBoutonsVue(idVueActive) {
+  const idVueNormalisee =
+    modeDuelActif() &&
+    idVueActive === "vue-joueur" &&
+    duelAffichageAdversaireActif()
+      ? "vue-bot"
+      : idVueActive;
+
   const correspondances = [
     ["btn-vue-marche", "vue-marche"],
     ["btn-vue-joueur", "vue-joueur"],
@@ -31773,13 +34330,25 @@ function mettreAJourEtatBoutonsVue(idVueActive) {
       return;
     }
 
-    const estActif = idVue === idVueActive;
+    const estActif = idVue === idVueNormalisee;
     bouton.classList.toggle("est-actif-vue", estActif);
     bouton.setAttribute("aria-pressed", estActif ? "true" : "false");
   });
 }
 
-function afficherVue(idVueAAfficher) {
+function afficherVue(idVueAAfficher, options = {}) {
+  const afficherAdversaireDuel = options?.afficherAdversaireDuel === true;
+  let idVueCible = idVueAAfficher;
+
+  if (modeDuelActif() && idVueAAfficher === "vue-bot") {
+    idVueCible = "vue-joueur";
+    jeu.ui.duelAffichageAdversaireActif = true;
+  } else if (modeDuelActif() && idVueAAfficher === "vue-joueur") {
+    jeu.ui.duelAffichageAdversaireActif = !!afficherAdversaireDuel;
+  } else {
+    jeu.ui.duelAffichageAdversaireActif = false;
+  }
+
   const idsVues = [
     "vue-accueil",
     "vue-marche",
@@ -31795,21 +34364,35 @@ function afficherVue(idVueAAfficher) {
     vue.classList.add("vue-cachee");
   });
 
-  const vueCible = document.getElementById(idVueAAfficher);
+  const vueCible = document.getElementById(idVueCible);
 
   if (!vueCible) {
-    console.error("Vue introuvable :", idVueAAfficher);
+    console.error("Vue introuvable :", idVueCible);
     return;
   }
 
   vueCible.classList.remove("vue-cachee");
   vueCible.classList.add("vue-active");
-  mettreAJourEtatBoutonsVue(idVueAAfficher);
+
+  if (idVueCible === "vue-accueil") {
+    activerScrollVueAccueil();
+  } else {
+    desactiverScrollVueAccueil();
+  }
+
+  const panneauAccueilMultijoueur = getElement("panneau-accueil-multijoueur");
+  if (panneauAccueilMultijoueur && idVueCible !== "vue-accueil") {
+    panneauAccueilMultijoueur.classList.remove("panneau-ui-ouvert");
+    panneauAccueilMultijoueur.classList.add("panneau-ui-cache");
+    panneauAccueilMultijoueur.setAttribute("aria-hidden", "true");
+  }
+
+  mettreAJourEtatBoutonsVue(idVueCible);
   planifierAjustementNomsCartes(document);
 
   const blocMusique = getElement("bloc-musique");
   if (blocMusique) {
-    if (idVueAAfficher === "vue-accueil") {
+    if (idVueCible === "vue-accueil") {
       blocMusique.classList.add("ui-cachee");
       fermerMenuEchap({ silencieux: true });
     } else {
@@ -31817,12 +34400,16 @@ function afficherVue(idVueAAfficher) {
     }
   }
 
+  if (idVueCible === "vue-joueur") {
+    afficherZoneJoueur();
+  }
+
   requestAnimationFrame(() => {
     if (
       (
-        idVueAAfficher === "vue-marche" ||
-        idVueAAfficher === "vue-joueur" ||
-        idVueAAfficher === "vue-bot"
+        idVueCible === "vue-marche" ||
+        idVueCible === "vue-joueur" ||
+        idVueCible === "vue-bot"
       ) &&
       typeof recalculerEchelleAvecSecurite === "function"
     ) {
@@ -32717,12 +35304,581 @@ function choisirCarteRegardRenommee(indexChoisi) {
    PAGE ACCUEUIL 
    ========================================================= */
 
+const MODES_JEU = Object.freeze({
+  SOLO: "solo",
+  DUEL: "duel",
+  CAMPAGNE: "campagne"
+});
+
+function normaliserModeJeu(mode) {
+  if (mode === MODES_JEU.DUEL) {
+    return MODES_JEU.DUEL;
+  }
+
+  if (mode === MODES_JEU.CAMPAGNE) {
+    return MODES_JEU.CAMPAGNE;
+  }
+
+  return MODES_JEU.SOLO;
+}
+
+function modeDuelActif() {
+  return normaliserModeJeu(configurationPartie?.modeJeu) === MODES_JEU.DUEL;
+}
+
+function modeCampagneActif() {
+  return normaliserModeJeu(configurationPartie?.modeJeu) === MODES_JEU.CAMPAGNE;
+}
+
+const CLE_ETAT_CAMPAGNE = "imperium-campagne-v1";
+const OBJECTIF_VICTOIRES_CAMPAGNE = 5;
+const LIMITE_DEFAITES_CAMPAGNE = 4;
+const DIFFICULTES_CAMPAGNE_ORDRE = [
+  DIFFICULTES_BOT.CHEF_DE_CLAN,
+  DIFFICULTES_BOT.SEIGNEUR_DE_GUERRE,
+  DIFFICULTES_BOT.IMPERATOR,
+  DIFFICULTES_BOT.SOUVERAIN,
+  DIFFICULTES_BOT.SUZERAIN
+];
+
+function libelleDifficulteBot(difficulte = "") {
+  const slug = normaliserDifficulteBot(difficulte);
+
+  switch (slug) {
+    case DIFFICULTES_BOT.CHEF_DE_CLAN:
+      return "Chef de clan";
+    case DIFFICULTES_BOT.SEIGNEUR_DE_GUERRE:
+      return "Seigneur de guerre";
+    case DIFFICULTES_BOT.SOUVERAIN:
+      return "Souverain";
+    case DIFFICULTES_BOT.SUZERAIN:
+      return "Suzerain";
+    default:
+      return "Imperator";
+  }
+}
+
+function normaliserListeChaines(liste = []) {
+  if (!Array.isArray(liste)) {
+    return [];
+  }
+
+  return liste
+    .map(item => String(item || "").trim())
+    .filter(Boolean);
+}
+
+function normaliserTemplateIdsCampagne(liste = []) {
+  return normaliserListeChaines(liste);
+}
+
+function construireEtatCampagneParDefaut() {
+  return {
+    active: false,
+    terminee: false,
+    resultatFinal: "",
+    idCampagne: "",
+    nationJoueur: "",
+    victoires: 0,
+    defaites: 0,
+    nationsBattues: [],
+    bonusDefaiteActif: false,
+    cartesAjouteesDeckDepart: [],
+    cartesRetireesDeckDepart: [],
+    recompenseEnAttente: false,
+    partieEnCours: null
+  };
+}
+
+function normaliserPartieCampagne(partie = null) {
+  if (!partie || typeof partie !== "object") {
+    return null;
+  }
+
+  const id = String(partie.id || "").trim();
+  if (!id) {
+    return null;
+  }
+
+  return {
+    id,
+    nationBot: String(partie.nationBot || "").trim(),
+    difficulteBot: normaliserDifficulteBot(partie.difficulteBot),
+    bonusDefaiteUtilise: !!partie.bonusDefaiteUtilise,
+    resolue: !!partie.resolue,
+    issue: String(partie.issue || "").trim(),
+    egaliteScore: !!partie.egaliteScore
+  };
+}
+
+function normaliserEtatCampagne(etat = null) {
+  const defaut = construireEtatCampagneParDefaut();
+  if (!etat || typeof etat !== "object") {
+    return defaut;
+  }
+
+  const victoires = Math.max(0, Number(etat.victoires || 0));
+  const defaites = Math.max(0, Number(etat.defaites || 0));
+  const nationJoueur = String(etat.nationJoueur || "").trim();
+  const terminee = !!etat.terminee;
+  const active = !!etat.active && !terminee && !!nationJoueur;
+
+  return {
+    ...defaut,
+    active,
+    terminee,
+    resultatFinal: String(etat.resultatFinal || "").trim(),
+    idCampagne: String(etat.idCampagne || "").trim(),
+    nationJoueur,
+    victoires: Math.min(victoires, OBJECTIF_VICTOIRES_CAMPAGNE),
+    defaites: Math.min(defaites, LIMITE_DEFAITES_CAMPAGNE),
+    nationsBattues: [...new Set(normaliserListeChaines(etat.nationsBattues))],
+    bonusDefaiteActif: !!etat.bonusDefaiteActif,
+    cartesAjouteesDeckDepart: [...new Set(normaliserTemplateIdsCampagne(etat.cartesAjouteesDeckDepart))],
+    cartesRetireesDeckDepart: normaliserTemplateIdsCampagne(etat.cartesRetireesDeckDepart),
+    recompenseEnAttente: !!etat.recompenseEnAttente,
+    partieEnCours: normaliserPartieCampagne(etat.partieEnCours)
+  };
+}
+
+function chargerEtatCampagneDepuisStockage() {
+  try {
+    const brut = localStorage.getItem(CLE_ETAT_CAMPAGNE);
+    if (!brut) {
+      return construireEtatCampagneParDefaut();
+    }
+
+    const parse = JSON.parse(brut);
+    return normaliserEtatCampagne(parse);
+  } catch (error) {
+    return construireEtatCampagneParDefaut();
+  }
+}
+
+function sauvegarderEtatCampagneDansStockage() {
+  try {
+    localStorage.setItem(CLE_ETAT_CAMPAGNE, JSON.stringify(etatCampagne));
+  } catch (error) {}
+}
+
+let etatCampagne = chargerEtatCampagneDepuisStockage();
+let campagneChoixRecompenseAjout = [];
+let campagneChoixRecompenseRetrait = [];
+
+function campagneEstActive() {
+  return !!(etatCampagne.active && !etatCampagne.terminee && etatCampagne.nationJoueur);
+}
+
+function campagneDifficulteCourante() {
+  const index = Math.max(
+    0,
+    Math.min(
+      Number(etatCampagne.victoires || 0),
+      DIFFICULTES_CAMPAGNE_ORDRE.length - 1
+    )
+  );
+  return DIFFICULTES_CAMPAGNE_ORDRE[index];
+}
+
+function campagneEtatLisible() {
+  if (campagneEstActive()) {
+    const bonus = etatCampagne.bonusDefaiteActif
+      ? " | Bonus prochaine partie: ressources de depart doublees"
+      : "";
+    return `Campagne active | Nation: ${etatCampagne.nationJoueur} | ` +
+      `Victoires ${etatCampagne.victoires}/${OBJECTIF_VICTOIRES_CAMPAGNE} | ` +
+      `Defaites ${etatCampagne.defaites}/${LIMITE_DEFAITES_CAMPAGNE} | ` +
+      `Difficulte: ${libelleDifficulteBot(campagneDifficulteCourante())}${bonus}`;
+  }
+
+  if (etatCampagne.terminee) {
+    const resultat = etatCampagne.resultatFinal === "victoire"
+      ? "Victoire de campagne"
+      : "Defaite de campagne";
+    return `${resultat} | Nation: ${etatCampagne.nationJoueur || "Aucune"} | ` +
+      `Score final: ${etatCampagne.victoires}V-${etatCampagne.defaites}D`;
+  }
+
+  return "Campagne inactive.";
+}
+
+function mettreAJourResumeCampagneAccueil() {
+  const resume = getElement("resume-campagne-accueil");
+  if (!resume) {
+    return;
+  }
+
+  resume.textContent = campagneEtatLisible();
+  resume.classList.remove("est-terminee-victoire", "est-terminee-defaite");
+
+  if (etatCampagne.terminee && etatCampagne.resultatFinal === "victoire") {
+    resume.classList.add("est-terminee-victoire");
+  } else if (etatCampagne.terminee && etatCampagne.resultatFinal === "defaite") {
+    resume.classList.add("est-terminee-defaite");
+  }
+}
+
+function campagneNationDejaBattue(nation = "") {
+  const cible = String(nation || "").trim();
+  if (!cible) {
+    return false;
+  }
+
+  return etatCampagne.nationsBattues.includes(cible);
+}
+
+function campagneMarquerCarteGagneeCettePartie(carte) {
+  if (!carte || !modeCampagneActif() || !campagneEstActive()) {
+    return;
+  }
+
+  if (String(carte.nation || "").trim() !== "Aucun") {
+    return;
+  }
+
+  if (inclutCategorie(carte, CATEGORIES.INSTABILITE)) {
+    return;
+  }
+
+  carte.campagneGagneeCettePartie = true;
+}
+
    let configurationPartie = {
   nationJoueur: null,
   nationBot: null,
+  modeJeu: MODES_JEU.SOLO,
   miniTutoriel: false,
   difficulteBot: DIFFICULTE_BOT_PAR_DEFAUT
 };
+
+function creerRessourcesJoueurParDefaut() {
+  return {
+    actions: 3,
+    epuisement: 5,
+    population: 2,
+    materiaux: 3,
+    progres: 1
+  };
+}
+
+function creerZonesJoueurParDefaut() {
+  return {
+    carteStatutVisible: null,
+    cartePuissanceVisible: null,
+    cartePleineVisible: null,
+    pileEtoileJoueur: [],
+    pileCroissantJoueur: [],
+    deckJoueur: [],
+    tableauJoueur: [],
+    mainJoueur: [],
+    defausseJoueur: [],
+    histoireJoueur: [],
+    pileRafraichissementNationEpuisee: false,
+    pileEtoileEpuisee: false
+  };
+}
+
+function capturerEtatJoueurCourantPourDuel(nation = "", nom = "") {
+  return {
+    nation: String(nation || ""),
+    nom: String(nom || ""),
+    joueur: {
+      actions: Number(jeu?.joueur?.actions || 0),
+      epuisement: Number(jeu?.joueur?.epuisement || 0),
+      population: Number(jeu?.joueur?.population || 0),
+      materiaux: Number(jeu?.joueur?.materiaux || 0),
+      progres: Number(jeu?.joueur?.progres || 0)
+    },
+    zones: {
+      carteStatutVisible: jeu.joueurZones.carteStatutVisible || null,
+      cartePuissanceVisible: jeu.joueurZones.cartePuissanceVisible || null,
+      cartePleineVisible: jeu.joueurZones.cartePleineVisible || null,
+      pileEtoileJoueur: [...(jeu.joueurZones.pileEtoileJoueur || [])],
+      pileCroissantJoueur: [...(jeu.joueurZones.pileCroissantJoueur || [])],
+      deckJoueur: [...(jeu.joueurZones.deckJoueur || [])],
+      tableauJoueur: [...(jeu.joueurZones.tableauJoueur || [])],
+      mainJoueur: [...(jeu.joueurZones.mainJoueur || [])],
+      defausseJoueur: [...(jeu.joueurZones.defausseJoueur || [])],
+      histoireJoueur: [...(jeu.joueurZones.histoireJoueur || [])],
+      pileRafraichissementNationEpuisee: !!jeu.joueurZones.pileRafraichissementNationEpuisee,
+      pileEtoileEpuisee: !!jeu.joueurZones.pileEtoileEpuisee
+    }
+  };
+}
+
+function creerProgressionDuelParDefaut() {
+  return {
+    nettoyageTermine: {
+      joueur1: false,
+      joueur2: false
+    },
+    solsticeTermine: {
+      joueur1: false,
+      joueur2: false
+    }
+  };
+}
+
+function reinitialiserEtatDuel() {
+  jeu.duel = {
+    actif: false,
+    joueurActifCle: "joueur1",
+    numeroTour: 1,
+    progressionManche: creerProgressionDuelParDefaut(),
+    interactionPassif: null,
+    joueurs: {
+      joueur1: null,
+      joueur2: null
+    }
+  };
+}
+
+function duelEtatActif() {
+  return !!(jeu?.duel?.actif && modeDuelActif());
+}
+
+function duelObtenirEtatJoueur(cle = "") {
+  if (!duelEtatActif()) {
+    return null;
+  }
+  if (cle !== "joueur1" && cle !== "joueur2") {
+    return null;
+  }
+  return jeu.duel.joueurs?.[cle] || null;
+}
+
+function duelObtenirCleJoueurActif() {
+  if (!duelEtatActif()) {
+    return "joueur1";
+  }
+  return jeu.duel.joueurActifCle === "joueur2" ? "joueur2" : "joueur1";
+}
+
+function duelObtenirCleJoueurSecondaire() {
+  return duelObtenirCleJoueurActif() === "joueur1" ? "joueur2" : "joueur1";
+}
+
+function duelObtenirCleJoueurPerspectiveLocale() {
+  if (!duelEtatActif()) {
+    return "joueur1";
+  }
+
+  if (multijoueurConnecte()) {
+    const cleLocale = multijoueurCleJoueurControleLocal();
+    if (cleLocale === "joueur1" || cleLocale === "joueur2") {
+      return cleLocale;
+    }
+  }
+
+  return duelObtenirCleJoueurActif();
+}
+
+function duelObtenirCleJoueurAdversePerspectiveLocale() {
+  return duelObtenirCleJoueurPerspectiveLocale() === "joueur1" ? "joueur2" : "joueur1";
+}
+
+function duelNomParCle(cle = "") {
+  return cle === "joueur2" ? "Joueur 2" : "Joueur 1";
+}
+
+function duelNationParCle(cle = "") {
+  const cleNormalisee = cle === "joueur2" ? "joueur2" : "joueur1";
+  const etat = duelObtenirEtatJoueur(cleNormalisee);
+  const nationEtat = String(etat?.nation || "").trim();
+  if (nationEtat) {
+    return nationEtat;
+  }
+
+  const nationConfiguration =
+    cleNormalisee === "joueur2"
+      ? String(configurationPartie?.nationBot || "").trim()
+      : String(configurationPartie?.nationJoueur || "").trim();
+
+  if (nationConfiguration) {
+    return nationConfiguration;
+  }
+
+  return duelNomParCle(cleNormalisee);
+}
+
+function duelObtenirEtatJoueurSecondaire() {
+  return duelObtenirEtatJoueur(duelObtenirCleJoueurSecondaire());
+}
+
+function duelObtenirEtatJoueurAdversePerspectiveLocale() {
+  return duelObtenirEtatJoueur(duelObtenirCleJoueurAdversePerspectiveLocale());
+}
+
+function duelAffichageAdversaireActif() {
+  return !!(duelEtatActif() && jeu?.ui?.duelAffichageAdversaireActif);
+}
+
+function duelRenduLectureAdversaireActif() {
+  return !!(duelEtatActif() && jeu?.ui?.duelRenduLectureAdversaireActif);
+}
+
+function appliquerEtatJoueurActifDuel(
+  cle = "joueur1",
+  { rafraichir = true, mettreAJourTourActif = true } = {}
+) {
+  const etat = duelObtenirEtatJoueur(cle);
+  if (!etat) {
+    return false;
+  }
+
+  const cleNormale = cle === "joueur2" ? "joueur2" : "joueur1";
+  if (mettreAJourTourActif) {
+    jeu.duel.joueurActifCle = cleNormale;
+  }
+  jeu.joueur = etat.joueur || creerRessourcesJoueurParDefaut();
+  jeu.joueurZones = etat.zones || creerZonesJoueurParDefaut();
+  configurationPartie.nationJoueur = etat.nation || configurationPartie.nationJoueur;
+
+  if (rafraichir) {
+    afficherZoneJoueur();
+    afficherZoneBot?.();
+  }
+
+  return true;
+}
+
+function duelSynchroniserZonePrincipaleSelonPerspectiveLocale() {
+  if (!duelEtatActif()) {
+    return false;
+  }
+
+  const clePerspective = duelObtenirCleJoueurPerspectiveLocale();
+  return appliquerEtatJoueurActifDuel(clePerspective, {
+    rafraichir: false,
+    mettreAJourTourActif: false
+  });
+}
+
+function duelObtenirProgressionManche() {
+  if (!duelEtatActif()) {
+    return creerProgressionDuelParDefaut();
+  }
+
+  if (!jeu.duel.progressionManche || typeof jeu.duel.progressionManche !== "object") {
+    jeu.duel.progressionManche = creerProgressionDuelParDefaut();
+  }
+
+  const progression = jeu.duel.progressionManche;
+  progression.nettoyageTermine = progression.nettoyageTermine || {};
+  progression.solsticeTermine = progression.solsticeTermine || {};
+  progression.nettoyageTermine.joueur1 = !!progression.nettoyageTermine.joueur1;
+  progression.nettoyageTermine.joueur2 = !!progression.nettoyageTermine.joueur2;
+  progression.solsticeTermine.joueur1 = !!progression.solsticeTermine.joueur1;
+  progression.solsticeTermine.joueur2 = !!progression.solsticeTermine.joueur2;
+
+  return progression;
+}
+
+function duelTousNettoyagesTermines() {
+  const progression = duelObtenirProgressionManche();
+  return !!(progression.nettoyageTermine.joueur1 && progression.nettoyageTermine.joueur2);
+}
+
+function duelTousSolsticesTermines() {
+  const progression = duelObtenirProgressionManche();
+  return !!(progression.solsticeTermine.joueur1 && progression.solsticeTermine.joueur2);
+}
+
+function duelReinitialiserProgressionManche() {
+  if (!duelEtatActif()) {
+    return;
+  }
+
+  jeu.duel.progressionManche = creerProgressionDuelParDefaut();
+}
+
+function duelBasculerVersJoueurSuivant() {
+  if (!duelEtatActif()) {
+    return false;
+  }
+
+  const suivant = duelObtenirCleJoueurActif() === "joueur1" ? "joueur2" : "joueur1";
+  appliquerEtatJoueurActifDuel(suivant, { rafraichir: false, mettreAJourTourActif: true });
+  if (suivant === "joueur1") {
+    jeu.duel.numeroTour = Number(jeu.duel.numeroTour || 1) + 1;
+  }
+  return true;
+}
+
+function initialiserModeDuel1v1() {
+  if (!modeDuelActif()) {
+    reinitialiserEtatDuel();
+    return false;
+  }
+
+  const nationJoueur1 = configurationPartie.nationJoueur;
+  const nationJoueur2 = configurationPartie.nationBot;
+  const nationAvantGeneration = configurationPartie.nationJoueur;
+
+  const etatJoueur1 = capturerEtatJoueurCourantPourDuel(nationJoueur1, "Joueur 1");
+
+  configurationPartie.nationJoueur = nationJoueur2;
+  jeu.joueur = creerRessourcesJoueurParDefaut();
+  jeu.joueurZones = creerZonesJoueurParDefaut();
+  construirePilesNation();
+  construireZoneJoueurNation();
+  const etatJoueur2 = capturerEtatJoueurCourantPourDuel(nationJoueur2, "Joueur 2");
+
+  configurationPartie.nationJoueur = nationAvantGeneration;
+
+  jeu.duel = {
+    actif: true,
+    joueurActifCle: "joueur1",
+    numeroTour: 1,
+    progressionManche: creerProgressionDuelParDefaut(),
+    interactionPassif: null,
+    joueurs: {
+      joueur1: etatJoueur1,
+      joueur2: etatJoueur2
+    }
+  };
+
+  appliquerEtatJoueurActifDuel("joueur1", { rafraichir: false, mettreAJourTourActif: true });
+  return true;
+}
+
+function mettreAJourLibellesModeJeu() {
+  const labelNationJoueur = getElement("label-nation-joueur");
+  const labelNationBot = getElement("label-nation-bot");
+  const labelDifficulteBot = getElement("label-difficulte-bot");
+  const btnVueBot = getElement("btn-vue-bot");
+
+  const duelActif = modeDuelActif();
+  const campagneActive = modeCampagneActif();
+
+  if (labelNationJoueur) {
+    labelNationJoueur.textContent = duelActif
+      ? "Nation du joueur 1"
+      : campagneActive
+        ? "Nation de campagne"
+        : "Nation du joueur";
+  }
+
+  if (labelNationBot) {
+    labelNationBot.textContent = duelActif
+      ? "Nation du joueur 2"
+      : campagneActive
+        ? "Nation adverse"
+        : "Nation du bot";
+  }
+
+  if (labelDifficulteBot) {
+    labelDifficulteBot.textContent = duelActif
+      ? "Difficulté bot (désactivé en duel)"
+      : campagneActive
+        ? "Difficulté bot (campagne)"
+        : "Difficulté du bot";
+  }
+
+  if (btnVueBot) {
+    btnVueBot.textContent = duelActif ? "Adversaire [3]" : "Bot [3]";
+  }
+}
 
 function obtenirListeNationsDepuisCartes(listeCartes) {
   const nations = [];
@@ -32746,11 +35902,62 @@ function obtenirListeNationsDepuisCartes(listeCartes) {
   return nations;
 }
 
+function restaurerOptionsNationsAdverses(selectBot) {
+  if (!selectBot) {
+    return;
+  }
+
+  Array.from(selectBot.options || []).forEach(option => {
+    option.disabled = false;
+  });
+}
+
+function appliquerRestrictionsNationsAdversesCampagne(selectBot, nationJoueur = "") {
+  if (!selectBot) {
+    return;
+  }
+
+  const nationJoueurNormalisee = String(nationJoueur || "").trim();
+  let premiereOptionEligible = "";
+
+  Array.from(selectBot.options || []).forEach(option => {
+    const nation = String(option.value || "").trim();
+    const desactivee = campagneNationDejaBattue(nation);
+    option.disabled = desactivee;
+
+    if (!desactivee && !premiereOptionEligible) {
+      premiereOptionEligible = nation;
+    }
+  });
+
+  const optionSelectionnee = selectBot.selectedOptions?.[0] || null;
+  const nationSelectionnee = String(optionSelectionnee?.value || "").trim();
+  const selectionInvalide =
+    !nationSelectionnee ||
+    campagneNationDejaBattue(nationSelectionnee);
+
+  if (selectionInvalide) {
+    const optionPrioritaire =
+      premiereOptionEligible && premiereOptionEligible !== nationJoueurNormalisee
+        ? premiereOptionEligible
+        : Array.from(selectBot.options || [])
+            .find(option => !option.disabled && String(option.value || "").trim() !== nationJoueurNormalisee)
+            ?.value ||
+          premiereOptionEligible;
+
+    if (optionPrioritaire) {
+      selectBot.value = optionPrioritaire;
+    }
+  }
+}
+
 function initialiserChoixNations() {
   const selectJoueur = document.getElementById("choix-nation-joueur");
   const selectBot = document.getElementById("choix-nation-bot");
   const selectDifficulteBot = document.getElementById("choix-difficulte-bot");
   const optionMiniTutoriel = document.getElementById("option-mini-tutoriel");
+  const optionModeDuel = document.getElementById("option-mode-duel");
+  const optionModeCampagne = document.getElementById("option-mode-campagne");
   const NATION_TUTORIEL_JOUEUR = "Romains";
   const NATION_TUTORIEL_BOT = "Celtes";
 
@@ -32806,8 +36013,10 @@ function initialiserChoixNations() {
   const romainsDisponibles = nations.includes(NATION_TUTORIEL_JOUEUR);
   const celtesDisponibles = nations.includes(NATION_TUTORIEL_BOT);
 
-  const appliquerContraintesTutorielAccueil = () => {
+  const appliquerContraintesAccueil = () => {
     const tutorielCoche = !!optionMiniTutoriel?.checked;
+    const duelCoche = !!optionModeDuel?.checked;
+    const campagneCoche = !!optionModeCampagne?.checked;
 
     if (tutorielCoche && romainsDisponibles && celtesDisponibles) {
       selectJoueur.value = NATION_TUTORIEL_JOUEUR;
@@ -32815,33 +36024,155 @@ function initialiserChoixNations() {
       configurationPartie.nationJoueur = NATION_TUTORIEL_JOUEUR;
       configurationPartie.nationBot = NATION_TUTORIEL_BOT;
       configurationPartie.difficulteBot = DIFFICULTES_BOT.IMPERATOR;
+      configurationPartie.modeJeu = MODES_JEU.SOLO;
       selectJoueur.disabled = true;
       selectBot.disabled = true;
+
+      if (optionModeDuel) {
+        optionModeDuel.checked = false;
+        optionModeDuel.disabled = true;
+      }
+      if (optionModeCampagne) {
+        optionModeCampagne.checked = false;
+        optionModeCampagne.disabled = true;
+      }
 
       if (selectDifficulteBot) {
         selectDifficulteBot.value = DIFFICULTES_BOT.IMPERATOR;
         selectDifficulteBot.disabled = true;
       }
 
+      restaurerOptionsNationsAdverses(selectBot);
+      mettreAJourLibellesModeJeu();
+      mettreAJourResumeCampagneAccueil();
       return;
     }
 
+    if (optionModeDuel) {
+      optionModeDuel.disabled = false;
+    }
+    if (optionModeCampagne) {
+      optionModeCampagne.disabled = false;
+    }
+    if (optionMiniTutoriel) {
+      optionMiniTutoriel.disabled = false;
+    }
+
+    if (campagneCoche) {
+      if (optionModeDuel) {
+        optionModeDuel.checked = false;
+      }
+      if (optionMiniTutoriel) {
+        optionMiniTutoriel.checked = false;
+        optionMiniTutoriel.disabled = true;
+      }
+
+      configurationPartie.modeJeu = MODES_JEU.CAMPAGNE;
+      configurationPartie.miniTutoriel = false;
+
+      if (optionModeDuel) {
+        optionModeDuel.disabled = true;
+      }
+
+      if (campagneEstActive()) {
+        if (etatCampagne.nationJoueur && nations.includes(etatCampagne.nationJoueur)) {
+          selectJoueur.value = etatCampagne.nationJoueur;
+        }
+        selectJoueur.disabled = true;
+      } else {
+        selectJoueur.disabled = false;
+      }
+
+      appliquerRestrictionsNationsAdversesCampagne(
+        selectBot,
+        selectJoueur.value
+      );
+      selectBot.disabled = false;
+
+      const difficulteCampagne = campagneEstActive()
+        ? campagneDifficulteCourante()
+        : DIFFICULTES_CAMPAGNE_ORDRE[0];
+      configurationPartie.difficulteBot = difficulteCampagne;
+
+      if (selectDifficulteBot) {
+        selectDifficulteBot.value = difficulteCampagne;
+        selectDifficulteBot.disabled = true;
+      }
+
+      configurationPartie.nationJoueur = selectJoueur.value;
+      configurationPartie.nationBot = selectBot.value;
+
+      mettreAJourLibellesModeJeu();
+      mettreAJourResumeCampagneAccueil();
+      return;
+    }
+
+    if (duelCoche && optionMiniTutoriel?.checked) {
+      optionMiniTutoriel.checked = false;
+      configurationPartie.miniTutoriel = false;
+    }
+
+    configurationPartie.modeJeu = duelCoche ? MODES_JEU.DUEL : MODES_JEU.SOLO;
+
     selectJoueur.disabled = false;
     selectBot.disabled = false;
+    restaurerOptionsNationsAdverses(selectBot);
+
     if (selectDifficulteBot) {
-      selectDifficulteBot.disabled = false;
+      selectDifficulteBot.disabled = duelCoche;
       selectDifficulteBot.value = normaliserDifficulteBot(configurationPartie.difficulteBot);
     }
+
+    configurationPartie.nationJoueur = selectJoueur.value;
+    configurationPartie.nationBot = selectBot.value;
+
+    mettreAJourLibellesModeJeu();
+    mettreAJourResumeCampagneAccueil();
   };
 
   if (optionMiniTutoriel) {
     optionMiniTutoriel.checked = !!configurationPartie.miniTutoriel;
     optionMiniTutoriel.onchange = () => {
       configurationPartie.miniTutoriel = !!optionMiniTutoriel.checked;
-      appliquerContraintesTutorielAccueil();
+      appliquerContraintesAccueil();
     };
-    appliquerContraintesTutorielAccueil();
   }
+
+  if (optionModeDuel) {
+    optionModeDuel.checked = normaliserModeJeu(configurationPartie.modeJeu) === MODES_JEU.DUEL;
+    optionModeDuel.onchange = () => {
+      configurationPartie.modeJeu = optionModeDuel.checked ? MODES_JEU.DUEL : MODES_JEU.SOLO;
+      if (optionModeDuel.checked && optionModeCampagne) {
+        optionModeCampagne.checked = false;
+      }
+      if (optionModeDuel.checked && optionMiniTutoriel) {
+        optionMiniTutoriel.checked = false;
+        configurationPartie.miniTutoriel = false;
+      }
+      appliquerContraintesAccueil();
+    };
+  }
+
+  if (optionModeCampagne) {
+    optionModeCampagne.checked =
+      normaliserModeJeu(configurationPartie.modeJeu) === MODES_JEU.CAMPAGNE ||
+      campagneEstActive();
+    optionModeCampagne.onchange = () => {
+      if (optionModeCampagne.checked && optionModeDuel) {
+        optionModeDuel.checked = false;
+      }
+      if (optionModeCampagne.checked && optionMiniTutoriel) {
+        optionMiniTutoriel.checked = false;
+        configurationPartie.miniTutoriel = false;
+      }
+      configurationPartie.modeJeu = optionModeCampagne.checked
+        ? MODES_JEU.CAMPAGNE
+        : MODES_JEU.SOLO;
+      appliquerContraintesAccueil();
+    };
+  }
+
+  appliquerContraintesAccueil();
 }
 
 function obtenirCartesDuneNation(nomNation, listeCartes) {
@@ -32860,56 +36191,130 @@ function obtenirCartesDuneNation(nomNation, listeCartes) {
 
 const MESSAGE_TOAST_RACCOURCIS_PARTIE =
   "Raccourcis: 1 Marché · 2 Joueur · 3 Bot · Esc Menu · Entrée OK";
+const MESSAGE_TOAST_RACCOURCIS_DUEL =
+  "Raccourcis: 1 Marché · 2 Joueur actif · 3 Joueur adverse · Esc Menu · Entrée OK";
+
+function campagneDemarrerNouvelle(nationJoueur = "") {
+  const nation = String(nationJoueur || "").trim();
+  const etat = construireEtatCampagneParDefaut();
+
+  etat.active = !!nation;
+  etat.terminee = false;
+  etat.resultatFinal = "";
+  etat.idCampagne = `campagne-${Date.now()}`;
+  etat.nationJoueur = nation;
+
+  etatCampagne = normaliserEtatCampagne(etat);
+  sauvegarderEtatCampagneDansStockage();
+  mettreAJourResumeCampagneAccueil();
+}
+
+function campagneReinitialiserDepuisFinPartie() {
+  etatCampagne = construireEtatCampagneParDefaut();
+  sauvegarderEtatCampagneDansStockage();
+  location.reload();
+}
+
+function campagneContinuerDepuisFinPartie() {
+  location.reload();
+}
+
+window.campagneReinitialiserDepuisFinPartie = campagneReinitialiserDepuisFinPartie;
+window.campagneContinuerDepuisFinPartie = campagneContinuerDepuisFinPartie;
+
+function campagnePreparerDemarragePartie({
+  nationJoueur = "",
+  nationBot = ""
+} = {}) {
+  const nationJoueurNormalisee = String(nationJoueur || "").trim();
+  const nationBotNormalisee = String(nationBot || "").trim();
+
+  if (!nationJoueurNormalisee) {
+    return {
+      ok: false,
+      message: "Campagne: nation joueur invalide."
+    };
+  }
+
+  if (!nationBotNormalisee) {
+    return {
+      ok: false,
+      message: "Campagne: nation adverse invalide."
+    };
+  }
+
+  if (!campagneEstActive() || etatCampagne.nationJoueur !== nationJoueurNormalisee) {
+    campagneDemarrerNouvelle(nationJoueurNormalisee);
+  }
+
+  if (campagneNationDejaBattue(nationBotNormalisee)) {
+    return {
+      ok: false,
+      message: `Campagne: vous avez deja battu ${nationBotNormalisee}. Choisissez une autre nation adverse.`
+    };
+  }
+
+  const difficulte = campagneDifficulteCourante();
+  etatCampagne.partieEnCours = {
+    id: `campagne-partie-${Date.now()}`,
+    nationBot: nationBotNormalisee,
+    difficulteBot: difficulte,
+    bonusDefaiteUtilise: !!etatCampagne.bonusDefaiteActif,
+    resolue: false,
+    issue: "",
+    egaliteScore: false
+  };
+  etatCampagne.recompenseEnAttente = false;
+  sauvegarderEtatCampagneDansStockage();
+  mettreAJourResumeCampagneAccueil();
+
+  return {
+    ok: true,
+    difficulte
+  };
+}
+
+function campagneAppliquerBonusRessourcesSiActif() {
+  if (!modeCampagneActif() || !campagneEstActive()) {
+    return;
+  }
+
+  const partie = etatCampagne.partieEnCours;
+  if (!partie || !partie.bonusDefaiteUtilise) {
+    return;
+  }
+
+  jeu.joueur.population = 4;
+  jeu.joueur.materiaux = 6;
+  jeu.joueur.progres = 2;
+}
+
+function campagnePartieEnCoursValide() {
+  if (!modeCampagneActif() || !campagneEstActive()) {
+    return false;
+  }
+
+  return !!(etatCampagne.partieEnCours && etatCampagne.partieEnCours.id);
+}
 
 function afficherRappelRaccourcisPartie() {
-  afficherToastUI(MESSAGE_TOAST_RACCOURCIS_PARTIE, { duree: 6400 });
+  const message = modeDuelActif()
+    ? MESSAGE_TOAST_RACCOURCIS_DUEL
+    : MESSAGE_TOAST_RACCOURCIS_PARTIE;
+  afficherToastUI(message, { duree: 6400 });
 }
 
 function commencerNouvellePartie() {
-  const selectNationJoueur = document.getElementById("choix-nation-joueur");
-  const selectNationBot = document.getElementById("choix-nation-bot");
-  const selectDifficulteBot = document.getElementById("choix-difficulte-bot");
-  const optionMiniTutoriel = document.getElementById("option-mini-tutoriel");
-  const modeMiniTutoriel = !!optionMiniTutoriel?.checked;
-
-  configurationPartie.miniTutoriel = modeMiniTutoriel;
-
-  if (modeMiniTutoriel) {
-    configurationPartie.nationJoueur = "Romains";
-    configurationPartie.nationBot = "Celtes";
-    configurationPartie.difficulteBot = DIFFICULTES_BOT.IMPERATOR;
-
-    if (selectNationJoueur) {
-      selectNationJoueur.value = "Romains";
+  if (lobbyMultijoueurActif()) {
+    if (etatMultijoueur.role === "host") {
+      void demarrerPartieDepuisLobbyMultijoueur();
+    } else {
+      definirStatutMultijoueur("Attendez que l'hote demarre la partie.", "erreur");
     }
-
-    if (selectNationBot) {
-      selectNationBot.value = "Celtes";
-    }
-
-    if (selectDifficulteBot) {
-      selectDifficulteBot.value = DIFFICULTES_BOT.IMPERATOR;
-    }
-  } else {
-    configurationPartie.nationJoueur = selectNationJoueur.value;
-    configurationPartie.nationBot = selectNationBot.value;
-    configurationPartie.difficulteBot = normaliserDifficulteBot(
-      selectDifficulteBot?.value || configurationPartie.difficulteBot
-    );
+    return;
   }
 
-  initialiserJeu();
-  initialiserBot();
-  afficherUIPartie();
-
-  document.getElementById("barre-navigation-vues")?.classList.remove("ui-cachee");
-
-  afficherVue("vue-joueur");
-  initialiserMiniTutorielPartie(!!configurationPartie.miniTutoriel);
-
-  setTimeout(() => {
-    afficherRappelRaccourcisPartie();
-  }, 420);
+  commencerNouvellePartieLocale();
 }
 
 function demarrerPartie() {
@@ -32924,6 +36329,7 @@ function demarrerPartie() {
 function afficherUIPartie() {
   const blocCompteurs = document.getElementById("bloc-compteurs-global");
   const blocControlesTour = document.getElementById("bloc-controles-tour");
+  const boutonJournal = getElement("btn-journal-actions");
 
   if (blocCompteurs) {
     blocCompteurs.classList.remove("ui-cachee");
@@ -32932,11 +36338,16 @@ function afficherUIPartie() {
   if (blocControlesTour) {
     blocControlesTour.classList.remove("ui-cachee");
   }
+
+  if (boutonJournal) {
+    boutonJournal.classList.remove("ui-cachee");
+  }
 }
 
 function masquerUIPartie() {
   const blocCompteurs = document.getElementById("bloc-compteurs-global");
   const blocControlesTour = document.getElementById("bloc-controles-tour");
+  const boutonJournal = getElement("btn-journal-actions");
 
   if (blocCompteurs) {
     blocCompteurs.classList.add("ui-cachee");
@@ -32945,6 +36356,12 @@ function masquerUIPartie() {
   if (blocControlesTour) {
     blocControlesTour.classList.add("ui-cachee");
   }
+
+  if (boutonJournal) {
+    boutonJournal.classList.add("ui-cachee");
+  }
+
+  fermerPanneauJournalActions();
 }
 
 function initialiserBoutonsTour() {
@@ -33027,6 +36444,10 @@ function mettreAJourBoutonsPhaseJoueur() {
   if (btnFinSolstice) {
     btnFinSolstice.disabled = !finSolsticeActif;
     btnFinSolstice.classList.toggle("bouton-inactif", !finSolsticeActif);
+  }
+
+  if (modeDuelActif()) {
+    definirEtatBoutonTourBot(false);
   }
 }
 
@@ -34945,6 +38366,2106 @@ function initialiserMenuEchap() {
   mettreAJourContenuLexiqueMenu();
 }
 
+function panneauAccueilMultijoueurEstOuvert() {
+  return getElement("panneau-accueil-multijoueur")?.classList.contains("panneau-ui-ouvert") === true;
+}
+
+function ouvrirPanneauAccueilMultijoueur() {
+  const panneau = getElement("panneau-accueil-multijoueur");
+  if (!panneau || panneauAccueilMultijoueurEstOuvert() || !vueAccueilEstVisible()) {
+    return;
+  }
+
+  lireFormulaireMultijoueur({ source: "auto" });
+  synchroniserChampsMultijoueurUI();
+
+  panneau.classList.remove("panneau-ui-cache");
+  panneau.classList.add("panneau-ui-ouvert");
+  panneau.setAttribute("aria-hidden", "false");
+
+  getElement("btn-fermer-accueil-multijoueur")?.focus();
+}
+
+function fermerPanneauAccueilMultijoueur({ restituerFocus = false } = {}) {
+  const panneau = getElement("panneau-accueil-multijoueur");
+  if (!panneau) {
+    return;
+  }
+
+  const etaitOuvert = panneauAccueilMultijoueurEstOuvert();
+  panneau.classList.remove("panneau-ui-ouvert");
+  panneau.classList.add("panneau-ui-cache");
+  panneau.setAttribute("aria-hidden", "true");
+
+  if (restituerFocus && etaitOuvert) {
+    getElement("btn-accueil-ouvrir-multijoueur")?.focus();
+  }
+}
+
+function basculerPanneauAccueilMultijoueur() {
+  if (panneauAccueilMultijoueurEstOuvert()) {
+    fermerPanneauAccueilMultijoueur({ restituerFocus: false });
+    return;
+  }
+
+  ouvrirPanneauAccueilMultijoueur();
+}
+
+function initialiserPanneauAccueilMultijoueur() {
+  const panneau = getElement("panneau-accueil-multijoueur");
+  const btnOuvrir = getElement("btn-accueil-ouvrir-multijoueur");
+  const btnFermer = getElement("btn-fermer-accueil-multijoueur");
+
+  if (!panneau) {
+    return;
+  }
+
+  if (btnOuvrir) {
+    btnOuvrir.addEventListener("click", () => {
+      basculerPanneauAccueilMultijoueur();
+    });
+  }
+
+  if (btnFermer) {
+    btnFermer.addEventListener("click", () => {
+      fermerPanneauAccueilMultijoueur({ restituerFocus: true });
+    });
+  }
+
+  panneau.addEventListener("click", event => {
+    if (event.target === panneau) {
+      fermerPanneauAccueilMultijoueur({ restituerFocus: true });
+    }
+  });
+
+  document.addEventListener("keydown", event => {
+    if (event.key !== "Escape" || !panneauAccueilMultijoueurEstOuvert()) {
+      return;
+    }
+
+    event.preventDefault();
+    event.stopPropagation();
+    fermerPanneauAccueilMultijoueur({ restituerFocus: true });
+  }, true);
+}
+
+/* =========================================================
+  48B) MULTIJOUEUR EN LIGNE (MVP SNAPSHOT SYNC)
+   ========================================================= */
+
+const CLE_PREFERENCES_MULTIJOUEUR = "imperium-multi-prefs-v1";
+const INTERVALLE_SYNC_MULTIJOUEUR_MS = 1200;
+const INTERVALLE_PING_MULTIJOUEUR_MS = 12000;
+const DELAI_RECONNEXION_MULTIJOUEUR_MS = 2500;
+const DUREE_TOAST_ACTION_ADVERSE_MS = 4300;
+const DELAI_ENTRE_TOAST_ACTION_ADVERSE_MS = 220;
+
+function creerLobbyMultijoueurParDefaut() {
+  return {
+    phase: "hors_ligne",
+    startedAt: "",
+    host: null,
+    guest: null,
+    canStart: false
+  };
+}
+
+const etatMultijoueur = {
+  initialise: false,
+  connecte: false,
+  serveurUrl: "http://localhost:8787",
+  nomJoueur: "Joueur",
+  codeSalle: "",
+  playerId: "",
+  role: "",
+  versionServeur: 0,
+  empreinteSnapshotLocale: "",
+  envoiEnCours: false,
+  applicationSnapshotEnCours: false,
+  dernierAvertissementRefusTs: 0,
+  interactionPassifEnCoursId: "",
+  interactionPassifLocaleEnCours: false,
+  journalActionsInitialise: false,
+  dernierJournalActionTraiteTs: 0,
+  idsJournalActionsTraitees: [],
+  fileToastsActionsAdverses: [],
+  timerToastActionAdverse: null,
+  synchronisationAccueilEnCours: false,
+  lobby: creerLobbyMultijoueurParDefaut(),
+  eventSource: null,
+  timerSync: null,
+  timerPing: null,
+  timerReconnexion: null
+};
+
+function reinitialiserFileToastsActionsAdverses() {
+  if (etatMultijoueur.timerToastActionAdverse) {
+    clearTimeout(etatMultijoueur.timerToastActionAdverse);
+    etatMultijoueur.timerToastActionAdverse = null;
+  }
+
+  etatMultijoueur.fileToastsActionsAdverses = [];
+}
+
+function traiterFileToastsActionsAdversesSiNecessaire() {
+  if (etatMultijoueur.timerToastActionAdverse) {
+    return;
+  }
+
+  if (
+    !Array.isArray(etatMultijoueur.fileToastsActionsAdverses) ||
+    etatMultijoueur.fileToastsActionsAdverses.length === 0
+  ) {
+    return;
+  }
+
+  const message = String(etatMultijoueur.fileToastsActionsAdverses.shift() || "").trim();
+  if (!message) {
+    traiterFileToastsActionsAdversesSiNecessaire();
+    return;
+  }
+
+  afficherToastUI(`Action adverse: ${message}`, { duree: DUREE_TOAST_ACTION_ADVERSE_MS });
+
+  const delaiSuivant = Math.max(
+    500,
+    DUREE_TOAST_ACTION_ADVERSE_MS + DELAI_ENTRE_TOAST_ACTION_ADVERSE_MS
+  );
+  etatMultijoueur.timerToastActionAdverse = setTimeout(() => {
+    etatMultijoueur.timerToastActionAdverse = null;
+    traiterFileToastsActionsAdversesSiNecessaire();
+  }, delaiSuivant);
+}
+
+function enfilerToastActionAdverse(message = "") {
+  const texte = String(message || "").trim();
+  if (!texte) {
+    return;
+  }
+
+  if (!Array.isArray(etatMultijoueur.fileToastsActionsAdverses)) {
+    etatMultijoueur.fileToastsActionsAdverses = [];
+  }
+
+  etatMultijoueur.fileToastsActionsAdverses.push(texte);
+
+  if (etatMultijoueur.fileToastsActionsAdverses.length > 30) {
+    etatMultijoueur.fileToastsActionsAdverses.splice(
+      0,
+      etatMultijoueur.fileToastsActionsAdverses.length - 30
+    );
+  }
+
+  traiterFileToastsActionsAdversesSiNecessaire();
+}
+
+function idEntreeJournalActionMultijoueur(entree = null) {
+  return String(entree?.id || "").trim();
+}
+
+function journalActionMultijoueurDejaTraitee(id = "") {
+  const cle = String(id || "").trim();
+  if (!cle) {
+    return false;
+  }
+
+  if (!Array.isArray(etatMultijoueur.idsJournalActionsTraitees)) {
+    etatMultijoueur.idsJournalActionsTraitees = [];
+    return false;
+  }
+
+  return etatMultijoueur.idsJournalActionsTraitees.includes(cle);
+}
+
+function marquerEntreesJournalActionsMultijoueurTraitees(entrees = []) {
+  if (!Array.isArray(entrees) || entrees.length === 0) {
+    return;
+  }
+
+  if (!Array.isArray(etatMultijoueur.idsJournalActionsTraitees)) {
+    etatMultijoueur.idsJournalActionsTraitees = [];
+  }
+
+  entrees.forEach(entree => {
+    const id = idEntreeJournalActionMultijoueur(entree);
+    if (!id) {
+      return;
+    }
+
+    if (!etatMultijoueur.idsJournalActionsTraitees.includes(id)) {
+      etatMultijoueur.idsJournalActionsTraitees.push(id);
+    }
+  });
+
+  const limite = Math.max(200, LIMITE_JOURNAL_ACTIONS_MULTIJOUEUR * 4);
+  if (etatMultijoueur.idsJournalActionsTraitees.length > limite) {
+    etatMultijoueur.idsJournalActionsTraitees.splice(
+      0,
+      etatMultijoueur.idsJournalActionsTraitees.length - limite
+    );
+  }
+}
+
+function multijoueurConnecte() {
+  return etatMultijoueur.connecte === true;
+}
+
+function multijoueurCleJoueurControleLocal() {
+  if (!multijoueurConnecte()) {
+    return "";
+  }
+
+  if (etatMultijoueur.role === "host") {
+    return "joueur1";
+  }
+
+  if (etatMultijoueur.role === "guest") {
+    return modeDuelActif() ? "joueur2" : "";
+  }
+
+  return "";
+}
+
+function multijoueurPeutJouerTourActif() {
+  if (!multijoueurConnecte()) {
+    return true;
+  }
+
+  const cleLocale = multijoueurCleJoueurControleLocal();
+  if (!cleLocale) {
+    return false;
+  }
+
+  if (!duelEtatActif()) {
+    return cleLocale === "joueur1";
+  }
+
+  return cleLocale === duelObtenirCleJoueurActif();
+}
+
+function multijoueurLectureSeuleActive() {
+  return multijoueurConnecte() && !multijoueurPeutJouerTourActif();
+}
+
+function multijoueurPublicationLocaleAutorisee() {
+  if (!multijoueurConnecte()) {
+    return false;
+  }
+
+  if (String(etatMultijoueur.lobby?.phase || "") !== "in_game") {
+    return false;
+  }
+
+  return multijoueurPeutJouerTourActif();
+}
+
+function libelleControleMultijoueur() {
+  if (!multijoueurConnecte()) {
+    return "hors ligne";
+  }
+
+  const cleLocale = multijoueurCleJoueurControleLocal();
+  if (!cleLocale) {
+    return "observateur";
+  }
+
+  if (!duelEtatActif()) {
+    return cleLocale === "joueur1" ? "hote actif" : "lecture seule";
+  }
+
+  const suffixeTour = multijoueurPeutJouerTourActif() ? "votre tour" : "attente";
+  return `${duelNomParCle(cleLocale)} - ${suffixeTour}`;
+}
+
+function obtenirJournalActionsMultijoueurCourant() {
+  if (!Array.isArray(jeu?.journalActionsMultijoueur)) {
+    return [];
+  }
+
+  return [...jeu.journalActionsMultijoueur]
+    .filter(entree => entree && typeof entree === "object")
+    .sort((a, b) => Number(a?.creeLe || 0) - Number(b?.creeLe || 0));
+}
+
+function horodatageMaxJournalActionsMultijoueur(entrees = []) {
+  if (!Array.isArray(entrees) || entrees.length === 0) {
+    return 0;
+  }
+
+  return entrees.reduce((max, entree) => {
+    const ts = Number(entree?.creeLe || 0);
+    return ts > max ? ts : max;
+  }, 0);
+}
+
+function panneauJournalActionsEstOuvert() {
+  return getElement("panneau-journal-actions")?.classList.contains("panneau-ui-ouvert") === true;
+}
+
+function formaterHeureJournalActionMultijoueur(horodatage = 0) {
+  const ts = Number(horodatage || 0);
+  if (!Number.isFinite(ts) || ts <= 0) {
+    return "--:--:--";
+  }
+
+  const date = new Date(ts);
+  if (Number.isNaN(date.getTime())) {
+    return "--:--:--";
+  }
+
+  try {
+    return date.toLocaleTimeString("fr-CA", {
+      hour: "2-digit",
+      minute: "2-digit",
+      second: "2-digit"
+    });
+  } catch (error) {
+    return date.toLocaleTimeString();
+  }
+}
+
+function libelleActeurJournalActionMultijoueur(entree = null) {
+  const acteurCle = String(entree?.acteurCle || "").trim();
+  if (acteurCle === "joueur1" || acteurCle === "joueur2") {
+    return duelNationParCle(acteurCle);
+  }
+  return "Systeme";
+}
+
+function rafraichirContenuPanneauJournalActions() {
+  const liste = getElement("journal-actions-liste");
+  if (!liste) {
+    return;
+  }
+
+  const entrees = obtenirJournalActionsMultijoueurCourant();
+  liste.innerHTML = "";
+
+  if (!Array.isArray(entrees) || entrees.length === 0) {
+    const vide = document.createElement("p");
+    vide.className = "journal-actions-vide";
+    vide.textContent = "Aucune action enregistree.";
+    liste.appendChild(vide);
+    return;
+  }
+
+  const entreesInversees = [...entrees].reverse();
+
+  entreesInversees.forEach(entree => {
+    const article = document.createElement("article");
+    article.className = "journal-actions-entree";
+
+    const entete = document.createElement("div");
+    entete.className = "journal-actions-entete";
+
+    const heure = document.createElement("span");
+    heure.textContent = formaterHeureJournalActionMultijoueur(entree?.creeLe);
+
+    const acteur = document.createElement("span");
+    acteur.textContent = libelleActeurJournalActionMultijoueur(entree);
+
+    entete.appendChild(heure);
+    entete.appendChild(acteur);
+
+    const message = document.createElement("div");
+    message.className = "journal-actions-message";
+    const messageJournal = personnaliserMessageJournalActionMultijoueur(
+      entree?.message || "",
+      entree?.acteurCle || ""
+    );
+    message.textContent = String(messageJournal || entree?.message || "").trim();
+
+    article.appendChild(entete);
+    article.appendChild(message);
+    liste.appendChild(article);
+  });
+}
+
+function ouvrirPanneauJournalActions() {
+  const panneau = getElement("panneau-journal-actions");
+  if (!panneau) {
+    return;
+  }
+
+  rafraichirContenuPanneauJournalActions();
+  panneau.classList.remove("panneau-ui-cache");
+  panneau.classList.add("panneau-ui-ouvert");
+  panneau.setAttribute("aria-hidden", "false");
+}
+
+function fermerPanneauJournalActions() {
+  const panneau = getElement("panneau-journal-actions");
+  if (!panneau) {
+    return;
+  }
+
+  panneau.classList.remove("panneau-ui-ouvert");
+  panneau.classList.add("panneau-ui-cache");
+  panneau.setAttribute("aria-hidden", "true");
+}
+
+function basculerPanneauJournalActions() {
+  if (panneauJournalActionsEstOuvert()) {
+    fermerPanneauJournalActions();
+    return;
+  }
+
+  ouvrirPanneauJournalActions();
+}
+
+function initialiserPanneauJournalActions() {
+  const panneau = getElement("panneau-journal-actions");
+  const boutonOuvrir = getElement("btn-journal-actions");
+  const boutonFermer = getElement("btn-fermer-journal-actions");
+
+  if (boutonOuvrir) {
+    boutonOuvrir.addEventListener("click", () => {
+      basculerPanneauJournalActions();
+    });
+  }
+
+  if (boutonFermer) {
+    boutonFermer.addEventListener("click", () => {
+      fermerPanneauJournalActions();
+    });
+  }
+
+  if (panneau) {
+    panneau.addEventListener("click", event => {
+      if (event.target === panneau) {
+        fermerPanneauJournalActions();
+      }
+    });
+  }
+
+  document.addEventListener("keydown", event => {
+    if (event.key !== "Escape") {
+      return;
+    }
+
+    if (!panneauJournalActionsEstOuvert()) {
+      return;
+    }
+
+    event.preventDefault();
+    event.stopPropagation();
+    fermerPanneauJournalActions();
+  }, true);
+}
+
+function afficherActionAdverseNonBloquanteSiNecessaire() {
+  if (!multijoueurConnecte() || !duelEtatActif()) {
+    reinitialiserFileToastsActionsAdverses();
+    return;
+  }
+
+  const cleLocale = multijoueurCleJoueurControleLocal();
+  if (cleLocale !== "joueur1" && cleLocale !== "joueur2") {
+    reinitialiserFileToastsActionsAdverses();
+    return;
+  }
+
+  const entrees = obtenirJournalActionsMultijoueurCourant();
+  const horodatageMax = horodatageMaxJournalActionsMultijoueur(entrees);
+
+  if (!etatMultijoueur.journalActionsInitialise) {
+    etatMultijoueur.journalActionsInitialise = true;
+    etatMultijoueur.dernierJournalActionTraiteTs = horodatageMax;
+    marquerEntreesJournalActionsMultijoueurTraitees(entrees);
+    return;
+  }
+
+  if (!multijoueurLectureSeuleActive()) {
+    etatMultijoueur.dernierJournalActionTraiteTs = horodatageMax;
+    marquerEntreesJournalActionsMultijoueurTraitees(entrees);
+    reinitialiserFileToastsActionsAdverses();
+    return;
+  }
+
+  const nouvellesEntreesAdverses = entrees.filter(entree => {
+    const acteurCle = entree?.acteurCle === "joueur2" ? "joueur2" : "joueur1";
+    const id = idEntreeJournalActionMultijoueur(entree);
+    const message = String(entree?.message || "").trim();
+    return !journalActionMultijoueurDejaTraitee(id) && acteurCle !== cleLocale && !!message;
+  });
+
+  if (nouvellesEntreesAdverses.length === 0) {
+    etatMultijoueur.dernierJournalActionTraiteTs = horodatageMax;
+    marquerEntreesJournalActionsMultijoueurTraitees(entrees);
+    return;
+  }
+
+  nouvellesEntreesAdverses.forEach(entree => {
+    enfilerToastActionAdverse(entree?.message || "");
+  });
+
+  marquerEntreesJournalActionsMultijoueurTraitees(nouvellesEntreesAdverses);
+  etatMultijoueur.dernierJournalActionTraiteTs = horodatageMax;
+}
+
+function vueAccueilEstVisible() {
+  return getElement("vue-accueil")?.classList.contains("vue-active") === true;
+}
+
+function lobbyMultijoueurActif() {
+  return multijoueurConnecte() && String(etatMultijoueur.lobby?.phase || "") === "lobby";
+}
+
+function normaliserEtatLobbyMultijoueur(lobby = null) {
+  if (!lobby || typeof lobby !== "object") {
+    return creerLobbyMultijoueurParDefaut();
+  }
+
+  const normaliserParticipant = participant => {
+    if (!participant || typeof participant !== "object") {
+      return null;
+    }
+
+    return {
+      id: String(participant.id || ""),
+      name: String(participant.name || "Joueur"),
+      nation: String(participant.nation || ""),
+      ready: !!participant.ready
+    };
+  };
+
+  return {
+    phase:
+      lobby.phase === "in_game"
+        ? "in_game"
+        : lobby.phase === "hors_ligne"
+          ? "hors_ligne"
+          : "lobby",
+    startedAt: String(lobby.startedAt || ""),
+    host: normaliserParticipant(lobby.host),
+    guest: normaliserParticipant(lobby.guest),
+    canStart: !!lobby.canStart
+  };
+}
+
+function multijoueurParticipantLocalLobby() {
+  if (!lobbyMultijoueurActif()) {
+    return null;
+  }
+
+  if (etatMultijoueur.role === "host") {
+    return etatMultijoueur.lobby.host;
+  }
+
+  if (etatMultijoueur.role === "guest") {
+    return etatMultijoueur.lobby.guest;
+  }
+
+  return null;
+}
+
+function multijoueurParticipantAdverseLobby() {
+  if (!lobbyMultijoueurActif()) {
+    return null;
+  }
+
+  if (etatMultijoueur.role === "host") {
+    return etatMultijoueur.lobby.guest;
+  }
+
+  if (etatMultijoueur.role === "guest") {
+    return etatMultijoueur.lobby.host;
+  }
+
+  return null;
+}
+
+function synchroniserRoleMultijoueurDepuisListeJoueurs(players = []) {
+  if (!multijoueurConnecte() || !etatMultijoueur.playerId || !Array.isArray(players)) {
+    return;
+  }
+
+  const local = players.find(player => String(player?.id || "") === etatMultijoueur.playerId);
+  const role = String(local?.role || "");
+
+  if (role === "host" || role === "guest") {
+    etatMultijoueur.role = role;
+  }
+}
+
+function synchroniserRoleMultijoueurDepuisLobby(lobby = etatMultijoueur.lobby) {
+  if (!multijoueurConnecte() || !etatMultijoueur.playerId || !lobby || typeof lobby !== "object") {
+    return;
+  }
+
+  const localId = String(etatMultijoueur.playerId || "");
+  if (!localId) {
+    return;
+  }
+
+  if (String(lobby.host?.id || "") === localId) {
+    etatMultijoueur.role = "host";
+    return;
+  }
+
+  if (String(lobby.guest?.id || "") === localId) {
+    etatMultijoueur.role = "guest";
+  }
+}
+
+function lireValeurChampMultijoueurParSource(source = "auto", ids = { accueil: "", menu: "" }, fallback = "") {
+  const champAccueil = ids.accueil ? getElement(ids.accueil) : null;
+  const champMenu = ids.menu ? getElement(ids.menu) : null;
+  const sourceFinale =
+    source === "accueil" || source === "menu"
+      ? source
+      : (vueAccueilEstVisible() ? "accueil" : "menu");
+
+  if (sourceFinale === "accueil" && champAccueil) {
+    return champAccueil.value;
+  }
+
+  if (sourceFinale === "menu" && champMenu) {
+    return champMenu.value;
+  }
+
+  if (champAccueil) {
+    return champAccueil.value;
+  }
+
+  if (champMenu) {
+    return champMenu.value;
+  }
+
+  return fallback;
+}
+
+function synchroniserChampsMultijoueurUI() {
+  const champsServeur = [
+    getElement("menu-multi-serveur-url"),
+    getElement("accueil-multi-serveur-url")
+  ].filter(Boolean);
+  const champsNom = [
+    getElement("menu-multi-nom"),
+    getElement("accueil-multi-nom")
+  ].filter(Boolean);
+  const champsCode = [
+    getElement("menu-multi-code-salle"),
+    getElement("accueil-multi-code-salle")
+  ].filter(Boolean);
+
+  champsServeur.forEach(champ => {
+    champ.value = etatMultijoueur.serveurUrl;
+  });
+  champsNom.forEach(champ => {
+    champ.value = etatMultijoueur.nomJoueur;
+  });
+  champsCode.forEach(champ => {
+    champ.value = etatMultijoueur.codeSalle;
+  });
+}
+
+function appliquerContraintesAccueilSelonLobbyMultijoueur() {
+  const selectJoueur = getElement("choix-nation-joueur");
+  const selectBot = getElement("choix-nation-bot");
+  const selectDifficulteBot = getElement("choix-difficulte-bot");
+  const optionModeDuel = getElement("option-mode-duel");
+  const optionModeCampagne = getElement("option-mode-campagne");
+  const optionMiniTutoriel = getElement("option-mini-tutoriel");
+  const btnCommencerLocal = getElement("btn-accueil-commencer-partie");
+  const btnPretLobby = getElement("btn-accueil-multi-pret");
+  const btnDemarrerLobby = getElement("btn-accueil-multi-demarrer");
+  const ligneJ1 = getElement("accueil-multi-lobby-j1");
+  const ligneJ2 = getElement("accueil-multi-lobby-j2");
+
+  const modeLobby = lobbyMultijoueurActif();
+  const participantLocal = multijoueurParticipantLocalLobby();
+  const participantAdverse = multijoueurParticipantAdverseLobby();
+
+  if (modeLobby) {
+    etatMultijoueur.synchronisationAccueilEnCours = true;
+    try {
+      const nationHost = String(etatMultijoueur.lobby.host?.nation || "");
+      const nationGuest = String(etatMultijoueur.lobby.guest?.nation || "");
+      if (selectJoueur && nationHost) {
+        selectJoueur.value = nationHost;
+      }
+      if (selectBot && nationGuest) {
+        selectBot.value = nationGuest;
+      }
+
+      configurationPartie.modeJeu = MODES_JEU.DUEL;
+      configurationPartie.miniTutoriel = false;
+
+      if (optionModeDuel) {
+        optionModeDuel.checked = true;
+        optionModeDuel.disabled = true;
+      }
+      if (optionModeCampagne) {
+        optionModeCampagne.checked = false;
+        optionModeCampagne.disabled = true;
+      }
+      if (optionMiniTutoriel) {
+        optionMiniTutoriel.checked = false;
+        optionMiniTutoriel.disabled = true;
+      }
+
+      if (selectDifficulteBot) {
+        selectDifficulteBot.disabled = true;
+      }
+
+      if (selectJoueur) {
+        selectJoueur.disabled = etatMultijoueur.role !== "host";
+      }
+      if (selectBot) {
+        selectBot.disabled = etatMultijoueur.role !== "guest";
+      }
+    } finally {
+      etatMultijoueur.synchronisationAccueilEnCours = false;
+    }
+
+    const texteJ1 = etatMultijoueur.lobby.host
+      ? `${etatMultijoueur.lobby.host.name} | Nation: ${etatMultijoueur.lobby.host.nation || "Aucune"} | ${etatMultijoueur.lobby.host.ready ? "Pret" : "En attente"}`
+      : "en attente";
+    const texteJ2 = etatMultijoueur.lobby.guest
+      ? `${etatMultijoueur.lobby.guest.name} | Nation: ${etatMultijoueur.lobby.guest.nation || "Aucune"} | ${etatMultijoueur.lobby.guest.ready ? "Pret" : "En attente"}`
+      : "en attente";
+
+    if (ligneJ1) {
+      ligneJ1.textContent = `Joueur 1: ${texteJ1}`;
+    }
+    if (ligneJ2) {
+      ligneJ2.textContent = `Joueur 2: ${texteJ2}`;
+    }
+
+    if (btnPretLobby) {
+      btnPretLobby.textContent = participantLocal?.ready ? "Annuler pret" : "Je suis pret";
+    }
+
+    if (btnDemarrerLobby) {
+      btnDemarrerLobby.disabled = !(etatMultijoueur.role === "host" && etatMultijoueur.lobby.canStart);
+      btnDemarrerLobby.classList.toggle("bouton-inactif", btnDemarrerLobby.disabled);
+    }
+
+    if (btnCommencerLocal) {
+      btnCommencerLocal.disabled = true;
+      btnCommencerLocal.classList.add("bouton-inactif");
+    }
+
+    if (participantLocal && participantAdverse) {
+      configurationPartie.nationJoueur =
+        String(etatMultijoueur.lobby.host?.nation || configurationPartie.nationJoueur || "Romains");
+      configurationPartie.nationBot =
+        String(etatMultijoueur.lobby.guest?.nation || configurationPartie.nationBot || "Celtes");
+    }
+
+    mettreAJourLibellesModeJeu();
+    return;
+  }
+
+  if (ligneJ1) {
+    ligneJ1.textContent = "Joueur 1: en attente";
+  }
+  if (ligneJ2) {
+    ligneJ2.textContent = "Joueur 2: en attente";
+  }
+  if (btnPretLobby) {
+    btnPretLobby.textContent = "Je suis pret";
+  }
+  if (btnDemarrerLobby) {
+    btnDemarrerLobby.disabled = true;
+    btnDemarrerLobby.classList.add("bouton-inactif");
+  }
+
+  if (optionModeDuel) {
+    optionModeDuel.disabled = false;
+    if (typeof optionModeDuel.onchange === "function") {
+      optionModeDuel.onchange();
+    }
+  }
+  if (optionModeCampagne) {
+    optionModeCampagne.disabled = false;
+  }
+  if (optionMiniTutoriel) {
+    optionMiniTutoriel.disabled = false;
+  }
+
+  if (btnCommencerLocal) {
+    btnCommencerLocal.disabled = false;
+    btnCommencerLocal.classList.remove("bouton-inactif");
+  }
+
+  mettreAJourResumeCampagneAccueil();
+}
+
+function appliquerEtatLobbyMultijoueur(lobby = null, { version = null } = {}) {
+  etatMultijoueur.lobby = normaliserEtatLobbyMultijoueur(lobby);
+  synchroniserRoleMultijoueurDepuisLobby(etatMultijoueur.lobby);
+
+  if (Number.isFinite(Number(version))) {
+    etatMultijoueur.versionServeur = Number(version);
+  }
+
+  appliquerContraintesAccueilSelonLobbyMultijoueur();
+}
+
+function obtenirNationLocaleSelectionneePourLobby() {
+  if (!lobbyMultijoueurActif()) {
+    return "";
+  }
+
+  if (etatMultijoueur.role === "host") {
+    return String(getElement("choix-nation-joueur")?.value || "").trim();
+  }
+
+  if (etatMultijoueur.role === "guest") {
+    return String(getElement("choix-nation-bot")?.value || "").trim();
+  }
+
+  return "";
+}
+
+async function synchroniserNationLocaleLobbyDepuisAccueil({ uniquementSiAbsente = false } = {}) {
+  if (!lobbyMultijoueurActif() || etatMultijoueur.synchronisationAccueilEnCours) {
+    return false;
+  }
+
+  const participantLocal = multijoueurParticipantLocalLobby();
+  if (!participantLocal) {
+    return false;
+  }
+
+  if (uniquementSiAbsente && String(participantLocal.nation || "").trim()) {
+    return false;
+  }
+
+  const nationSelectionnee = obtenirNationLocaleSelectionneePourLobby();
+  if (!nationSelectionnee) {
+    return false;
+  }
+
+  if (String(participantLocal.nation || "").trim() === nationSelectionnee) {
+    return false;
+  }
+
+  await mettreAJourLobbySalleMultijoueur({ nation: nationSelectionnee });
+  return true;
+}
+
+function interactionLocaleMultijoueurBloquee({ avertirUtilisateur = true } = {}) {
+  if (!multijoueurLectureSeuleActive()) {
+    return false;
+  }
+
+  if (!avertirUtilisateur) {
+    return true;
+  }
+
+  const maintenant = Date.now();
+  if (maintenant - Number(etatMultijoueur.dernierAvertissementRefusTs || 0) > 1200) {
+    etatMultijoueur.dernierAvertissementRefusTs = maintenant;
+    const message = duelEtatActif()
+      ? "Mode duel en ligne : attendez votre tour pour jouer."
+      : "Mode invité actif : seule la personne qui a créé la salle peut jouer.";
+    ouvrirPanneauUI(
+      message,
+      [{ label: "OK" }]
+    );
+  }
+  return true;
+}
+
+function appliquerVerrouLectureSeuleMultijoueur() {
+  const lectureSeule = multijoueurLectureSeuleActive();
+  document.body?.classList.toggle("multijoueur-lecture-seule", lectureSeule);
+
+  const idsBoutonsAction = [
+    "btn-pacifier",
+    "btn-innover-tour",
+    "btn-fin-tour",
+    "btn-fin-nettoyage",
+    "btn-commencer-tour-bot",
+    "btn-fin-solstice"
+  ];
+
+  idsBoutonsAction.forEach(id => {
+    const bouton = getElement(id);
+    if (!bouton) {
+      return;
+    }
+
+    if (lectureSeule) {
+      bouton.disabled = true;
+      bouton.classList.add("bouton-inactif");
+    }
+  });
+
+  if (!lectureSeule) {
+    mettreAJourBoutonsOptionsDebutTour();
+    mettreAJourBoutonsPhaseJoueur();
+    definirEtatBoutonTourBot(jeu?.manche?.phase === "attente-tour-bot");
+  }
+}
+
+function normaliserUrlServeurMultijoueur(url = "") {
+  const valeur = String(url || "").trim();
+  if (!valeur) {
+    return "http://localhost:8787";
+  }
+
+  return valeur.replace(/\/+$/, "");
+}
+
+function normaliserCodeSalleMultijoueur(code = "") {
+  return String(code || "")
+    .trim()
+    .toUpperCase()
+    .replace(/[^A-Z0-9]/g, "")
+    .slice(0, 12);
+}
+
+function calculerEmpreinteTexte(texte = "") {
+  let hash = 5381;
+  for (let i = 0; i < texte.length; i += 1) {
+    hash = ((hash * 33) ^ texte.charCodeAt(i)) >>> 0;
+  }
+  return hash.toString(16);
+}
+
+function chargerPreferencesMultijoueur() {
+  try {
+    const brut = localStorage.getItem(CLE_PREFERENCES_MULTIJOUEUR);
+    if (!brut) {
+      return;
+    }
+    const prefs = JSON.parse(brut);
+    if (!prefs || typeof prefs !== "object") {
+      return;
+    }
+    etatMultijoueur.serveurUrl = normaliserUrlServeurMultijoueur(prefs.serveurUrl);
+    etatMultijoueur.nomJoueur = String(prefs.nomJoueur || "Joueur").trim().slice(0, 24) || "Joueur";
+    etatMultijoueur.codeSalle = normaliserCodeSalleMultijoueur(prefs.codeSalle || "");
+  } catch (error) {
+    console.warn("Multijoueur: preferences invalides.", error);
+  }
+}
+
+function sauvegarderPreferencesMultijoueur() {
+  try {
+    localStorage.setItem(
+      CLE_PREFERENCES_MULTIJOUEUR,
+      JSON.stringify({
+        serveurUrl: etatMultijoueur.serveurUrl,
+        nomJoueur: etatMultijoueur.nomJoueur,
+        codeSalle: etatMultijoueur.codeSalle
+      })
+    );
+  } catch (error) {}
+}
+
+function lireFormulaireMultijoueur({ source = "auto" } = {}) {
+  const valeurServeur = lireValeurChampMultijoueurParSource(
+    source,
+    {
+      accueil: "accueil-multi-serveur-url",
+      menu: "menu-multi-serveur-url"
+    },
+    etatMultijoueur.serveurUrl
+  );
+  const valeurNom = lireValeurChampMultijoueurParSource(
+    source,
+    {
+      accueil: "accueil-multi-nom",
+      menu: "menu-multi-nom"
+    },
+    etatMultijoueur.nomJoueur
+  );
+  const valeurCode = lireValeurChampMultijoueurParSource(
+    source,
+    {
+      accueil: "accueil-multi-code-salle",
+      menu: "menu-multi-code-salle"
+    },
+    etatMultijoueur.codeSalle
+  );
+
+  etatMultijoueur.serveurUrl = normaliserUrlServeurMultijoueur(valeurServeur || etatMultijoueur.serveurUrl);
+  etatMultijoueur.nomJoueur = String(valeurNom || etatMultijoueur.nomJoueur || "Joueur")
+    .trim()
+    .slice(0, 24) || "Joueur";
+  etatMultijoueur.codeSalle = normaliserCodeSalleMultijoueur(valeurCode || etatMultijoueur.codeSalle);
+
+  synchroniserChampsMultijoueurUI();
+
+  sauvegarderPreferencesMultijoueur();
+}
+
+function definirStatutMultijoueur(message, type = "normal") {
+  const statuts = [
+    getElement("menu-multi-statut"),
+    getElement("accueil-multi-statut")
+  ].filter(Boolean);
+
+  statuts.forEach(statut => {
+    statut.textContent = String(message || "");
+    statut.classList.remove("est-connecte", "est-erreur");
+    if (type === "connecte") {
+      statut.classList.add("est-connecte");
+    } else if (type === "erreur") {
+      statut.classList.add("est-erreur");
+    }
+  });
+}
+
+function mettreAJourEtatUIBoutonsMultijoueur() {
+  const groupes = [
+    {
+      inputServeur: getElement("menu-multi-serveur-url"),
+      inputNom: getElement("menu-multi-nom"),
+      inputCode: getElement("menu-multi-code-salle"),
+      btnCreer: getElement("btn-multi-creer-salle"),
+      btnRejoindre: getElement("btn-multi-rejoindre-salle"),
+      btnQuitter: getElement("btn-multi-quitter-salle")
+    },
+    {
+      inputServeur: getElement("accueil-multi-serveur-url"),
+      inputNom: getElement("accueil-multi-nom"),
+      inputCode: getElement("accueil-multi-code-salle"),
+      btnCreer: getElement("btn-accueil-multi-creer-salle"),
+      btnRejoindre: getElement("btn-accueil-multi-rejoindre-salle"),
+      btnQuitter: getElement("btn-accueil-multi-quitter-salle")
+    }
+  ];
+  const btnPret = getElement("btn-accueil-multi-pret");
+  const btnDemarrer = getElement("btn-accueil-multi-demarrer");
+
+  const connecte = etatMultijoueur.connecte;
+  const verrouillerConnexion = etatMultijoueur.envoiEnCours || etatMultijoueur.applicationSnapshotEnCours;
+  const lobbyActif = lobbyMultijoueurActif();
+  const localLobby = multijoueurParticipantLocalLobby();
+
+  groupes.forEach(groupe => {
+    if (groupe.inputServeur) {
+      groupe.inputServeur.disabled = connecte;
+    }
+    if (groupe.inputNom) {
+      groupe.inputNom.disabled = connecte;
+    }
+    if (groupe.inputCode) {
+      groupe.inputCode.disabled = connecte;
+    }
+
+    if (groupe.btnCreer) {
+      groupe.btnCreer.disabled = connecte || verrouillerConnexion;
+      groupe.btnCreer.classList.toggle("bouton-inactif", groupe.btnCreer.disabled);
+    }
+    if (groupe.btnRejoindre) {
+      groupe.btnRejoindre.disabled = connecte || verrouillerConnexion;
+      groupe.btnRejoindre.classList.toggle("bouton-inactif", groupe.btnRejoindre.disabled);
+    }
+    if (groupe.btnQuitter) {
+      groupe.btnQuitter.disabled = !connecte;
+      groupe.btnQuitter.classList.toggle("bouton-inactif", groupe.btnQuitter.disabled);
+    }
+  });
+
+  if (btnPret) {
+    btnPret.disabled = !lobbyActif || !localLobby || verrouillerConnexion;
+    btnPret.classList.toggle("bouton-inactif", btnPret.disabled);
+  }
+
+  if (btnDemarrer) {
+    const peutDemarrer = lobbyActif && etatMultijoueur.role === "host" && !!etatMultijoueur.lobby.canStart;
+    btnDemarrer.disabled = !peutDemarrer || verrouillerConnexion;
+    btnDemarrer.classList.toggle("bouton-inactif", btnDemarrer.disabled);
+  }
+
+  synchroniserChampsMultijoueurUI();
+  appliquerContraintesAccueilSelonLobbyMultijoueur();
+  appliquerVerrouLectureSeuleMultijoueur();
+}
+
+async function requeteJsonMultijoueur(endpoint, { method = "GET", body = null, timeoutMs = 9000 } = {}) {
+  const baseUrl = normaliserUrlServeurMultijoueur(etatMultijoueur.serveurUrl);
+  const url = `${baseUrl}${endpoint}`;
+
+  const controleur = new AbortController();
+  const timer = setTimeout(() => controleur.abort(), timeoutMs);
+
+  try {
+    const reponse = await fetch(url, {
+      method,
+      headers: body ? { "Content-Type": "application/json" } : undefined,
+      body: body ? JSON.stringify(body) : undefined,
+      signal: controleur.signal
+    });
+
+    let payload = null;
+    try {
+      payload = await reponse.json();
+    } catch (error) {}
+
+    if (!reponse.ok) {
+      const erreurServeur = String(payload?.error || "").trim();
+      let message = erreurServeur || `Erreur reseau (${reponse.status}).`;
+
+      if (
+        reponse.status === 404 &&
+        /route inconnue/i.test(erreurServeur) &&
+        String(endpoint || "").includes("/lobby")
+      ) {
+        message = "Serveur multijoueur trop ancien: route /lobby absente. Relancez npm run multiplayer:server avec la version actuelle.";
+      }
+
+      throw new Error(message);
+    }
+
+    return payload || {};
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+async function recupererLobbySalleMultijoueur() {
+  if (!multijoueurConnecte() || !etatMultijoueur.codeSalle) {
+    return false;
+  }
+
+  try {
+    const payload = await requeteJsonMultijoueur(
+      `/api/rooms/${encodeURIComponent(etatMultijoueur.codeSalle)}/lobby`
+    );
+    synchroniserRoleMultijoueurDepuisListeJoueurs(payload.players);
+    etatMultijoueur.versionServeur = Number(payload.version || etatMultijoueur.versionServeur || 0);
+    appliquerEtatLobbyMultijoueur(payload.lobby, { version: payload.version });
+    mettreAJourEtatUIBoutonsMultijoueur();
+    return true;
+  } catch (error) {
+    definirStatutMultijoueur(`Erreur lobby: ${error.message}`, "erreur");
+    return false;
+  }
+}
+
+async function mettreAJourLobbySalleMultijoueur({ nation, ready } = {}) {
+  if (!multijoueurConnecte() || !etatMultijoueur.codeSalle || !etatMultijoueur.playerId) {
+    return false;
+  }
+
+  const body = {
+    playerId: etatMultijoueur.playerId
+  };
+
+  if (typeof nation === "string") {
+    body.nation = String(nation || "");
+  }
+  if (typeof ready === "boolean") {
+    body.ready = ready;
+  }
+
+  const payload = await requeteJsonMultijoueur(
+    `/api/rooms/${encodeURIComponent(etatMultijoueur.codeSalle)}/lobby`,
+    {
+      method: "POST",
+      body
+    }
+  );
+
+  synchroniserRoleMultijoueurDepuisListeJoueurs(payload.players);
+  etatMultijoueur.versionServeur = Number(payload.version || etatMultijoueur.versionServeur || 0);
+  appliquerEtatLobbyMultijoueur(payload.lobby, { version: payload.version });
+  mettreAJourEtatUIBoutonsMultijoueur();
+  return true;
+}
+
+async function basculerPretLobbyMultijoueur() {
+  const participantLocal = multijoueurParticipantLocalLobby();
+  if (!participantLocal) {
+    return;
+  }
+
+  try {
+    await mettreAJourLobbySalleMultijoueur({
+      ready: !participantLocal.ready
+    });
+  } catch (error) {
+    definirStatutMultijoueur(`Erreur lobby: ${error.message}`, "erreur");
+  }
+}
+
+function appliquerNationsLobbyDansConfigurationLocale() {
+  if (!lobbyMultijoueurActif() && String(etatMultijoueur.lobby?.phase || "") !== "in_game") {
+    return false;
+  }
+
+  const nationJ1 = String(etatMultijoueur.lobby.host?.nation || "").trim();
+  const nationJ2 = String(etatMultijoueur.lobby.guest?.nation || "").trim();
+  if (!nationJ1 || !nationJ2) {
+    return false;
+  }
+
+  const selectJoueur = getElement("choix-nation-joueur");
+  const selectBot = getElement("choix-nation-bot");
+  const optionModeDuel = getElement("option-mode-duel");
+  const optionMiniTutoriel = getElement("option-mini-tutoriel");
+  const selectDifficulteBot = getElement("choix-difficulte-bot");
+
+  etatMultijoueur.synchronisationAccueilEnCours = true;
+  try {
+    configurationPartie.modeJeu = MODES_JEU.DUEL;
+    configurationPartie.miniTutoriel = false;
+    configurationPartie.nationJoueur = nationJ1;
+    configurationPartie.nationBot = nationJ2;
+
+    if (selectJoueur) {
+      selectJoueur.value = nationJ1;
+    }
+    if (selectBot) {
+      selectBot.value = nationJ2;
+    }
+    if (optionModeDuel) {
+      optionModeDuel.checked = true;
+    }
+    if (optionMiniTutoriel) {
+      optionMiniTutoriel.checked = false;
+    }
+    if (selectDifficulteBot) {
+      selectDifficulteBot.disabled = true;
+    }
+  } finally {
+    etatMultijoueur.synchronisationAccueilEnCours = false;
+  }
+
+  return true;
+}
+
+function commencerNouvellePartieLocale() {
+  const selectNationJoueur = document.getElementById("choix-nation-joueur");
+  const selectNationBot = document.getElementById("choix-nation-bot");
+  const selectDifficulteBot = document.getElementById("choix-difficulte-bot");
+  const optionMiniTutoriel = document.getElementById("option-mini-tutoriel");
+  const optionModeDuel = document.getElementById("option-mode-duel");
+  const optionModeCampagne = document.getElementById("option-mode-campagne");
+  const modeMiniTutoriel = !!optionMiniTutoriel?.checked;
+  const modeCampagneSelectionne =
+    !!optionModeCampagne?.checked &&
+    !modeMiniTutoriel &&
+    !lobbyMultijoueurActif();
+  const modeDuelSelectionne =
+    !!optionModeDuel?.checked &&
+    !modeMiniTutoriel &&
+    !modeCampagneSelectionne;
+
+  configurationPartie.miniTutoriel = modeMiniTutoriel;
+  configurationPartie.modeJeu = modeMiniTutoriel
+    ? MODES_JEU.SOLO
+    : modeCampagneSelectionne
+      ? MODES_JEU.CAMPAGNE
+      : modeDuelSelectionne
+        ? MODES_JEU.DUEL
+        : MODES_JEU.SOLO;
+
+  if (modeMiniTutoriel) {
+    configurationPartie.nationJoueur = "Romains";
+    configurationPartie.nationBot = "Celtes";
+    configurationPartie.difficulteBot = DIFFICULTES_BOT.IMPERATOR;
+
+    if (selectNationJoueur) {
+      selectNationJoueur.value = "Romains";
+    }
+
+    if (selectNationBot) {
+      selectNationBot.value = "Celtes";
+    }
+
+    if (selectDifficulteBot) {
+      selectDifficulteBot.value = DIFFICULTES_BOT.IMPERATOR;
+    }
+  } else if (modeCampagneSelectionne) {
+    const nationJoueur = String(selectNationJoueur?.value || "").trim();
+    const nationBot = String(selectNationBot?.value || "").trim();
+
+    const preparationCampagne = campagnePreparerDemarragePartie({
+      nationJoueur,
+      nationBot
+    });
+
+    if (!preparationCampagne.ok) {
+      avertir(preparationCampagne.message || "Impossible de demarrer la campagne.");
+      return false;
+    }
+
+    configurationPartie.nationJoueur = etatCampagne.nationJoueur;
+    configurationPartie.nationBot = nationBot;
+    configurationPartie.difficulteBot = normaliserDifficulteBot(preparationCampagne.difficulte);
+
+    if (selectNationJoueur) {
+      selectNationJoueur.value = configurationPartie.nationJoueur;
+    }
+    if (selectNationBot) {
+      selectNationBot.value = configurationPartie.nationBot;
+    }
+    if (selectDifficulteBot) {
+      selectDifficulteBot.value = configurationPartie.difficulteBot;
+    }
+  } else {
+    configurationPartie.nationJoueur = selectNationJoueur.value;
+    configurationPartie.nationBot = selectNationBot.value;
+    configurationPartie.difficulteBot = normaliserDifficulteBot(
+      selectDifficulteBot?.value || configurationPartie.difficulteBot
+    );
+  }
+
+  initialiserJeu();
+  campagneMarquerCartesInitialesPartie();
+  if (modeDuelActif()) {
+    initialiserModeDuel1v1();
+  } else {
+    campagneAppliquerBonusRessourcesSiActif();
+    initialiserBot();
+  }
+  mettreAJourLibellesModeJeu();
+  mettreAJourResumeCampagneAccueil();
+  afficherUIPartie();
+
+  document.getElementById("barre-navigation-vues")?.classList.remove("ui-cachee");
+
+  afficherVue("vue-joueur");
+  initialiserMiniTutorielPartie(!!configurationPartie.miniTutoriel);
+
+  setTimeout(() => {
+    afficherRappelRaccourcisPartie();
+  }, 420);
+
+  return true;
+}
+
+async function demarrerPartieDepuisLobbyMultijoueur() {
+  if (!multijoueurConnecte() || !lobbyMultijoueurActif()) {
+    return false;
+  }
+
+  if (etatMultijoueur.role !== "host") {
+    definirStatutMultijoueur("Seul l'hote peut demarrer la partie.", "erreur");
+    return false;
+  }
+
+  try {
+    const payload = await requeteJsonMultijoueur(
+      `/api/rooms/${encodeURIComponent(etatMultijoueur.codeSalle)}/start`,
+      {
+        method: "POST",
+        body: {
+          playerId: etatMultijoueur.playerId
+        }
+      }
+    );
+
+    synchroniserRoleMultijoueurDepuisListeJoueurs(payload.players);
+    etatMultijoueur.versionServeur = Number(payload.version || etatMultijoueur.versionServeur || 0);
+    appliquerEtatLobbyMultijoueur(payload.lobby, { version: payload.version });
+    mettreAJourEtatUIBoutonsMultijoueur();
+
+    if (!appliquerNationsLobbyDansConfigurationLocale()) {
+      definirStatutMultijoueur("Lobby incomplet: nations manquantes.", "erreur");
+      return false;
+    }
+
+    commencerNouvellePartieLocale();
+    await envoyerSnapshotMultijoueur({ force: true, ignorerAutorisation: true });
+    definirStatutMultijoueur(
+      `Connecte (${etatMultijoueur.codeSalle}) - partie demarree`,
+      "connecte"
+    );
+    return true;
+  } catch (error) {
+    definirStatutMultijoueur(`Erreur demarrage: ${error.message}`, "erreur");
+    return false;
+  }
+}
+
+function arreterTimersMultijoueur() {
+  if (etatMultijoueur.timerSync) {
+    clearInterval(etatMultijoueur.timerSync);
+    etatMultijoueur.timerSync = null;
+  }
+  if (etatMultijoueur.timerPing) {
+    clearInterval(etatMultijoueur.timerPing);
+    etatMultijoueur.timerPing = null;
+  }
+  if (etatMultijoueur.timerReconnexion) {
+    clearTimeout(etatMultijoueur.timerReconnexion);
+    etatMultijoueur.timerReconnexion = null;
+  }
+}
+
+function fermerCanalEvenementsMultijoueur() {
+  if (!etatMultijoueur.eventSource) {
+    return;
+  }
+
+  etatMultijoueur.eventSource.close();
+  etatMultijoueur.eventSource = null;
+}
+
+function capturerEtatVueActivePourSyncMultijoueur() {
+  const idsVues = ["vue-accueil", "vue-marche", "vue-joueur", "vue-bot"];
+  const id = idsVues.find(vueId => getElement(vueId)?.classList.contains("vue-active")) || "";
+  return {
+    id,
+    afficherAdversaireDuel: duelAffichageAdversaireActif()
+  };
+}
+
+function finaliserRenduApresSnapshotApplique({ etatVueAvantSnapshot = null } = {}) {
+  reinitialiserFeedbackCompteursJoueur();
+  afficherUIPartie();
+  mettreAJourLibellesModeJeu();
+  document.getElementById("barre-navigation-vues")?.classList.remove("ui-cachee");
+
+  afficherHautMarche();
+  afficherBarreIndicateurs();
+  afficherBasMarche();
+  afficherZoneJoueur();
+  afficherPileExil();
+  afficherZoneBot?.();
+
+  const phase = jeu?.manche?.phase;
+  definirEtatBoutonTourBot(phase === "attente-tour-bot");
+  mettreAJourBoutonsPhaseJoueur();
+
+  if (jeu.finPartie?.terminee) {
+    if (jeu.finPartie.resultat === "score") {
+      afficherEcranScoreFinal();
+    } else {
+      afficherEcranFinDePartie();
+    }
+  } else {
+    const vueAvant = etatVueAvantSnapshot || {};
+    const idVueAvant = String(vueAvant.id || "");
+    const vueJeuConservable =
+      multijoueurConnecte() &&
+      (idVueAvant === "vue-marche" || idVueAvant === "vue-joueur" || idVueAvant === "vue-bot");
+
+    if (vueJeuConservable) {
+      if (
+        modeDuelActif() &&
+        (idVueAvant === "vue-bot" || (idVueAvant === "vue-joueur" && vueAvant.afficherAdversaireDuel))
+      ) {
+        afficherVue("vue-joueur", { afficherAdversaireDuel: true });
+      } else {
+        afficherVue(idVueAvant);
+      }
+    } else {
+      afficherVue(determinerVueApresChargement());
+    }
+  }
+
+  mettreAJourDisponibiliteBoutonsSauvegarde();
+  miniTutorielSynchroniser();
+  traiterInteractionPassifDuelSiNecessaire();
+  afficherActionAdverseNonBloquanteSiNecessaire();
+  rafraichirContenuPanneauJournalActions();
+
+  if (multijoueurConnecte()) {
+    definirStatutMultijoueur(
+      `Connecte (${etatMultijoueur.codeSalle}) - ${libelleControleMultijoueur()} - sync v${etatMultijoueur.versionServeur}`,
+      "connecte"
+    );
+  }
+}
+
+async function appliquerSnapshotDistantMultijoueur(snapshot, version = 0) {
+  if (!snapshot || typeof snapshot !== "object") {
+    return false;
+  }
+
+  let serialise = "";
+  try {
+    serialise = JSON.stringify(snapshot);
+  } catch (error) {
+    return false;
+  }
+
+  const empreinte = calculerEmpreinteTexte(serialise);
+  if (empreinte && empreinte === etatMultijoueur.empreinteSnapshotLocale) {
+    etatMultijoueur.versionServeur = Number(version || etatMultijoueur.versionServeur || 0);
+    return false;
+  }
+
+  etatMultijoueur.applicationSnapshotEnCours = true;
+  mettreAJourEtatUIBoutonsMultijoueur();
+
+  try {
+    const etatVueAvantSnapshot = capturerEtatVueActivePourSyncMultijoueur();
+    appliquerSauvegardePartie(snapshot);
+    finaliserRenduApresSnapshotApplique({ etatVueAvantSnapshot });
+    etatMultijoueur.empreinteSnapshotLocale = empreinte;
+    etatMultijoueur.versionServeur = Number(version || etatMultijoueur.versionServeur || 0);
+    return true;
+  } finally {
+    etatMultijoueur.applicationSnapshotEnCours = false;
+    mettreAJourEtatUIBoutonsMultijoueur();
+  }
+}
+
+async function recupererSnapshotSalleMultijoueur({ ignorerVerrouInteraction = false } = {}) {
+  if (!etatMultijoueur.connecte || !etatMultijoueur.codeSalle) {
+    return false;
+  }
+
+  if (etatMultijoueur.interactionPassifLocaleEnCours && !ignorerVerrouInteraction) {
+    return false;
+  }
+
+  const payload = await requeteJsonMultijoueur(
+    `/api/rooms/${encodeURIComponent(etatMultijoueur.codeSalle)}/state`
+  );
+
+  synchroniserRoleMultijoueurDepuisListeJoueurs(payload.players);
+  etatMultijoueur.versionServeur = Number(payload.version || etatMultijoueur.versionServeur || 0);
+  if (payload.lobby) {
+    appliquerEtatLobbyMultijoueur(payload.lobby, { version: payload.version });
+  }
+
+  if (!payload.snapshot) {
+    return false;
+  }
+
+  return await appliquerSnapshotDistantMultijoueur(payload.snapshot, payload.version);
+}
+
+async function envoyerSnapshotMultijoueur({ force = false, ignorerAutorisation = false } = {}) {
+  if (!etatMultijoueur.connecte || !etatMultijoueur.codeSalle || !etatMultijoueur.playerId) {
+    return false;
+  }
+
+  if (!ignorerAutorisation && !multijoueurPublicationLocaleAutorisee()) {
+    return false;
+  }
+
+  if (etatMultijoueur.envoiEnCours || etatMultijoueur.applicationSnapshotEnCours) {
+    return false;
+  }
+
+  let snapshot = null;
+  let snapshotJson = "";
+  try {
+    snapshot = creerSnapshotSauvegardePartie();
+    snapshotJson = JSON.stringify(snapshot);
+  } catch (error) {
+    console.error("Multijoueur: snapshot local invalide.", error);
+    return false;
+  }
+
+  const empreinte = calculerEmpreinteTexte(snapshotJson);
+  if (!force && empreinte === etatMultijoueur.empreinteSnapshotLocale) {
+    return false;
+  }
+
+  etatMultijoueur.envoiEnCours = true;
+  mettreAJourEtatUIBoutonsMultijoueur();
+
+  try {
+    const payload = await requeteJsonMultijoueur(
+      `/api/rooms/${encodeURIComponent(etatMultijoueur.codeSalle)}/state`,
+      {
+        method: "POST",
+        body: {
+          playerId: etatMultijoueur.playerId,
+          snapshot,
+          baseVersion: etatMultijoueur.versionServeur
+        },
+        timeoutMs: 12000
+      }
+    );
+
+    etatMultijoueur.versionServeur = Number(payload.version || etatMultijoueur.versionServeur || 0);
+    etatMultijoueur.empreinteSnapshotLocale = empreinte;
+    definirStatutMultijoueur(
+      `Connecte (${etatMultijoueur.codeSalle}) - ${libelleControleMultijoueur()} - sync v${etatMultijoueur.versionServeur}`,
+      "connecte"
+    );
+    return true;
+  } catch (error) {
+    definirStatutMultijoueur(`Erreur sync: ${error.message}`, "erreur");
+    return false;
+  } finally {
+    etatMultijoueur.envoiEnCours = false;
+    mettreAJourEtatUIBoutonsMultijoueur();
+  }
+}
+
+async function diffuserSnapshotMultijoueurApresTransitionTour() {
+  if (!multijoueurConnecte()) {
+    return false;
+  }
+
+  const succes = await envoyerSnapshotMultijoueur({
+    force: true,
+    ignorerAutorisation: true
+  });
+
+  if (!succes) {
+    try {
+      await recupererSnapshotSalleMultijoueur();
+    } catch (error) {}
+  }
+
+  return succes;
+}
+
+async function pingerSalleMultijoueur() {
+  if (!etatMultijoueur.connecte || !etatMultijoueur.codeSalle || !etatMultijoueur.playerId) {
+    return;
+  }
+
+  try {
+    await requeteJsonMultijoueur(
+      `/api/rooms/${encodeURIComponent(etatMultijoueur.codeSalle)}/ping`,
+      {
+        method: "POST",
+        body: { playerId: etatMultijoueur.playerId },
+        timeoutMs: 6000
+      }
+    );
+  } catch (error) {}
+}
+
+function planifierReconnexionEvenementsMultijoueur() {
+  if (!etatMultijoueur.connecte || etatMultijoueur.timerReconnexion) {
+    return;
+  }
+
+  etatMultijoueur.timerReconnexion = setTimeout(() => {
+    etatMultijoueur.timerReconnexion = null;
+    ouvrirCanalEvenementsMultijoueur();
+  }, DELAI_RECONNEXION_MULTIJOUEUR_MS);
+}
+
+function ouvrirCanalEvenementsMultijoueur() {
+  if (
+    !etatMultijoueur.connecte ||
+    !etatMultijoueur.codeSalle ||
+    !etatMultijoueur.playerId ||
+    typeof EventSource === "undefined"
+  ) {
+    return;
+  }
+
+  fermerCanalEvenementsMultijoueur();
+
+  const url = `${normaliserUrlServeurMultijoueur(etatMultijoueur.serveurUrl)}/api/rooms/${encodeURIComponent(
+    etatMultijoueur.codeSalle
+  )}/events?playerId=${encodeURIComponent(etatMultijoueur.playerId)}`;
+
+  const source = new EventSource(url);
+  etatMultijoueur.eventSource = source;
+
+  source.onmessage = event => {
+    if (!event?.data) {
+      return;
+    }
+
+    let payload = null;
+    try {
+      payload = JSON.parse(event.data);
+    } catch (error) {
+      return;
+    }
+
+    if (!payload || typeof payload !== "object") {
+      return;
+    }
+
+    if (payload.type === "connected") {
+      synchroniserRoleMultijoueurDepuisListeJoueurs(payload.players);
+      etatMultijoueur.versionServeur = Number(payload.version || etatMultijoueur.versionServeur || 0);
+      if (payload.lobby) {
+        appliquerEtatLobbyMultijoueur(payload.lobby, { version: payload.version });
+      }
+      mettreAJourEtatUIBoutonsMultijoueur();
+      if (!payload.lobby) {
+        void recupererLobbySalleMultijoueur();
+      }
+      return;
+    }
+
+    if (payload.type === "state-updated") {
+      etatMultijoueur.versionServeur = Number(payload.version || etatMultijoueur.versionServeur || 0);
+      if (payload.senderId && payload.senderId === etatMultijoueur.playerId) {
+        return;
+      }
+      void recupererSnapshotSalleMultijoueur();
+      return;
+    }
+
+    if (payload.type === "lobby-updated") {
+      synchroniserRoleMultijoueurDepuisListeJoueurs(payload.players);
+      etatMultijoueur.versionServeur = Number(payload.version || etatMultijoueur.versionServeur || 0);
+      appliquerEtatLobbyMultijoueur(payload.lobby, { version: payload.version });
+      mettreAJourEtatUIBoutonsMultijoueur();
+
+      const nbJoueurs = Array.isArray(payload.players) ? payload.players.length : null;
+      const detailsJoueurs = Number.isFinite(nbJoueurs) ? ` - ${nbJoueurs} joueur(s)` : "";
+      const detailsRole = ` - ${libelleControleMultijoueur()}`;
+      const phaseLobby = String(payload.lobby?.phase || etatMultijoueur.lobby?.phase || "");
+
+      if (phaseLobby === "in_game") {
+        definirStatutMultijoueur(
+          `Connecte (${etatMultijoueur.codeSalle})${detailsRole} - partie demarree`,
+          "connecte"
+        );
+        void recupererSnapshotSalleMultijoueur({ ignorerVerrouInteraction: true });
+        return;
+      }
+
+      definirStatutMultijoueur(
+        `Connecte (${etatMultijoueur.codeSalle})${detailsRole}${detailsJoueurs} - lobby`,
+        "connecte"
+      );
+      return;
+    }
+
+    if (payload.type === "presence") {
+      synchroniserRoleMultijoueurDepuisListeJoueurs(payload.players);
+      mettreAJourEtatUIBoutonsMultijoueur();
+      const nbJoueurs = Array.isArray(payload.players) ? payload.players.length : null;
+      const detailsJoueurs = Number.isFinite(nbJoueurs) ? ` - ${nbJoueurs} joueur(s)` : "";
+      const detailsRole = ` - ${libelleControleMultijoueur()}`;
+      definirStatutMultijoueur(
+        `Connecte (${etatMultijoueur.codeSalle})${detailsRole}${detailsJoueurs}`,
+        "connecte"
+      );
+      return;
+    }
+  };
+
+  source.onerror = () => {
+    fermerCanalEvenementsMultijoueur();
+    if (!etatMultijoueur.connecte) {
+      return;
+    }
+    definirStatutMultijoueur("Connexion temps reel interrompue. Reconnexion...", "erreur");
+    planifierReconnexionEvenementsMultijoueur();
+  };
+}
+
+function demarrerBouclesMultijoueur() {
+  arreterTimersMultijoueur();
+
+  etatMultijoueur.timerSync = setInterval(() => {
+    if (etatMultijoueur.interactionPassifLocaleEnCours) {
+      return;
+    }
+
+    if (lobbyMultijoueurActif()) {
+      void recupererLobbySalleMultijoueur();
+      return;
+    }
+
+    if (multijoueurPublicationLocaleAutorisee()) {
+      void envoyerSnapshotMultijoueur();
+      return;
+    }
+
+    if (multijoueurConnecte()) {
+      void recupererSnapshotSalleMultijoueur();
+    }
+  }, INTERVALLE_SYNC_MULTIJOUEUR_MS);
+
+  etatMultijoueur.timerPing = setInterval(() => {
+    void pingerSalleMultijoueur();
+  }, INTERVALLE_PING_MULTIJOUEUR_MS);
+}
+
+async function quitterSalleMultijoueur({ silencieux = false } = {}) {
+  if (etatMultijoueur.connecte && etatMultijoueur.codeSalle && etatMultijoueur.playerId) {
+    try {
+      await requeteJsonMultijoueur(
+        `/api/rooms/${encodeURIComponent(etatMultijoueur.codeSalle)}/leave`,
+        {
+          method: "POST",
+          body: { playerId: etatMultijoueur.playerId },
+          timeoutMs: 5000
+        }
+      );
+    } catch (error) {}
+  }
+
+  arreterTimersMultijoueur();
+  fermerCanalEvenementsMultijoueur();
+
+  etatMultijoueur.connecte = false;
+  etatMultijoueur.codeSalle = "";
+  etatMultijoueur.playerId = "";
+  etatMultijoueur.role = "";
+  etatMultijoueur.versionServeur = 0;
+  etatMultijoueur.empreinteSnapshotLocale = "";
+  etatMultijoueur.dernierAvertissementRefusTs = 0;
+  etatMultijoueur.interactionPassifEnCoursId = "";
+  etatMultijoueur.interactionPassifLocaleEnCours = false;
+  etatMultijoueur.journalActionsInitialise = false;
+  etatMultijoueur.dernierJournalActionTraiteTs = 0;
+  etatMultijoueur.idsJournalActionsTraitees = [];
+  reinitialiserFileToastsActionsAdverses();
+  etatMultijoueur.synchronisationAccueilEnCours = false;
+  etatMultijoueur.lobby = creerLobbyMultijoueurParDefaut();
+
+  lireFormulaireMultijoueur({ source: "auto" });
+  mettreAJourEtatUIBoutonsMultijoueur();
+
+  if (!silencieux) {
+    definirStatutMultijoueur("Hors ligne");
+  }
+}
+
+function initialiserConnexionMultijoueurDepuisPayload(payload = {}) {
+  const lobbyInitial =
+    payload?.lobby ||
+    (payload?.hasSnapshot ? { phase: "in_game" } : { phase: "lobby" });
+
+  etatMultijoueur.connecte = true;
+  etatMultijoueur.codeSalle = normaliserCodeSalleMultijoueur(payload.roomCode || etatMultijoueur.codeSalle);
+  etatMultijoueur.playerId = String(payload.playerId || "");
+  etatMultijoueur.role = String(payload.role || "");
+  etatMultijoueur.versionServeur = Number(payload.version || 0);
+  etatMultijoueur.empreinteSnapshotLocale = "";
+  etatMultijoueur.interactionPassifEnCoursId = "";
+  etatMultijoueur.interactionPassifLocaleEnCours = false;
+  etatMultijoueur.journalActionsInitialise = false;
+  etatMultijoueur.dernierJournalActionTraiteTs = 0;
+  etatMultijoueur.idsJournalActionsTraitees = [];
+  reinitialiserFileToastsActionsAdverses();
+  etatMultijoueur.lobby = normaliserEtatLobbyMultijoueur(lobbyInitial);
+  synchroniserRoleMultijoueurDepuisListeJoueurs(payload.players);
+  synchroniserRoleMultijoueurDepuisLobby(etatMultijoueur.lobby);
+
+  sauvegarderPreferencesMultijoueur();
+  appliquerEtatLobbyMultijoueur(etatMultijoueur.lobby, { version: payload.version });
+  mettreAJourEtatUIBoutonsMultijoueur();
+
+  const phaseLobby = String(etatMultijoueur.lobby?.phase || "");
+  const suffixeLobby = phaseLobby === "lobby" ? " - lobby" : "";
+  definirStatutMultijoueur(`Connecte (${etatMultijoueur.codeSalle}) - ${libelleControleMultijoueur()}${suffixeLobby}`, "connecte");
+
+  ouvrirCanalEvenementsMultijoueur();
+  demarrerBouclesMultijoueur();
+  void pingerSalleMultijoueur();
+
+  if (phaseLobby === "lobby") {
+    void recupererLobbySalleMultijoueur();
+  } else if (phaseLobby === "in_game") {
+    void recupererSnapshotSalleMultijoueur({ ignorerVerrouInteraction: true });
+  }
+}
+
+async function creerSalleMultijoueur() {
+  lireFormulaireMultijoueur({ source: "auto" });
+
+  try {
+    const payload = await requeteJsonMultijoueur("/api/create-room", {
+      method: "POST",
+      body: {
+        playerName: etatMultijoueur.nomJoueur
+      }
+    });
+
+    initialiserConnexionMultijoueurDepuisPayload(payload);
+
+    if (lobbyMultijoueurActif()) {
+      try {
+        await synchroniserNationLocaleLobbyDepuisAccueil({ uniquementSiAbsente: true });
+      } catch (error) {
+        definirStatutMultijoueur(`Erreur lobby: ${error.message}`, "erreur");
+        return;
+      }
+
+      definirStatutMultijoueur(
+        `Connecte (${etatMultijoueur.codeSalle}) - ${libelleControleMultijoueur()} - lobby cree`,
+        "connecte"
+      );
+      return;
+    }
+
+    definirStatutMultijoueur(`Connecte (${etatMultijoueur.codeSalle}) - ${libelleControleMultijoueur()}`, "connecte");
+  } catch (error) {
+    definirStatutMultijoueur(`Erreur creation salle: ${error.message}`, "erreur");
+  }
+}
+
+async function rejoindreSalleMultijoueur() {
+  lireFormulaireMultijoueur({ source: "auto" });
+
+  if (!etatMultijoueur.codeSalle) {
+    definirStatutMultijoueur("Code salle requis.", "erreur");
+    return;
+  }
+
+  try {
+    const payload = await requeteJsonMultijoueur("/api/join-room", {
+      method: "POST",
+      body: {
+        roomCode: etatMultijoueur.codeSalle,
+        playerName: etatMultijoueur.nomJoueur
+      }
+    });
+
+    initialiserConnexionMultijoueurDepuisPayload(payload);
+
+    if (lobbyMultijoueurActif()) {
+      try {
+        await synchroniserNationLocaleLobbyDepuisAccueil({ uniquementSiAbsente: true });
+      } catch (error) {
+        definirStatutMultijoueur(`Erreur lobby: ${error.message}`, "erreur");
+        return;
+      }
+
+      definirStatutMultijoueur(
+        `Connecte (${etatMultijoueur.codeSalle}) - ${libelleControleMultijoueur()} - lobby rejoint`,
+        "connecte"
+      );
+      return;
+    }
+
+    const applique = await recupererSnapshotSalleMultijoueur({ ignorerVerrouInteraction: true });
+    if (!applique) {
+      definirStatutMultijoueur(
+        `Connecte (${etatMultijoueur.codeSalle}) - ${libelleControleMultijoueur()}`,
+        "connecte"
+      );
+    }
+  } catch (error) {
+    definirStatutMultijoueur(`Erreur connexion: ${error.message}`, "erreur");
+  }
+}
+
+function initialiserMultijoueurEnLigne() {
+  if (etatMultijoueur.initialise) {
+    return;
+  }
+
+  etatMultijoueur.initialise = true;
+  chargerPreferencesMultijoueur();
+  initialiserPanneauAccueilMultijoueur();
+
+  const inputServeurMenu = getElement("menu-multi-serveur-url");
+  const inputNomMenu = getElement("menu-multi-nom");
+  const inputCodeMenu = getElement("menu-multi-code-salle");
+  const inputServeurAccueil = getElement("accueil-multi-serveur-url");
+  const inputNomAccueil = getElement("accueil-multi-nom");
+  const inputCodeAccueil = getElement("accueil-multi-code-salle");
+
+  const btnCreerMenu = getElement("btn-multi-creer-salle");
+  const btnRejoindreMenu = getElement("btn-multi-rejoindre-salle");
+  const btnQuitterMenu = getElement("btn-multi-quitter-salle");
+  const btnCreerAccueil = getElement("btn-accueil-multi-creer-salle");
+  const btnRejoindreAccueil = getElement("btn-accueil-multi-rejoindre-salle");
+  const btnQuitterAccueil = getElement("btn-accueil-multi-quitter-salle");
+  const btnPretAccueil = getElement("btn-accueil-multi-pret");
+  const btnDemarrerAccueil = getElement("btn-accueil-multi-demarrer");
+  const selectNationJoueur = getElement("choix-nation-joueur");
+  const selectNationBot = getElement("choix-nation-bot");
+
+  if (inputServeurMenu) {
+    inputServeurMenu.addEventListener("change", () => {
+      lireFormulaireMultijoueur({ source: "menu" });
+    });
+  }
+  if (inputNomMenu) {
+    inputNomMenu.addEventListener("change", () => {
+      lireFormulaireMultijoueur({ source: "menu" });
+    });
+  }
+  if (inputCodeMenu) {
+    inputCodeMenu.addEventListener("change", () => {
+      lireFormulaireMultijoueur({ source: "menu" });
+    });
+  }
+
+  if (inputServeurAccueil) {
+    inputServeurAccueil.addEventListener("change", () => {
+      lireFormulaireMultijoueur({ source: "accueil" });
+    });
+  }
+  if (inputNomAccueil) {
+    inputNomAccueil.addEventListener("change", () => {
+      lireFormulaireMultijoueur({ source: "accueil" });
+    });
+  }
+  if (inputCodeAccueil) {
+    inputCodeAccueil.addEventListener("change", () => {
+      lireFormulaireMultijoueur({ source: "accueil" });
+    });
+  }
+
+  [btnCreerMenu, btnCreerAccueil].filter(Boolean).forEach(bouton => {
+    bouton.addEventListener("click", () => {
+      void creerSalleMultijoueur();
+    });
+  });
+
+  [btnRejoindreMenu, btnRejoindreAccueil].filter(Boolean).forEach(bouton => {
+    bouton.addEventListener("click", () => {
+      void rejoindreSalleMultijoueur();
+    });
+  });
+
+  [btnQuitterMenu, btnQuitterAccueil].filter(Boolean).forEach(bouton => {
+    bouton.addEventListener("click", () => {
+      void quitterSalleMultijoueur();
+    });
+  });
+
+  if (btnPretAccueil) {
+    btnPretAccueil.addEventListener("click", () => {
+      void basculerPretLobbyMultijoueur();
+    });
+  }
+
+  if (btnDemarrerAccueil) {
+    btnDemarrerAccueil.addEventListener("click", () => {
+      void demarrerPartieDepuisLobbyMultijoueur();
+    });
+  }
+
+  if (selectNationJoueur) {
+    selectNationJoueur.addEventListener("change", () => {
+      configurationPartie.nationJoueur = String(selectNationJoueur.value || configurationPartie.nationJoueur);
+      if (
+        !lobbyMultijoueurActif() ||
+        etatMultijoueur.synchronisationAccueilEnCours ||
+        etatMultijoueur.role !== "host"
+      ) {
+        return;
+      }
+
+      void synchroniserNationLocaleLobbyDepuisAccueil().catch(error => {
+        definirStatutMultijoueur(`Erreur lobby: ${error.message}`, "erreur");
+      });
+    });
+  }
+
+  if (selectNationBot) {
+    selectNationBot.addEventListener("change", () => {
+      configurationPartie.nationBot = String(selectNationBot.value || configurationPartie.nationBot);
+      if (
+        !lobbyMultijoueurActif() ||
+        etatMultijoueur.synchronisationAccueilEnCours ||
+        etatMultijoueur.role !== "guest"
+      ) {
+        return;
+      }
+
+      void synchroniserNationLocaleLobbyDepuisAccueil().catch(error => {
+        definirStatutMultijoueur(`Erreur lobby: ${error.message}`, "erreur");
+      });
+    });
+  }
+
+  window.addEventListener("beforeunload", () => {
+    void quitterSalleMultijoueur({ silencieux: true });
+  });
+
+  lireFormulaireMultijoueur({ source: "auto" });
+  definirStatutMultijoueur("Hors ligne");
+  mettreAJourEtatUIBoutonsMultijoueur();
+}
+
 /* =========================================================
    49) MUSIQUE
    ========================================================= */
@@ -35392,10 +40913,12 @@ function initialiserInterfaces() {
   initialiserPanneauHistoire();
   initialiserPanneauArchiver();
   initialiserPanneauExil();
+  initialiserPanneauJournalActions();
   initialiserMusique();
   initialiserControleMusique();
   initialiserTooltipsMotsClesEffet();
   initialiserMenuEchap();
+  initialiserMultijoueurEnLigne();
   initialiserMiniTutorielInterface();
    initialiserOuverturePileEtoile();
      brancherClicHistoireBot();
@@ -35428,7 +40951,10 @@ if (btnFermerDeckJoueur) {
 }
 
 function initialiserDonneesJeu() {
+  reinitialiserEtatDuel();
   reinitialiserFeedbackCompteursJoueur();
+  jeu.journalActionsMultijoueur = [];
+  rafraichirContenuPanneauJournalActions();
   initialiserPilesCommunes();
   construirePilesNation();
   construireHautMarche();
@@ -35501,8 +41027,12 @@ function obtenirFondFinDePartie(resultat) {
 }
 
 function afficherEcranFinDePartie() {
+  campagneTraiterFinPartieSiNecessaire();
+
   const fond = obtenirFondFinDePartie(jeu.finPartie.resultat);
   const estDefaite = jeu.finPartie.resultat === "defaite";
+  const blocCampagne = campagneConstruireBlocFinPartieHTML();
+  const boutonsCampagne = campagneConstruireBoutonsFinPartieHTML();
   const titreHtml = estDefaite
     ? ""
     : `
@@ -35556,13 +41086,11 @@ function afficherEcranFinDePartie() {
           ${jeu.finPartie.raison || ""}
         </p>
 
-        <button onclick="location.reload()" style="
-          padding: 14px 28px;
-          font-size: 20px;
-          cursor: pointer;
-        ">
-          Rejouer
-        </button>
+        ${blocCampagne}
+
+        <div style="margin-top:24px; display:flex; gap:12px; flex-wrap:wrap; justify-content:center;">
+          ${boutonsCampagne}
+        </div>
       </div>
     </div>
   `;
