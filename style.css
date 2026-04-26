@@ -4529,12 +4529,19 @@ body.multijoueur-lecture-seule #btn-fin-solstice {
     "titre titre"
     "actions actions"
     "audio raccourcis"
-    "multijoueur raccourcis"
     "lexique lexique"
     "pied pied";
   gap: 12px;
   align-items: start;
   text-align: left;
+}
+
+/* Masquage temporaire visuel du multijoueur (version de presentation). */
+#btn-accueil-ouvrir-multijoueur,
+#panneau-accueil-multijoueur,
+#menu-multijoueur,
+#bloc-choix-mode-duel {
+  display: none !important;
 }
 
 .menu-echap-titre {
@@ -4837,7 +4844,6 @@ body.multijoueur-lecture-seule #btn-fin-solstice {
       "titre"
       "actions"
       "audio"
-      "multijoueur"
       "raccourcis"
       "lexique"
       "pied";

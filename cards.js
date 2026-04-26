@@ -36443,7 +36443,6 @@ function demarrerPartie() {
 function afficherUIPartie() {
   const blocCompteurs = document.getElementById("bloc-compteurs-global");
   const blocControlesTour = document.getElementById("bloc-controles-tour");
-  const boutonJournal = getElement("btn-journal-actions");
 
   if (blocCompteurs) {
     blocCompteurs.classList.remove("ui-cachee");
@@ -36453,9 +36452,7 @@ function afficherUIPartie() {
     blocControlesTour.classList.remove("ui-cachee");
   }
 
-  if (boutonJournal) {
-    boutonJournal.classList.remove("ui-cachee");
-  }
+  mettreAJourVisibiliteBoutonJournalActions();
 }
 
 function masquerUIPartie() {
@@ -39058,6 +39055,24 @@ function multijoueurLectureSeuleActive() {
   return multijoueurConnecte() && !multijoueurPeutJouerTourActif();
 }
 
+function boutonJournalActionsDoitEtreVisible() {
+  return duelEtatActif() && multijoueurConnecte();
+}
+
+function mettreAJourVisibiliteBoutonJournalActions() {
+  const boutonJournal = getElement("btn-journal-actions");
+  if (!boutonJournal) {
+    return;
+  }
+
+  const visible = boutonJournalActionsDoitEtreVisible();
+  boutonJournal.classList.toggle("ui-cachee", !visible);
+
+  if (!visible) {
+    fermerPanneauJournalActions();
+  }
+}
+
 function multijoueurPublicationLocaleAutorisee() {
   if (!multijoueurConnecte()) {
     return false;
@@ -39892,6 +39907,7 @@ function mettreAJourEtatUIBoutonsMultijoueur() {
   synchroniserChampsMultijoueurUI();
   appliquerContraintesAccueilSelonLobbyMultijoueur();
   appliquerVerrouLectureSeuleMultijoueur();
+  mettreAJourVisibiliteBoutonJournalActions();
 }
 
 async function requeteJsonMultijoueur(endpoint, { method = "GET", body = null, timeoutMs = 9000 } = {}) {
