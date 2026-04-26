@@ -2,6 +2,7 @@ const http = require("http");
 const { randomUUID } = require("crypto");
 
 const PORT = Number(process.env.MULTIPLAYER_PORT || 8787);
+const HOST = String(process.env.MULTIPLAYER_HOST || "0.0.0.0").trim() || "0.0.0.0";
 const CORS_ORIGIN = process.env.MULTIPLAYER_CORS_ORIGIN || "*";
 
 const rooms = new Map();
@@ -677,6 +678,6 @@ const server = http.createServer(async (req, res) => {
   }
 });
 
-server.listen(PORT, () => {
-  console.log(`[multiplayer] serveur en ecoute sur http://localhost:${PORT}`);
+server.listen(PORT, HOST, () => {
+  console.log(`[multiplayer] serveur en ecoute sur http://${HOST}:${PORT}`);
 });
