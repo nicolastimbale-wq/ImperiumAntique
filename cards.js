@@ -2671,26 +2671,21 @@ const cartesNations = [
     effet: "Solstice: vous POUVEZ défausser 1 carte pour Choisir: gagnez 1 Population OU gagnez 1 Matériaux OU piochez 1 carte.",
     solsticeCode: [
     {
-      type: "optionnel",
+      type: "optionnelDefausserMainPuisChoisirAvecRollback",
       message: "Défausser 1 carte pour activer le Solstice de Cité de Rome ?",
-      effetSiOui: [
-        { type: "defausserMain", quantite: 1 },
+      quantiteDefausse: 1,
+      options: [
         {
-          type: "choisir",
-          options: [
-            {
-              label: "Gagner 1 Population",
-              effets: [{ type: "gagner", ressource: "population", quantite: 1 }]
-            },
-            {
-              label: "Gagner 1 Matériaux",
-              effets: [{ type: "gagner", ressource: "materiaux", quantite: 1 }]
-            },
-            {
-              label: "Piocher 1 carte",
-              effets: [{ type: "piocher", quantite: 1 }]
-            }
-          ]
+          label: "Gagner 1 Population",
+          effets: [{ type: "gagner", ressource: "population", quantite: 1 }]
+        },
+        {
+          label: "Gagner 1 Matériaux",
+          effets: [{ type: "gagner", ressource: "materiaux", quantite: 1 }]
+        },
+        {
+          label: "Piocher 1 carte",
+          effets: [{ type: "piocher", quantite: 1 }]
         }
       ]
     }
@@ -20668,6 +20663,8 @@ const jeu = {
   terminee: false,
   raison: "",
   resultat: "",
+  duelPerdantCle: "",
+  duelVainqueurCle: "",
    decompteDeclenche: false,
   mancheDeclenchementDecompte: null,
   annonceDecompteAccusee: false
@@ -21733,38 +21730,56 @@ function getZoneConfig(zone) {
    ========================================================= */
 
 function initialiserPilesCommunes() {
+  const templatesRetiresDuMarcheCampagne =
+    modeCampagneActif() && campagneEstActive()
+      ? new Set(
+        normaliserTemplateIdsCampagne(etatCampagne?.cartesAjouteesDeckDepart)
+          .map(templateId => String(templateId || "").trim())
+          .filter(Boolean)
+      )
+      : new Set();
+
+  const cartesCommunesDisponibles = cartesCommunes.filter(carte => {
+    const templateId = String(carte?.templateId || "").trim();
+    if (!templateId) {
+      return false;
+    }
+
+    return !templatesRetiresDuMarcheCampagne.has(templateId);
+  });
+
   jeu.piles.tradition = melanger(
     clonerListeCartes(
-      cartesCommunes.filter(carte => inclutCategorie(carte, CATEGORIES.TRADITION))
+      cartesCommunesDisponibles.filter(carte => inclutCategorie(carte, CATEGORIES.TRADITION))
     )
   );
 
   jeu.piles.civilise = melanger(
     clonerListeCartes(
-      cartesCommunes.filter(carte => estCategorieExacte(carte, CATEGORIES.CIVILISE))
+      cartesCommunesDisponibles.filter(carte => estCategorieExacte(carte, CATEGORIES.CIVILISE))
     )
   );
 
   jeu.piles.region = melanger(
     clonerListeCartes(
-      cartesCommunes.filter(carte => inclutCategorie(carte, CATEGORIES.REGION))
+      cartesCommunesDisponibles.filter(carte => inclutCategorie(carte, CATEGORIES.REGION))
     )
   );
 
   jeu.piles.vassal = melanger(
     clonerListeCartes(
-      cartesCommunes.filter(carte => inclutCategorie(carte, CATEGORIES.VASSAL))
+      cartesCommunesDisponibles.filter(carte => inclutCategorie(carte, CATEGORIES.VASSAL))
     )
   );
 
   jeu.piles.renommee = melanger(
     clonerListeCartes(
-      cartesCommunes.filter(carte => inclutCategorie(carte, CATEGORIES.RENOMMEE))
+      cartesCommunesDisponibles.filter(carte => inclutCategorie(carte, CATEGORIES.RENOMMEE))
     )
   );
 
   jeu.piles.instabilite = clonerListeCartes(
-    cartesCommunes.filter(carte => inclutCategorie(carte, CATEGORIES.INSTABILITE))
+    cartesCommunesDisponibles.filter(carte => inclutCategorie(carte, CATEGORIES.INSTABILITE))
   );
 }
 
@@ -23352,6 +23367,8 @@ function terminerPartieParScoreFinal(raisonPersonnalisee = "") {
   jeu.finPartie.terminee = true;
   jeu.finPartie.resultat = "score";
   jeu.finPartie.raison = String(raisonPersonnalisee || "").trim() || "Le Décompte est terminé.";
+  jeu.finPartie.duelPerdantCle = "";
+  jeu.finPartie.duelVainqueurCle = "";
 
   tourBotEnCours = false;
 
@@ -23888,13 +23905,21 @@ function verifierEffondrement() {
         );
       }
 
-      const perdantNom = instabilitesJoueur1 > instabilitesJoueur2
-        ? nomJoueur1
-        : nomJoueur2;
+      const perdantCle = instabilitesJoueur1 > instabilitesJoueur2
+        ? "joueur1"
+        : "joueur2";
+      const vainqueurCle = perdantCle === "joueur1" ? "joueur2" : "joueur1";
+      const perdantNom = perdantCle === "joueur1" ? nomJoueur1 : nomJoueur2;
+      const clePerspectiveLocale = duelObtenirCleJoueurPerspectiveLocale();
+      const resultatLocal = clePerspectiveLocale === perdantCle ? "defaite" : "victoire";
 
       terminerPartie(
-        "defaite",
-        `Effondrement : la pile Instabilité du marché est vide. ${nomJoueur1}: ${instabilitesJoueur1} | ${nomJoueur2}: ${instabilitesJoueur2}. ${perdantNom} a le plus de cartes Instabilité et perd la partie.`
+        resultatLocal,
+        `Effondrement : la pile Instabilité du marché est vide. ${nomJoueur1}: ${instabilitesJoueur1} | ${nomJoueur2}: ${instabilitesJoueur2}. ${perdantNom} a le plus de cartes Instabilité et perd la partie.`,
+        {
+          duelPerdantCle: perdantCle,
+          duelVainqueurCle: vainqueurCle
+        }
       );
       return true;
     }
@@ -23909,7 +23934,7 @@ function verifierEffondrement() {
   return false;
 }
 
-   function terminerPartie(resultat, raison) {
+   function terminerPartie(resultat, raison, options = {}) {
   if (jeu.finPartie.terminee) {
     return true;
   }
@@ -23917,6 +23942,18 @@ function verifierEffondrement() {
   jeu.finPartie.terminee = true;
   jeu.finPartie.resultat = resultat || "";
   jeu.finPartie.raison = raison || "";
+  jeu.finPartie.duelPerdantCle =
+    options?.duelPerdantCle === "joueur2"
+      ? "joueur2"
+      : options?.duelPerdantCle === "joueur1"
+        ? "joueur1"
+        : "";
+  jeu.finPartie.duelVainqueurCle =
+    options?.duelVainqueurCle === "joueur2"
+      ? "joueur2"
+      : options?.duelVainqueurCle === "joueur1"
+        ? "joueur1"
+        : "";
 
   tourBotEnCours = false;
 
@@ -30450,6 +30487,58 @@ async optionnel(effet, contexte) {
   return succes;
 },
 
+async optionnelDefausserMainPuisChoisirAvecRollback(effet, contexte) {
+  if (typeof effet.condition === "function" && !effet.condition(contexte)) {
+    return true;
+  }
+
+  const confirmer = await confirmerActionOptionnelle(
+    effet.message || "Voulez-vous effectuer cette action ?"
+  );
+
+  if (!confirmer) {
+    return true;
+  }
+
+  const messageOptionnel = String(effet.message || "").trim();
+  if (messageOptionnel) {
+    journal(`Le joueur actif active une option: ${messageOptionnel}`);
+  } else {
+    journal("Le joueur actif active une action optionnelle.");
+  }
+
+  const quantiteDefausse = Math.max(1, Number(effet.quantiteDefausse || 1));
+  const defausseAvant = [...(jeu.joueurZones.defausseJoueur || [])];
+  const succesDefausse = await executerEffetUnique(
+    { type: "defausserMain", quantite: quantiteDefausse },
+    contexte
+  );
+
+  if (!succesDefausse) {
+    return false;
+  }
+
+  const cartesDefaussees = (jeu.joueurZones.defausseJoueur || []).slice(defausseAvant.length);
+  const succesChoix = await executerEffetUnique(
+    { type: "choisir", options: effet.options || [] },
+    contexte
+  );
+
+  if (succesChoix !== false) {
+    return true;
+  }
+
+  for (let i = cartesDefaussees.length - 1; i >= 0; i -= 1) {
+    restaurerCarteDansMainDepuisDefausse(cartesDefaussees[i]);
+  }
+
+  ouvrirPanneauUI("Action annulee : la carte defaussee revient dans votre main.", [
+    { label: "OK" }
+  ]);
+  afficherZoneJoueur();
+  return false;
+},
+
   async defausserMain(effet) {
     return await defausserCarteChoisieDepuisMain(effet.quantite || 1);
   },
@@ -33075,12 +33164,37 @@ function afficherSlotMain() {
 
   if (lectureAdversaire) {
     const nombreCartes = Array.isArray(main) ? main.length : 0;
-    zone.innerHTML = `
-      <div class="pile-verticale-cachee slot-main-adversaire-cachee">
-        <div class="dos-carte-verticale"></div>
-        <div class="compteur-pile-joueur">${nombreCartes}</div>
-      </div>
-    `;
+    zone.innerHTML = "";
+
+    if (nombreCartes === 0) {
+      return;
+    }
+
+    const espacement = Math.min(
+      150,
+      Math.max(70, (UI.LARGEUR_ZONE_MAIN - UI.LARGEUR_CARTE_MAIN) / Math.max(nombreCartes - 1, 1))
+    );
+    const largeurTotale = UI.LARGEUR_CARTE_MAIN + espacement * (nombreCartes - 1);
+    const departX = (UI.LARGEUR_ZONE_MAIN - largeurTotale) / 2;
+
+    for (let index = 0; index < nombreCartes; index += 1) {
+      const div = document.createElement("div");
+      div.className = "carte carte-main-joueur carte-main-adverse-dos";
+
+      const offsetCentre = index - (nombreCartes - 1) / 2;
+      const rotationBase = offsetCentre * 3;
+      const topBase = Math.abs(offsetCentre) * 6;
+      const leftBase = departX + index * espacement;
+
+      div.style.left = `${leftBase}px`;
+      div.style.top = `${topBase}px`;
+      div.style.zIndex = `${index + 1}`;
+      div.style.transform = `scale(${UI.SCALE_MAIN}) rotate(${rotationBase}deg)`;
+      div.style.transformOrigin = "top left";
+      div.innerHTML = `<div class="dos-carte-verticale"></div>`;
+
+      zone.appendChild(div);
+    }
     return;
   }
 
@@ -38459,6 +38573,8 @@ const INTERVALLE_PING_MULTIJOUEUR_MS = 12000;
 const DELAI_RECONNEXION_MULTIJOUEUR_MS = 2500;
 const DUREE_TOAST_ACTION_ADVERSE_MS = 4300;
 const DELAI_ENTRE_TOAST_ACTION_ADVERSE_MS = 220;
+const DUREE_ANIMATION_CARTE_ACTION_ADVERSE_MS = 2200;
+const DELAI_ENTRE_ANIMATIONS_ACTION_ADVERSE_MS = 160;
 
 function creerLobbyMultijoueurParDefaut() {
   return {
@@ -38490,6 +38606,10 @@ const etatMultijoueur = {
   idsJournalActionsTraitees: [],
   fileToastsActionsAdverses: [],
   timerToastActionAdverse: null,
+  fileAnimationsActionsAdverses: [],
+  timerAnimationActionAdverse: null,
+  animationActionAdverseEnCours: false,
+  fermerAnimationActionAdverse: null,
   synchronisationAccueilEnCours: false,
   lobby: creerLobbyMultijoueurParDefaut(),
   eventSource: null,
@@ -38505,6 +38625,297 @@ function reinitialiserFileToastsActionsAdverses() {
   }
 
   etatMultijoueur.fileToastsActionsAdverses = [];
+
+  if (etatMultijoueur.timerAnimationActionAdverse) {
+    clearTimeout(etatMultijoueur.timerAnimationActionAdverse);
+    etatMultijoueur.timerAnimationActionAdverse = null;
+  }
+
+  if (typeof etatMultijoueur.fermerAnimationActionAdverse === "function") {
+    etatMultijoueur.fermerAnimationActionAdverse({ enchainement: false });
+  } else {
+    fermerZoomActionAdverseSiOuvert();
+  }
+
+  etatMultijoueur.fileAnimationsActionsAdverses = [];
+  etatMultijoueur.animationActionAdverseEnCours = false;
+  etatMultijoueur.fermerAnimationActionAdverse = null;
+}
+
+function fermerZoomActionAdverseSiOuvert() {
+  if (String(jeu?.ui?.sourceZoomVerrouille || "") !== "action-adverse") {
+    return;
+  }
+
+  const zoomCarte = getElement("zoom-carte");
+  if (!zoomCarte) {
+    return;
+  }
+
+  zoomCarte.style.display = "none";
+  zoomCarte.innerHTML = "";
+  zoomCarte.style.zIndex = "13000";
+  zoomCarte.style.pointerEvents = "none";
+  zoomCarte.classList.remove("zoom-force-visible", "zoom-action-adverse-actif");
+
+  jeu.ui.zoomVerrouille = false;
+  jeu.ui.sourceZoomVerrouille = null;
+}
+
+function normaliserNomCartePourRecherche(texte = "") {
+  return String(texte || "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/\s+/g, " ")
+    .trim()
+    .toLowerCase();
+}
+
+function extraireNomCarteDepuisMessageActionAdverse(message = "") {
+  const texte = String(message || "").trim();
+  if (!texte || !/\bjoue\b/i.test(texte)) {
+    return "";
+  }
+
+  const match = texte.match(/\bjoue\s+(.+?)(?:\.\s*|$)/i);
+  if (!match?.[1]) {
+    return "";
+  }
+
+  return String(match[1] || "")
+    .replace(/^[\s"'“”«»]+/, "")
+    .replace(/[\s"'“”«»]+$/, "")
+    .trim();
+}
+
+function trouverCarteParNomDansListe(liste = [], nomCarteNormalise = "") {
+  if (!Array.isArray(liste) || !nomCarteNormalise) {
+    return null;
+  }
+
+  for (let index = liste.length - 1; index >= 0; index -= 1) {
+    const carte = liste[index];
+    if (!carte || typeof carte !== "object") {
+      continue;
+    }
+
+    if (normaliserNomCartePourRecherche(carte.nom) === nomCarteNormalise) {
+      return carte;
+    }
+  }
+
+  return null;
+}
+
+function trouverCarteActionAdversePourAnimation(nomCarte = "", acteurCle = "") {
+  const nomCarteNormalise = normaliserNomCartePourRecherche(nomCarte);
+  if (!nomCarteNormalise) {
+    return null;
+  }
+
+  const cleActeur = acteurCle === "joueur2" ? "joueur2" : "joueur1";
+  const etatActeur = duelObtenirEtatJoueur(cleActeur);
+  const zonesActeur = etatActeur?.zones || {};
+
+  const listesPrioritaires = [
+    zonesActeur.tableauJoueur || [],
+    zonesActeur.histoireJoueur || [],
+    zonesActeur.cartePuissanceVisible ? [zonesActeur.cartePuissanceVisible] : [],
+    zonesActeur.defausseJoueur || [],
+    zonesActeur.mainJoueur || [],
+    zonesActeur.deckJoueur || [],
+    zonesActeur.pileCroissantJoueur || [],
+    zonesActeur.pileEtoileJoueur || [],
+    zonesActeur.cartePleineVisible ? [zonesActeur.cartePleineVisible] : [],
+    zonesActeur.carteStatutVisible ? [zonesActeur.carteStatutVisible] : []
+  ];
+
+  for (const liste of listesPrioritaires) {
+    const carteTrouvee = trouverCarteParNomDansListe(liste, nomCarteNormalise);
+    if (carteTrouvee) {
+      return clonerCartePourJeu(carteTrouvee);
+    }
+  }
+
+  const nationActeur = String(etatActeur?.nation || "").trim();
+  const toutesLesCartes = [
+    ...(Array.isArray(cartesNations) ? cartesNations : []),
+    ...(Array.isArray(cartesCommunes) ? cartesCommunes : [])
+  ];
+
+  let fallback = null;
+
+  for (const template of toutesLesCartes) {
+    if (!template || typeof template !== "object") {
+      continue;
+    }
+
+    if (normaliserNomCartePourRecherche(template.nom) !== nomCarteNormalise) {
+      continue;
+    }
+
+    const nationTemplate = String(template.nation || "").trim();
+    if (nationActeur && nationTemplate === nationActeur) {
+      return clonerCartePourJeu(template);
+    }
+
+    if (!fallback) {
+      fallback = template;
+    }
+  }
+
+  return fallback ? clonerCartePourJeu(fallback) : null;
+}
+
+function construireAnimationCarteActionAdverseDepuisEntree(entree = null) {
+  const message = String(entree?.message || "").trim();
+  if (!message) {
+    return null;
+  }
+
+  const nomCarte = extraireNomCarteDepuisMessageActionAdverse(message);
+  if (!nomCarte) {
+    return null;
+  }
+
+  const acteurCle = entree?.acteurCle === "joueur2" ? "joueur2" : "joueur1";
+  const carte = trouverCarteActionAdversePourAnimation(nomCarte, acteurCle);
+  if (!carte) {
+    return null;
+  }
+
+  return {
+    message,
+    carte
+  };
+}
+
+function ouvrirAnimationCarteActionAdverse(animation = null, demanderFermeture = null) {
+  if (!animation?.carte) {
+    return false;
+  }
+
+  const zoomCarte = getElement("zoom-carte");
+  if (!zoomCarte) {
+    return false;
+  }
+
+  jeu.ui.zoomVerrouille = true;
+  jeu.ui.sourceZoomVerrouille = "action-adverse";
+  jeu.ui.timestampOuvertureZoom = Date.now();
+
+  zoomCarte.innerHTML = "";
+  zoomCarte.style.display = "block";
+  zoomCarte.style.zIndex = "130000";
+  zoomCarte.style.pointerEvents = "auto";
+  zoomCarte.classList.add("zoom-force-visible", "zoom-action-adverse-actif");
+
+  const conteneur = document.createElement("div");
+  conteneur.className = "zoom-action-adverse-conteneur";
+
+  const message = String(animation?.message || "").trim();
+  if (message) {
+    const bandeauMessage = document.createElement("div");
+    bandeauMessage.className = "zoom-action-adverse-message";
+    bandeauMessage.textContent = message;
+    conteneur.appendChild(bandeauMessage);
+  }
+
+  const carteDiv = document.createElement("div");
+  carteDiv.className = "carte zoom-carte-principale zoom-action-adverse-carte";
+  carteDiv.innerHTML = creerCarteHTML(animation.carte);
+  conteneur.appendChild(carteDiv);
+
+  if (typeof demanderFermeture === "function") {
+    conteneur.addEventListener("click", event => {
+      event.preventDefault();
+      event.stopPropagation();
+      demanderFermeture();
+    });
+  }
+
+  zoomCarte.appendChild(conteneur);
+  return true;
+}
+
+function traiterFileAnimationsActionsAdversesSiNecessaire() {
+  if (etatMultijoueur.animationActionAdverseEnCours) {
+    return;
+  }
+
+  if (
+    !Array.isArray(etatMultijoueur.fileAnimationsActionsAdverses) ||
+    etatMultijoueur.fileAnimationsActionsAdverses.length === 0
+  ) {
+    return;
+  }
+
+  const animation = etatMultijoueur.fileAnimationsActionsAdverses.shift() || null;
+  if (!animation?.carte) {
+    traiterFileAnimationsActionsAdversesSiNecessaire();
+    return;
+  }
+
+  etatMultijoueur.animationActionAdverseEnCours = true;
+
+  let terminee = false;
+  const terminerAnimation = ({ enchainement = true } = {}) => {
+    if (terminee) {
+      return;
+    }
+    terminee = true;
+
+    if (etatMultijoueur.timerAnimationActionAdverse) {
+      clearTimeout(etatMultijoueur.timerAnimationActionAdverse);
+      etatMultijoueur.timerAnimationActionAdverse = null;
+    }
+
+    etatMultijoueur.fermerAnimationActionAdverse = null;
+    etatMultijoueur.animationActionAdverseEnCours = false;
+    fermerZoomActionAdverseSiOuvert();
+
+    if (enchainement) {
+      etatMultijoueur.timerAnimationActionAdverse = setTimeout(() => {
+        etatMultijoueur.timerAnimationActionAdverse = null;
+        traiterFileAnimationsActionsAdversesSiNecessaire();
+      }, DELAI_ENTRE_ANIMATIONS_ACTION_ADVERSE_MS);
+    }
+  };
+
+  etatMultijoueur.fermerAnimationActionAdverse = terminerAnimation;
+
+  const ouverte = ouvrirAnimationCarteActionAdverse(animation, terminerAnimation);
+  if (!ouverte) {
+    terminerAnimation();
+    return;
+  }
+
+  etatMultijoueur.timerAnimationActionAdverse = setTimeout(() => {
+    terminerAnimation();
+  }, DUREE_ANIMATION_CARTE_ACTION_ADVERSE_MS);
+}
+
+function enfilerAnimationCarteActionAdverseDepuisEntree(entree = null) {
+  const animation = construireAnimationCarteActionAdverseDepuisEntree(entree);
+  if (!animation) {
+    return false;
+  }
+
+  if (!Array.isArray(etatMultijoueur.fileAnimationsActionsAdverses)) {
+    etatMultijoueur.fileAnimationsActionsAdverses = [];
+  }
+
+  etatMultijoueur.fileAnimationsActionsAdverses.push(animation);
+
+  if (etatMultijoueur.fileAnimationsActionsAdverses.length > 20) {
+    etatMultijoueur.fileAnimationsActionsAdverses.splice(
+      0,
+      etatMultijoueur.fileAnimationsActionsAdverses.length - 20
+    );
+  }
+
+  traiterFileAnimationsActionsAdversesSiNecessaire();
+  return true;
 }
 
 function traiterFileToastsActionsAdversesSiNecessaire() {
@@ -38896,7 +39307,10 @@ function afficherActionAdverseNonBloquanteSiNecessaire() {
   }
 
   nouvellesEntreesAdverses.forEach(entree => {
-    enfilerToastActionAdverse(entree?.message || "");
+    const animationEnfilee = enfilerAnimationCarteActionAdverseDepuisEntree(entree);
+    if (!animationEnfilee) {
+      enfilerToastActionAdverse(entree?.message || "");
+    }
   });
 
   marquerEntreesJournalActionsMultijoueurTraitees(nouvellesEntreesAdverses);
@@ -40995,6 +41409,31 @@ function slugNationPourFond(nomNation) {
     .toLowerCase();
 }
 
+function obtenirResultatFinPartiePerspectiveLocale() {
+  const resultatBrut = String(jeu?.finPartie?.resultat || "").trim();
+
+  if (!duelEtatActif() || (resultatBrut !== "victoire" && resultatBrut !== "defaite")) {
+    return resultatBrut;
+  }
+
+  const perdantCle = String(jeu?.finPartie?.duelPerdantCle || "");
+  const vainqueurCle = String(jeu?.finPartie?.duelVainqueurCle || "");
+  if (!perdantCle && !vainqueurCle) {
+    return resultatBrut;
+  }
+
+  const clePerspectiveLocale = duelObtenirCleJoueurPerspectiveLocale();
+  if (clePerspectiveLocale === perdantCle) {
+    return "defaite";
+  }
+
+  if (clePerspectiveLocale === vainqueurCle) {
+    return "victoire";
+  }
+
+  return resultatBrut;
+}
+
 function obtenirFondFinDePartie(resultat) {
   const nation = slugNationPourFond(configurationPartie?.nationJoueur);
   const nationsAvecFondDefaite = new Set([
@@ -41007,7 +41446,16 @@ function obtenirFondFinDePartie(resultat) {
     "scythes",
     "vikings"
   ]);
-  const nationsAvecFondVictoire = new Set(["celtes", "romains"]);
+  const nationsAvecFondVictoire = new Set([
+    "carthaginois",
+    "celtes",
+    "grecs",
+    "macedoniens",
+    "perses",
+    "romains",
+    "scythes",
+    "vikings"
+  ]);
 
   if (resultat === "defaite") {
     if (nationsAvecFondDefaite.has(nation)) {
@@ -41029,8 +41477,9 @@ function obtenirFondFinDePartie(resultat) {
 function afficherEcranFinDePartie() {
   campagneTraiterFinPartieSiNecessaire();
 
-  const fond = obtenirFondFinDePartie(jeu.finPartie.resultat);
-  const estDefaite = jeu.finPartie.resultat === "defaite";
+  const resultatAffiche = obtenirResultatFinPartiePerspectiveLocale();
+  const fond = obtenirFondFinDePartie(resultatAffiche);
+  const estDefaite = resultatAffiche === "defaite";
   const blocCampagne = campagneConstruireBlocFinPartieHTML();
   const boutonsCampagne = campagneConstruireBoutonsFinPartieHTML();
   const titreHtml = estDefaite
