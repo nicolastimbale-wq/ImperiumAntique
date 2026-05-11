@@ -20655,7 +20655,8 @@ const jeu = {
     numero: 1,
     tailleMain: 5,
      modificateursTour: {
-      agricultureActive: false
+      agricultureActive: false,
+      cartesActionGratuiteJoueesCeTour: []
     }
   },
 
@@ -22103,6 +22104,103 @@ function estActionGratuite(carte) {
   return effet.startsWith("action gratuite");
 }
 
+let sequenceInstanceCarte = 0;
+
+function obtenirInstanceUidCarte(carte) {
+  if (!carte || typeof carte !== "object") {
+    return "";
+  }
+
+  const uidExistant = String(carte.instanceUid || "").trim();
+  if (uidExistant) {
+    return uidExistant;
+  }
+
+  sequenceInstanceCarte += 1;
+  const base = String(carte.templateId || carte.nom || "carte")
+    .trim()
+    .replace(/\s+/g, "-")
+    .toLowerCase();
+
+  const uid =
+    `${base}-${Date.now().toString(36)}-` +
+    `${sequenceInstanceCarte.toString(36)}-${Math.floor(Math.random() * 1e6).toString(36)}`;
+
+  carte.instanceUid = uid;
+  return uid;
+}
+
+function obtenirCartesActionGratuiteJoueesCeTour() {
+  if (!jeu.manche || typeof jeu.manche !== "object") {
+    jeu.manche = {};
+  }
+
+  if (!jeu.manche.modificateursTour || typeof jeu.manche.modificateursTour !== "object") {
+    jeu.manche.modificateursTour = {};
+  }
+
+  const idsBruts = jeu.manche.modificateursTour.cartesActionGratuiteJoueesCeTour;
+  if (!Array.isArray(idsBruts)) {
+    jeu.manche.modificateursTour.cartesActionGratuiteJoueesCeTour = [];
+  } else {
+    jeu.manche.modificateursTour.cartesActionGratuiteJoueesCeTour = idsBruts
+      .map(id => String(id || "").trim())
+      .filter(Boolean);
+  }
+
+  return jeu.manche.modificateursTour.cartesActionGratuiteJoueesCeTour;
+}
+
+function carteActionGratuiteDejaJoueeCeTour(carte) {
+  if (!estActionGratuite(carte)) {
+    return false;
+  }
+
+  const uid = obtenirInstanceUidCarte(carte);
+  if (!uid) {
+    return false;
+  }
+
+  return obtenirCartesActionGratuiteJoueesCeTour().includes(uid);
+}
+
+function bloquerRejeuCarteActionGratuiteCeTourSiNecessaire(carte) {
+  if (!carteActionGratuiteDejaJoueeCeTour(carte)) {
+    return false;
+  }
+
+  avertir("Cette carte Action gratuite a deja ete jouee ce tour.");
+  return true;
+}
+
+function marquerCarteActionGratuiteJoueeCeTour(carte) {
+  if (!estActionGratuite(carte)) {
+    return;
+  }
+
+  const uid = obtenirInstanceUidCarte(carte);
+  if (!uid) {
+    return;
+  }
+
+  const ids = obtenirCartesActionGratuiteJoueesCeTour();
+  if (!ids.includes(uid)) {
+    ids.push(uid);
+  }
+}
+
+function reinitialiserCartesActionGratuiteJoueesCeTour() {
+  if (!jeu.manche || typeof jeu.manche !== "object") {
+    jeu.manche = {};
+  }
+
+  if (!jeu.manche.modificateursTour || typeof jeu.manche.modificateursTour !== "object") {
+    jeu.manche.modificateursTour = {};
+  }
+
+  jeu.manche.modificateursTour.cartesActionGratuiteJoueesCeTour = [];
+}
+
 function categoriePrincipaleCarte(carte) {
   if (!carte?.categorie) {
     return "";
@@ -23001,23 +23099,8 @@ function campagneNettoyerTexteEffetCarte(texte = "") {
     .trim();
 }
 
-function campagneCartesEligiblesZonesRecompense() {
+function campagneCartesPossedeesParJoueur() {
   const cartes = [
-    ...(jeu?.joueurZones?.mainJoueur || []),
-    ...(jeu?.joueurZones?.deckJoueur || []),
-    ...(jeu?.joueurZones?.defausseJoueur || []),
-    ...(jeu?.joueurZones?.histoireJoueur || [])
-  ];
-
-  return aplatirCartesAvecReservees(cartes);
-}
-
-function campagneMarquerCartesInitialesPartie() {
-  if (!modeCampagneActif() || !campagneEstActive()) {
-    return;
-  }
-
-  const cartesDepart = [
     ...(jeu?.joueurZones?.mainJoueur || []),
     ...(jeu?.joueurZones?.deckJoueur || []),
     ...(jeu?.joueurZones?.defausseJoueur || []),
@@ -23030,7 +23113,19 @@ function campagneMarquerCartesInitialesPartie() {
     ...(jeu?.joueurZones?.cartePleineVisible ? [jeu.joueurZones.cartePleineVisible] : [])
   ];
 
-  aplatirCartesAvecReservees(cartesDepart).forEach(carte => {
+  return aplatirCartesAvecReservees(cartes);
+}
+
+function campagneCartesEligiblesZonesRecompense() {
+  return campagneCartesPossedeesParJoueur();
+}
+
+function campagneMarquerCartesInitialesPartie() {
+  if (!modeCampagneActif() || !campagneEstActive()) {
+    return;
+  }
+
+  campagneCartesPossedeesParJoueur().forEach(carte => {
     if (!carte || typeof carte !== "object") {
       return;
     }
@@ -23048,7 +23143,7 @@ function campagneCarteCommuneEligibileAjout(carte) {
     return false;
   }
 
-  if (inclutCategorie(carte, CATEGORIES.INSTABILITE) || inclutCategorie(carte, CATEGORIES.RENOMMEE)) {
+  if (inclutCategorie(carte, CATEGORIES.RENOMMEE)) {
     return false;
   }
 
@@ -24015,11 +24110,12 @@ function reinitialiserEpuisementJoueur() {
 
 function reinitialiserModificateursTour() {
   if (!jeu.manche.modificateursTour) {
-    return;
+    jeu.manche.modificateursTour = {};
   }
 
   jeu.manche.modificateursTour.agricultureActive = false;
   jeu.manche.modificateursTour.doubleMateriauxCarthaginoisActif = false;
+  jeu.manche.modificateursTour.cartesActionGratuiteJoueesCeTour = [];
 }
 /* =========================================================
    13) STATUT JOUEUR / TRANSITION NATION
@@ -26926,6 +27022,10 @@ function cartePeutEtreJouee(carte, options = {}) {
     return false;
   }
 
+  if (bloquerRejeuCarteActionGratuiteCeTourSiNecessaire(carte)) {
+    return false;
+  }
+
   const statutVisible = jeu.joueurZones.carteStatutVisible;
 
   const carteCompteCommeBarbare =
@@ -29035,6 +29135,12 @@ autresJoueursGagnentPopulation(effet) {
 
   const carte = defausse.splice(indexCarte, 1)[0];
 
+  if (bloquerRejeuCarteActionGratuiteCeTourSiNecessaire(carte)) {
+    defausse.splice(indexCarte, 0, carte);
+    annulerActivationPhalange();
+    return false;
+  }
+
   const contexteEffetsRegion = {
     carteSource: carte,
     statutAuDebutCarte: jeu.joueurZones.carteStatutVisible?.nom || null
@@ -29050,6 +29156,8 @@ autresJoueursGagnentPopulation(effet) {
     annulerActivationPhalange();
     return false;
   }
+
+  marquerCarteActionGratuiteJoueeCeTour(carte);
 
   verrouillerOptionsSpecialesDebutTour();
   declencherCotteDeMaillesSiPossible(carte);
@@ -30737,6 +30845,8 @@ async function jouerCarteDepuisMain(indexCarte, options = {}) {
     return false;
   }
 
+  marquerCarteActionGratuiteJoueeCeTour(carte);
+
     if (peignesActif()) {
     jeu.manche.modificateursTour.peignesActif = false;
   }
@@ -30789,6 +30899,7 @@ await proposerCavalerieDesCompagnonsSiPossible(carte);
 
 
    function preparerDebutTourJoueur() {
+  reinitialiserCartesActionGratuiteJoueesCeTour();
   activerOptionsSpecialesDebutTour();
   mettreAJourBoutonsOptionsDebutTour();
 }
@@ -35583,6 +35694,20 @@ function campagneEstActive() {
   return !!(etatCampagne.active && !etatCampagne.terminee && etatCampagne.nationJoueur);
 }
 
+function campagnePeutEtreAbandonnee() {
+  if (campagneEstActive()) {
+    return true;
+  }
+
+  return (
+    !!etatCampagne.terminee ||
+    Number(etatCampagne.victoires || 0) > 0 ||
+    Number(etatCampagne.defaites || 0) > 0 ||
+    (Array.isArray(etatCampagne.nationsBattues) && etatCampagne.nationsBattues.length > 0) ||
+    !!String(etatCampagne.nationJoueur || "").trim()
+  );
+}
+
 function campagneDifficulteCourante() {
   const index = Math.max(
     0,
@@ -35618,21 +35743,73 @@ function campagneEtatLisible() {
 
 function mettreAJourResumeCampagneAccueil() {
   const resume = getElement("resume-campagne-accueil");
-  if (!resume) {
+  if (resume) {
+    resume.textContent = campagneEtatLisible();
+    resume.classList.remove("est-terminee-victoire", "est-terminee-defaite");
+
+    if (etatCampagne.terminee && etatCampagne.resultatFinal === "victoire") {
+      resume.classList.add("est-terminee-victoire");
+    } else if (etatCampagne.terminee && etatCampagne.resultatFinal === "defaite") {
+      resume.classList.add("est-terminee-defaite");
+    }
+  }
+
+  mettreAJourBoutonAbandonCampagneAccueil();
+}
+
+function mettreAJourBoutonAbandonCampagneAccueil() {
+  const bouton = getElement("btn-abandonner-campagne-accueil");
+  if (!bouton) {
     return;
   }
 
-  resume.textContent = campagneEtatLisible();
-  resume.classList.remove("est-terminee-victoire", "est-terminee-defaite");
+  const visible = campagnePeutEtreAbandonnee();
+  bouton.classList.toggle("ui-cachee", !visible);
+  bouton.disabled = !visible;
+  bouton.classList.toggle("bouton-inactif", !visible);
+}
 
-  if (etatCampagne.terminee && etatCampagne.resultatFinal === "victoire") {
-    resume.classList.add("est-terminee-victoire");
-  } else if (etatCampagne.terminee && etatCampagne.resultatFinal === "defaite") {
-    resume.classList.add("est-terminee-defaite");
+function abandonnerCampagneDepuisAccueil() {
+  if (!campagnePeutEtreAbandonnee()) {
+    avertir("Aucune campagne en cours a reinitialiser.");
+    return;
   }
+
+  ouvrirPanneauUI(
+    "Abandonner / reinitialiser la campagne ? Toute la progression sera perdue.",
+    [
+      { label: "Annuler" },
+      {
+        label: "Abandonner",
+        callback: () => {
+          etatCampagne = construireEtatCampagneParDefaut();
+          sauvegarderEtatCampagneDansStockage();
+
+          const optionModeCampagne = getElement("option-mode-campagne");
+          if (optionModeCampagne) {
+            optionModeCampagne.checked = false;
+            if (typeof optionModeCampagne.onchange === "function") {
+              optionModeCampagne.onchange();
+            }
+          } else {
+            configurationPartie.modeJeu = MODES_JEU.SOLO;
+            mettreAJourLibellesModeJeu();
+            mettreAJourResumeCampagneAccueil();
+          }
+
+          avertir("Campagne abandonnee.");
+        }
+      }
+    ],
+    { forcerModal: true }
+  );
 }
 
 function campagneNationDejaBattue(nation = "") {
+  if (!campagneEstActive()) {
+    return false;
+  }
+
   const cible = String(nation || "").trim();
   if (!cible) {
     return false;
@@ -36072,6 +36249,7 @@ function initialiserChoixNations() {
   const optionMiniTutoriel = document.getElementById("option-mini-tutoriel");
   const optionModeDuel = document.getElementById("option-mode-duel");
   const optionModeCampagne = document.getElementById("option-mode-campagne");
+  const btnAbandonnerCampagne = document.getElementById("btn-abandonner-campagne-accueil");
   const NATION_TUTORIEL_JOUEUR = "Romains";
   const NATION_TUTORIEL_BOT = "Celtes";
 
@@ -36193,14 +36371,14 @@ function initialiserChoixNations() {
           selectJoueur.value = etatCampagne.nationJoueur;
         }
         selectJoueur.disabled = true;
+        appliquerRestrictionsNationsAdversesCampagne(
+          selectBot,
+          selectJoueur.value
+        );
       } else {
         selectJoueur.disabled = false;
+        restaurerOptionsNationsAdverses(selectBot);
       }
-
-      appliquerRestrictionsNationsAdversesCampagne(
-        selectBot,
-        selectJoueur.value
-      );
       selectBot.disabled = false;
 
       const difficulteCampagne = campagneEstActive()
@@ -36283,6 +36461,12 @@ function initialiserChoixNations() {
         ? MODES_JEU.CAMPAGNE
         : MODES_JEU.SOLO;
       appliquerContraintesAccueil();
+    };
+  }
+
+  if (btnAbandonnerCampagne) {
+    btnAbandonnerCampagne.onclick = () => {
+      abandonnerCampagneDepuisAccueil();
     };
   }
 
