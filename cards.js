@@ -39940,6 +39940,405 @@ function calculerEmpreinteTexte(texte = "") {
   return hash.toString(16);
 }
 
+function multijoueurUtiliseFirebase() {
+  const url = normaliserUrlServeurMultijoueur(etatMultijoueur.serveurUrl);
+  try {
+    const parsed = new URL(url);
+    return /(?:firebaseio\.com|firebasedatabase\.app)$/i.test(parsed.hostname);
+  } catch (error) {
+    return /(?:firebaseio\.com|firebasedatabase\.app)/i.test(url);
+  }
+}
+
+function creerIdFirebaseMultijoueur() {
+  if (globalThis.crypto?.randomUUID) {
+    return globalThis.crypto.randomUUID();
+  }
+  return `p-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
+}
+
+function horodatageMultijoueurIso() {
+  return new Date().toISOString();
+}
+
+function genererCodeSalleFirebaseMultijoueur() {
+  const caracteres = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+  let code = "";
+  for (let index = 0; index < 6; index += 1) {
+    code += caracteres[Math.floor(Math.random() * caracteres.length)];
+  }
+  return code;
+}
+
+function normaliserNomJoueurMultijoueur(nom = "") {
+  return String(nom || "").trim().slice(0, 24) || "Joueur";
+}
+
+function normaliserNationLobbyMultijoueur(nation = "") {
+  return String(nation || "").trim().slice(0, 40);
+}
+
+function urlFirebaseMultijoueur(chemin = "") {
+  const base = normaliserUrlServeurMultijoueur(etatMultijoueur.serveurUrl);
+  const morceaux = String(chemin || "")
+    .split("/")
+    .map(morceau => encodeURIComponent(morceau))
+    .filter(Boolean);
+  return `${base}/${morceaux.join("/")}.json`;
+}
+
+async function requeteFirebaseMultijoueur(chemin, { method = "GET", body = undefined, timeoutMs = 9000 } = {}) {
+  const controleur = new AbortController();
+  const timer = setTimeout(() => controleur.abort(), timeoutMs);
+
+  try {
+    const reponse = await fetch(urlFirebaseMultijoueur(chemin), {
+      method,
+      headers: body === undefined ? undefined : { "Content-Type": "application/json" },
+      body: body === undefined ? undefined : JSON.stringify(body),
+      signal: controleur.signal
+    });
+
+    let payload = null;
+    try {
+      payload = await reponse.json();
+    } catch (error) {}
+
+    if (!reponse.ok) {
+      const details = String(payload?.error || payload?.message || "").trim();
+      throw new Error(details || `Erreur Firebase (${reponse.status}).`);
+    }
+
+    return payload;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+function objetValeursMultijoueur(objet = null) {
+  if (!objet || typeof objet !== "object") {
+    return [];
+  }
+  return Object.values(objet).filter(valeur => valeur && typeof valeur === "object");
+}
+
+function joueursPublicsSalleFirebase(room = null) {
+  return objetValeursMultijoueur(room?.players).map(player => ({
+    id: String(player.id || ""),
+    role: player.role === "guest" ? "guest" : "host",
+    name: normaliserNomJoueurMultijoueur(player.name),
+    joinedAt: String(player.joinedAt || "")
+  })).filter(player => player.id);
+}
+
+function participantsSalleFirebase(room = null) {
+  const players = joueursPublicsSalleFirebase(room);
+  return {
+    host: players.find(player => player.role === "host") || null,
+    guest: players.find(player => player.role === "guest") || null
+  };
+}
+
+function etatLobbyJoueurFirebase(room = null, playerId = "") {
+  const id = String(playerId || "");
+  const lobbyPlayers = room?.lobby?.players;
+  if (!id || !lobbyPlayers || typeof lobbyPlayers !== "object") {
+    return { nation: "", ready: false };
+  }
+  const state = lobbyPlayers[id] || {};
+  return {
+    nation: normaliserNationLobbyMultijoueur(state.nation),
+    ready: !!state.ready
+  };
+}
+
+function lobbyPublicSalleFirebase(room = null) {
+  const participants = participantsSalleFirebase(room);
+  const phase = room?.lobby?.phase === "in_game" ? "in_game" : "lobby";
+  const hostState = participants.host ? etatLobbyJoueurFirebase(room, participants.host.id) : null;
+  const guestState = participants.guest ? etatLobbyJoueurFirebase(room, participants.guest.id) : null;
+  const canStart =
+    phase === "lobby" &&
+    !!participants.host &&
+    !!participants.guest &&
+    !!hostState?.ready &&
+    !!guestState?.ready &&
+    String(hostState?.nation || "").trim().length > 0 &&
+    String(guestState?.nation || "").trim().length > 0;
+
+  return {
+    phase,
+    startedAt: String(room?.lobby?.startedAt || ""),
+    host: participants.host ? { ...participants.host, ...hostState } : null,
+    guest: participants.guest ? { ...participants.guest, ...guestState } : null,
+    canStart
+  };
+}
+
+function construirePayloadSalleFirebase(room = null, { roomCode = "", playerId = "", role = "" } = {}) {
+  return {
+    roomCode: normaliserCodeSalleMultijoueur(room?.code || roomCode),
+    playerId: String(playerId || ""),
+    role: String(role || ""),
+    version: Number(room?.version || 0),
+    updatedAt: String(room?.updatedAt || ""),
+    snapshot: room?.snapshot || null,
+    hasSnapshot: !!room?.snapshot,
+    players: joueursPublicsSalleFirebase(room),
+    lobby: lobbyPublicSalleFirebase(room)
+  };
+}
+
+async function trouverCodeSalleDisponibleFirebaseMultijoueur() {
+  for (let tentative = 0; tentative < 32; tentative += 1) {
+    const code = genererCodeSalleFirebaseMultijoueur();
+    const existante = await requeteFirebaseMultijoueur(`rooms/${code}`, { timeoutMs: 9000 });
+    if (!existante) {
+      return code;
+    }
+  }
+  return creerIdFirebaseMultijoueur().replace(/-/g, "").slice(0, 8).toUpperCase();
+}
+
+async function creerSalleFirebaseMultijoueur(body = {}) {
+  const roomCode = await trouverCodeSalleDisponibleFirebaseMultijoueur();
+  const playerId = creerIdFirebaseMultijoueur();
+  const maintenant = horodatageMultijoueurIso();
+  const room = {
+    code: roomCode,
+    hostId: playerId,
+    version: 0,
+    snapshot: null,
+    lobby: {
+      phase: "lobby",
+      startedAt: "",
+      players: {
+        [playerId]: {
+          nation: "",
+          ready: false
+        }
+      }
+    },
+    players: {
+      [playerId]: {
+        id: playerId,
+        role: "host",
+        name: normaliserNomJoueurMultijoueur(body.playerName),
+        joinedAt: maintenant,
+        lastSeenAt: maintenant
+      }
+    },
+    createdAt: maintenant,
+    updatedAt: maintenant
+  };
+
+  await requeteFirebaseMultijoueur(`rooms/${roomCode}`, {
+    method: "PUT",
+    body: room,
+    timeoutMs: 12000
+  });
+
+  return construirePayloadSalleFirebase(room, { roomCode, playerId, role: "host" });
+}
+
+async function rejoindreSalleFirebaseMultijoueur(body = {}) {
+  const roomCode = normaliserCodeSalleMultijoueur(body.roomCode);
+  if (!roomCode) {
+    throw new Error("Code salle requis.");
+  }
+
+  const room = await requeteFirebaseMultijoueur(`rooms/${roomCode}`, { timeoutMs: 9000 });
+  if (!room) {
+    throw new Error("Salle introuvable.");
+  }
+
+  const participants = participantsSalleFirebase(room);
+  if (participants.guest) {
+    throw new Error("Salle complete.");
+  }
+
+  if (room?.lobby?.phase === "in_game") {
+    throw new Error("La partie est deja demarree.");
+  }
+
+  const playerId = creerIdFirebaseMultijoueur();
+  const maintenant = horodatageMultijoueurIso();
+  const version = Number(room.version || 0) + 1;
+  const patch = {
+    version,
+    updatedAt: maintenant,
+    [`players/${playerId}`]: {
+      id: playerId,
+      role: "guest",
+      name: normaliserNomJoueurMultijoueur(body.playerName),
+      joinedAt: maintenant,
+      lastSeenAt: maintenant
+    },
+    [`lobby/players/${playerId}`]: {
+      nation: "",
+      ready: false
+    }
+  };
+
+  await requeteFirebaseMultijoueur(`rooms/${roomCode}`, {
+    method: "PATCH",
+    body: patch,
+    timeoutMs: 12000
+  });
+
+  const roomMaj = {
+    ...room,
+    version,
+    updatedAt: maintenant,
+    players: {
+      ...(room.players || {}),
+      [playerId]: patch[`players/${playerId}`]
+    },
+    lobby: {
+      ...(room.lobby || {}),
+      players: {
+        ...(room.lobby?.players || {}),
+        [playerId]: patch[`lobby/players/${playerId}`]
+      }
+    }
+  };
+
+  return construirePayloadSalleFirebase(roomMaj, { roomCode, playerId, role: "guest" });
+}
+
+async function requeteMultijoueurFirebase(endpoint, { method = "GET", body = null, timeoutMs = 9000 } = {}) {
+  const chemin = String(endpoint || "");
+
+  if (method === "POST" && chemin === "/api/create-room") {
+    return await creerSalleFirebaseMultijoueur(body || {});
+  }
+
+  if (method === "POST" && chemin === "/api/join-room") {
+    return await rejoindreSalleFirebaseMultijoueur(body || {});
+  }
+
+  const match = chemin.match(/^\/api\/rooms\/([^/]+)\/(state|lobby|start|ping|leave)$/);
+  if (!match) {
+    throw new Error("Route multijoueur Firebase inconnue.");
+  }
+
+  const roomCode = normaliserCodeSalleMultijoueur(decodeURIComponent(match[1]));
+  const action = match[2];
+  const room = await requeteFirebaseMultijoueur(`rooms/${roomCode}`, { timeoutMs });
+  if (!room) {
+    throw new Error("Salle introuvable.");
+  }
+
+  if (action === "state" && method === "GET") {
+    return construirePayloadSalleFirebase(room, { roomCode });
+  }
+
+  if (action === "lobby" && method === "GET") {
+    return construirePayloadSalleFirebase(room, { roomCode });
+  }
+
+  const playerId = String(body?.playerId || "");
+  if (!playerId || !room.players?.[playerId]) {
+    throw new Error("Joueur inconnu dans cette salle.");
+  }
+
+  const maintenant = horodatageMultijoueurIso();
+
+  if (action === "ping" && method === "POST") {
+    await requeteFirebaseMultijoueur(`rooms/${roomCode}/players/${playerId}`, {
+      method: "PATCH",
+      body: { lastSeenAt: maintenant },
+      timeoutMs
+    });
+    return { ok: true, roomCode, version: Number(room.version || 0) };
+  }
+
+  if (action === "leave" && method === "POST") {
+    const version = Number(room.version || 0) + 1;
+    const patch = {
+      version,
+      updatedAt: maintenant,
+      [`players/${playerId}`]: null,
+      [`lobby/players/${playerId}`]: null
+    };
+    await requeteFirebaseMultijoueur(`rooms/${roomCode}`, {
+      method: "PATCH",
+      body: patch,
+      timeoutMs
+    });
+    return { ok: true, roomCode, version };
+  }
+
+  if (action === "lobby" && method === "POST") {
+    if (room?.lobby?.phase === "in_game") {
+      throw new Error("La partie est deja demarree.");
+    }
+    const version = Number(room.version || 0) + 1;
+    const patch = {
+      version,
+      updatedAt: maintenant,
+      [`players/${playerId}/lastSeenAt`]: maintenant
+    };
+    if (typeof body?.nation === "string") {
+      patch[`lobby/players/${playerId}/nation`] = normaliserNationLobbyMultijoueur(body.nation);
+    }
+    if (typeof body?.ready === "boolean") {
+      patch[`lobby/players/${playerId}/ready`] = !!body.ready;
+    }
+    await requeteFirebaseMultijoueur(`rooms/${roomCode}`, {
+      method: "PATCH",
+      body: patch,
+      timeoutMs
+    });
+
+    const roomMaj = await requeteFirebaseMultijoueur(`rooms/${roomCode}`, { timeoutMs });
+    return construirePayloadSalleFirebase(roomMaj, { roomCode, playerId, role: room.players[playerId].role });
+  }
+
+  if (action === "start" && method === "POST") {
+    if (room.players[playerId]?.role !== "host") {
+      throw new Error("Seul l'hote peut demarrer la partie.");
+    }
+    const lobby = lobbyPublicSalleFirebase(room);
+    if (!lobby.canStart) {
+      throw new Error("Les deux joueurs doivent etre prets avec une nation choisie.");
+    }
+    const version = Number(room.version || 0) + 1;
+    await requeteFirebaseMultijoueur(`rooms/${roomCode}`, {
+      method: "PATCH",
+      body: {
+        version,
+        updatedAt: maintenant,
+        "lobby/phase": "in_game",
+        "lobby/startedAt": maintenant,
+        [`players/${playerId}/lastSeenAt`]: maintenant
+      },
+      timeoutMs
+    });
+
+    const roomMaj = await requeteFirebaseMultijoueur(`rooms/${roomCode}`, { timeoutMs });
+    return construirePayloadSalleFirebase(roomMaj, { roomCode, playerId, role: "host" });
+  }
+
+  if (action === "state" && method === "POST") {
+    const version = Number(room.version || 0) + 1;
+    await requeteFirebaseMultijoueur(`rooms/${roomCode}`, {
+      method: "PATCH",
+      body: {
+        version,
+        updatedAt: maintenant,
+        snapshot: body?.snapshot || null,
+        "lobby/phase": "in_game",
+        [`players/${playerId}/lastSeenAt`]: maintenant
+      },
+      timeoutMs
+    });
+    return { ok: true, roomCode, version, updatedAt: maintenant };
+  }
+
+  throw new Error("Action multijoueur Firebase inconnue.");
+}
+
 function chargerPreferencesMultijoueur() {
   try {
     const brut = localStorage.getItem(CLE_PREFERENCES_MULTIJOUEUR);
@@ -40095,6 +40494,10 @@ function mettreAJourEtatUIBoutonsMultijoueur() {
 }
 
 async function requeteJsonMultijoueur(endpoint, { method = "GET", body = null, timeoutMs = 9000 } = {}) {
+  if (multijoueurUtiliseFirebase()) {
+    return await requeteMultijoueurFirebase(endpoint, { method, body, timeoutMs });
+  }
+
   const baseUrl = normaliserUrlServeurMultijoueur(etatMultijoueur.serveurUrl);
   const url = `${baseUrl}${endpoint}`;
 
@@ -40655,9 +41058,17 @@ function ouvrirCanalEvenementsMultijoueur() {
   if (
     !etatMultijoueur.connecte ||
     !etatMultijoueur.codeSalle ||
-    !etatMultijoueur.playerId ||
-    typeof EventSource === "undefined"
+    !etatMultijoueur.playerId
   ) {
+    return;
+  }
+
+  if (multijoueurUtiliseFirebase()) {
+    ouvrirCanalEvenementsFirebaseMultijoueur();
+    return;
+  }
+
+  if (typeof EventSource === "undefined") {
     return;
   }
 
@@ -40756,6 +41167,75 @@ function ouvrirCanalEvenementsMultijoueur() {
     }
     definirStatutMultijoueur("Connexion temps reel interrompue. Reconnexion...", "erreur");
     planifierReconnexionEvenementsMultijoueur();
+  };
+}
+
+function ouvrirCanalEvenementsFirebaseMultijoueur() {
+  if (typeof EventSource === "undefined") {
+    return;
+  }
+
+  fermerCanalEvenementsMultijoueur();
+
+  const source = new EventSource(urlFirebaseMultijoueur(`rooms/${etatMultijoueur.codeSalle}`));
+  etatMultijoueur.eventSource = source;
+
+  const traiterEvenementFirebase = () => {
+    if (!etatMultijoueur.connecte || !etatMultijoueur.codeSalle) {
+      return;
+    }
+
+    void requeteFirebaseMultijoueur(`rooms/${etatMultijoueur.codeSalle}`, { timeoutMs: 9000 })
+      .then(room => {
+        if (!room || !etatMultijoueur.connecte) {
+          return;
+        }
+
+        const payload = construirePayloadSalleFirebase(room, {
+          roomCode: etatMultijoueur.codeSalle,
+          playerId: etatMultijoueur.playerId,
+          role: etatMultijoueur.role
+        });
+
+        synchroniserRoleMultijoueurDepuisListeJoueurs(payload.players);
+        etatMultijoueur.versionServeur = Number(payload.version || etatMultijoueur.versionServeur || 0);
+        appliquerEtatLobbyMultijoueur(payload.lobby, { version: payload.version });
+        mettreAJourEtatUIBoutonsMultijoueur();
+
+        const phaseLobby = String(payload.lobby?.phase || "");
+        const detailsRole = ` - ${libelleControleMultijoueur()}`;
+
+        if (phaseLobby === "in_game") {
+          definirStatutMultijoueur(
+            `Connecte (${etatMultijoueur.codeSalle})${detailsRole} - sync v${etatMultijoueur.versionServeur}`,
+            "connecte"
+          );
+          if (payload.snapshot) {
+            void appliquerSnapshotDistantMultijoueur(payload.snapshot, payload.version);
+          }
+          return;
+        }
+
+        const nbJoueurs = Array.isArray(payload.players) ? payload.players.length : null;
+        const detailsJoueurs = Number.isFinite(nbJoueurs) ? ` - ${nbJoueurs} joueur(s)` : "";
+        definirStatutMultijoueur(
+          `Connecte (${etatMultijoueur.codeSalle})${detailsRole}${detailsJoueurs} - lobby`,
+          "connecte"
+        );
+      })
+      .catch(error => {
+        definirStatutMultijoueur(`Erreur Firebase: ${error.message}`, "erreur");
+      });
+  };
+
+  source.addEventListener("put", traiterEvenementFirebase);
+  source.addEventListener("patch", traiterEvenementFirebase);
+  source.onmessage = traiterEvenementFirebase;
+  source.onerror = () => {
+    if (!etatMultijoueur.connecte) {
+      return;
+    }
+    definirStatutMultijoueur("Connexion Firebase interrompue. Reconnexion...", "erreur");
   };
 }
 
